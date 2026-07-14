@@ -6,14 +6,6 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-- **`crucible.report`** (behind the `[report]` extra) — `tearsheet()` writes a
-  self-contained HTML page (verdict banner, metric scorecard, R-multiple
-  distribution, cumulative R, MFE/MAE excursion, bootstrap expectancy), and
-  `cumulative_r()`. Capital-free — charts summed R, never an equity curve.
-- `examples/tearsheet.py`. CI now installs the `report` extra so the tearsheet
-  tests run.
-
 ## [0.1.0] — 2026-07-14
 
 Initial release — the capital-free trading-edge evaluation core.
@@ -35,9 +27,13 @@ Initial release — the capital-free trading-edge evaluation core.
     Walk-Forward Efficiency, stitching OOS slices into one `TradeLog`.
   - `permutation` — `sign_permutation_pvalue`, `sidak_correction`, and
     `whites_reality_check` (max-statistic across every variant searched).
+- **`crucible.report`** (behind the `[report]` extra) — `tearsheet()` writes a
+  self-contained HTML page (verdict banner, metric scorecard, R-multiple
+  distribution, cumulative R, MFE/MAE excursion, bootstrap expectancy), and
+  `cumulative_r()`. Capital-free — charts summed R, never an equity curve.
 - **`crucible.strategies`** — `ma_cross`, `macd_cross` example signals.
-- Examples: `quickstart.py`, `validation.py` (synthetic, no network), and
-  `real_data_yfinance.py` (real prices via the `[examples]` extra).
+- Examples: `quickstart.py`, `validation.py`, `tearsheet.py` (synthetic, no
+  network), and `real_data_yfinance.py` (real prices via the `[examples]` extra).
 - CI across Python 3.9–3.12; tag-triggered PyPI release via Trusted Publishing.
 
 [Unreleased]: https://github.com/mspinola/crucible/compare/v0.1.0...HEAD
