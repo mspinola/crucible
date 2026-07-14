@@ -182,8 +182,27 @@ backtester.
 ### Feeding crucible from a RealTest export
 
 The two tools compose cleanly. RealTest runs headless from the command line
-(`realtest -test script.rts`) and, with `SaveTradesAs` / `SaveStatsAs` set, writes
-the trade log and summary stats to CSV. That CSV is exactly what crucible ingests:
+(`realtest -test script.rts`) and, with `SaveTradesAs` set, writes the trade log
+to CSV. RealTest's default trade export carries these columns:
+
+```
+Trade, Strategy, Symbol, Side, DateIn, TimeIn, QtyIn, PriceIn, DateOut, TimeOut,
+QtyOut, PriceOut, Reason, Bars, PctGain, Profit, PctMFE, PctMAE, Fraction, Size, Dividends
+```
+
+(The `Trades` section of your script defines these, so a customized export can
+rename or add columns — treat the list above as the stock layout, not a fixed
+schema.) Two things to know before mapping it:
+
+- **P&L is in percent and dollars, not R.** `PctGain` is the return as a percent
+  of position size and `Profit` is net dollars — neither is an R-multiple. There
+  is **no per-trade risk column** in the export, so choosing the 1R denominator
+  is a real modeling decision you own, not a column rename.
+- **MFE/MAE *are* exported**, as `PctMFE` / `PctMAE` (percent runup / drawdown
+  during the trade). Put them in the same R unit as the return.
+
+If you define 1R as a fixed fractional risk `R_PCT` (e.g. you risked ~1% of the
+position per trade), the conversion is one division each:
 
 ```python
 import pandas as pd
@@ -191,25 +210,27 @@ from crucible.edge import TradeLog, edge_report, reality_check
 
 raw = pd.read_csv("trades.csv")                 # RealTest SaveTradesAs output
 
-# RealTest reports P&L in dollars/percent; crucible's `r` is risk-normalized
-# (1R = the risk taken at entry). Normalize by per-trade initial risk first —
-# this is the one real step, not a plain column rename:
-raw["r"] = raw["ProfitDlr"] / raw["RiskDlr"]    # adjust names to your columns
+R_PCT = 1.0                                      # your 1R, as a % move — YOUR choice
+raw["r"]   = raw["PctGain"].str.rstrip("%").astype(float) / R_PCT
+raw["mfe"] = raw["PctMFE"].str.rstrip("%").astype(float)  / R_PCT
+raw["mae"] = raw["PctMAE"].str.rstrip("%").astype(float)  / R_PCT
 
-trades = TradeLog.from_frame(raw, mapping={"MFE": "mfe", "MAE": "mae"})
+trades = TradeLog.from_frame(
+    raw, mapping={"DateIn": "entry_date", "DateOut": "exit_date", "Bars": "bars_held"},
+)
 print(edge_report(trades))
 print(reality_check(trades))                     # the verdict RealTest's MC doesn't give
 ```
 
-The one thing to get right is the R normalization: RealTest's trade CSV is in
-dollars/percent, so you divide each trade's P&L (and its MFE/MAE) by the initial
-risk that trade took to land in R-multiples. A strategy that trades a fixed
-stop distance makes this a single division; without a defined per-trade risk,
-decide what your 1R denominator is before trusting the metrics. Column names in
-the export vary by RealTest version and your results-script config — map them to
-the [`TradeLog`](src/crucible/edge/trade_log.py) schema
-(`r`, and optionally `mfe`, `mae`, `bars_held`, `prob`, `entry_date`, `exit_date`)
-with `mapping=`.
+Map your columns onto the [`TradeLog`](src/crucible/edge/trade_log.py) schema
+(`r` required; `mfe`, `mae`, `bars_held`, `prob`, `entry_date`, `exit_date`
+optional) with `mapping=`. Two honesty notes that matter more than the plumbing:
+without a defined per-trade risk, the R denominator is an assumption the whole
+report rides on — pick it deliberately. And if the RealTest run is a
+multi-strategy portfolio where several sub-strategies take the same trade, those
+rows are duplicated and correlated; crucible's bootstrap assumes independent
+trades, so de-duplicate (or collapse to one book) first or the confidence
+interval will look tighter than reality.
 
 *(Comparison verified against RealTest's published documentation as of
 July 2026. RealTest is actively developed; check its docs for the current
