@@ -3,7 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "crucible"
+# Distribution name is `crucible-quant` (the bare `crucible` is squatted on PyPI);
+# the IMPORT package is still `crucible` — users write `import crucible`.
+name = "crucible-quant"
 version = "0.1.0"
 description = "Measure the raw mathematical edge of a trading signal — capital-free, with confidence intervals and a reality check."
 readme = "README.md"

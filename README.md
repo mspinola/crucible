@@ -12,9 +12,11 @@ the edge is real. No account, no position sizing, no equity curve. It's the thin
 you run *before* a backtester.
 
 ```bash
-pip install crucible            # core: metrics + stats + simulator (numpy/pandas only)
-pip install "crucible[examples]"  # + yfinance, to run the demo below on real data
+pip install crucible-quant              # core: metrics + stats + simulator (numpy/pandas only)
+pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on real data
 ```
+
+> Installed as **`crucible-quant`**, imported as **`crucible`** (`import crucible`).
 
 ## 30-second example
 
@@ -60,7 +62,7 @@ would have shown you as a rising equity curve is, at this sample size,
 
 > Runnable versions live in [`examples/`](examples): `quickstart.py` and
 > `validation.py` use synthetic data (no network); `real_data_yfinance.py` pulls
-> real prices from Yahoo Finance (`pip install "crucible[examples]"`) and runs the
+> real prices from Yahoo Finance (`pip install "crucible-quant[examples]"`) and runs the
 > full pipeline — try `python examples/real_data_yfinance.py --ticker QQQ`.
 
 ## What's in the box
