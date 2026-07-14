@@ -6,6 +6,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`crucible.report`** (behind the `[report]` extra) — `tearsheet()` writes a
+  self-contained HTML page (verdict banner, metric scorecard, R-multiple
+  distribution, cumulative R, MFE/MAE excursion, bootstrap expectancy), and
+  `cumulative_r()`. Capital-free — charts summed R, never an equity curve.
+- `examples/tearsheet.py`. CI now installs the `report` extra so the tearsheet
+  tests run.
+
 ## [0.1.0] — 2026-07-14
 
 Initial release — the capital-free trading-edge evaluation core.

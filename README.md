@@ -104,6 +104,23 @@ Also here: `sidak_correction` and `whites_reality_check` (max-statistic across e
 variant you searched) for when a grid search flatters the best result.
 See [`examples/validation.py`](examples/validation.py).
 
+## A shareable tearsheet — `crucible.report`
+
+```bash
+pip install "crucible-quant[report]"
+```
+
+```python
+from crucible.report import tearsheet
+tearsheet(trades, "sheet.html", title="SPY — 20/50 MA cross")
+```
+
+Writes a **self-contained** HTML page (plotly.js inlined, renders offline): the
+verdict banner, the metric scorecard, the R-multiple distribution, cumulative R,
+MFE/MAE excursion, and the bootstrap expectancy distribution behind the CI. Still
+capital-free — it charts summed **R**, never an equity curve. See
+[`examples/tearsheet.py`](examples/tearsheet.py).
+
 ## What this is — and isn't
 
 ✅ Trade-level edge metrics, excursion efficiency, bootstrap CIs, a random-entry
