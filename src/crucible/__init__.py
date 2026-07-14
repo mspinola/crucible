@@ -4,7 +4,7 @@ The capital-free core lives in :mod:`crucible.edge`: a trade log goes in, an edg
 verdict — with a confidence interval and a p-value — comes out. No account, no
 position sizing, no equity curve.
 """
-from crucible import edge, strategies
+from crucible import edge, strategies, validation
 
 __version__ = "0.1.0"
-__all__ = ["edge", "strategies", "__version__"]
+__all__ = ["edge", "strategies", "validation", "__version__"]

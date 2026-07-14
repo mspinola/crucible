@@ -71,6 +71,32 @@ would have shown you as a rising equity curve is, at this sample size,
   signal → a `TradeLog`. No instrument specifics.
 - **Example signals** — `ma_cross`, `macd_cross`. Demos, not endorsed edges.
 
+## Does the edge survive out of sample? — `crucible.validation`
+
+The pooled reality check tells you if an edge is real *on the whole history*.
+`crucible.validation` asks the harder question — does it hold on data the analysis
+never touched?
+
+```python
+from crucible.validation import holdout, walk_forward, sign_permutation_pvalue
+
+# 1. Early-train / late-confirm — leakage-controlled temporal split
+print(holdout(trades, "2019-01-01", embargo_weeks=8))    # verdict is the LATE period
+
+# 2. Sign-permutation p-value (Masters) — could the edge come from noise?
+print(sign_permutation_pvalue(trades))
+
+# 3. Pardo walk-forward — optimize params in-sample, confirm out-of-sample, stitch
+wf = walk_forward(px, ma_cross, param_grid={"fast": [10, 20], "slow": [50, 100]},
+                  is_days=365 * 3, oos_days=365)
+print(wf)                          # per-fold IS->OOS efficiency (WFE)
+print(reality_check(wf.stitched))  # the stitched-OOS verdict — the honest one
+```
+
+Also here: `sidak_correction` and `whites_reality_check` (max-statistic across every
+variant you searched) for when a grid search flatters the best result.
+See [`examples/validation.py`](examples/validation.py).
+
 ## What this is — and isn't
 
 ✅ Trade-level edge metrics, excursion efficiency, bootstrap CIs, a random-entry
