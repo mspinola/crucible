@@ -113,6 +113,35 @@ reality check — all **capital-free**.
 Monte-Carlo-on-equity. *If you want an equity curve, hand the `TradeLog` to
 [quantstats](https://github.com/ranaroussi/quantstats). crucible stops at the edge.*
 
+## Releasing
+
+Releases publish to PyPI via GitHub Actions using **Trusted Publishing** (OIDC —
+no API tokens are stored anywhere). Changes are tracked in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+**One-time setup** (maintainer, before the first publish):
+
+1. Create two GitHub environments — repo **Settings → Environments** — named
+   `pypi` and `testpypi`. (Add a required-reviewer rule on `pypi` for a manual
+   approval gate, if you want one.)
+2. Register a **pending Trusted Publisher** at
+   <https://pypi.org/manage/account/publishing/>:
+   PyPI project `crucible-quant`, owner `mspinola`, repo `crucible`, workflow
+   `release.yml`, environment `pypi`. Repeat on
+   <https://test.pypi.org/manage/account/publishing/> with environment
+   `testpypi` for dry runs.
+
+**Cutting a release:**
+
+1. Bump `version` in `pyproject.toml` and move the `CHANGELOG.md` entry from
+   *Unreleased* to the new version.
+2. (Optional dry run) **Actions → Release → Run workflow → `testpypi`**.
+3. Tag and push — the tag **must** match the `pyproject` version or the run fails:
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0     # builds, twine-checks, publishes to PyPI
+   ```
+
 ## License
 
 MIT
