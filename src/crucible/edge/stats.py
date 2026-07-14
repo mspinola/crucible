@@ -1,0 +1,129 @@
+"""The honesty layer — the reason crucible.edge exists.
+
+A positive expectancy on a trade log means nothing until you know it could not
+have come from noise. These tools answer that with a confidence interval, a
+resampling p-value, and — when you have the price series — a random-entry null.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable
+
+import numpy as np
+
+from crucible.edge.trade_log import TradeLog
+from crucible.edge.metrics import expectancy
+
+Metric = Callable[[np.ndarray], float]
+
+
+@dataclass
+class CI:
+    point: float
+    low: float
+    high: float
+    alpha: float
+
+    def __str__(self) -> str:
+        lvl = int(round((1 - self.alpha) * 100))
+        return f"{self.point:+.3f}  {lvl}% CI [{self.low:+.3f}, {self.high:+.3f}]"
+
+
+@dataclass
+class Verdict:
+    metric: str
+    point: float
+    ci: CI
+    p_value: float          # one-sided: P(metric <= 0) under resampling
+    label: str              # "HELD" | "FRAGILE" | "FAIL"
+
+    def __str__(self) -> str:
+        lvl = int(round((1 - self.ci.alpha) * 100))
+        note = {
+            "HELD": "the edge clears zero across resamples.",
+            "FRAGILE": "point positive, but the CI straddles zero — not "
+                       "distinguishable from noise at this sample size. Do NOT size it up.",
+            "FAIL": "no positive edge.",
+        }[self.label]
+        return (f"VERDICT ({self.metric}): {self.point:+.3f} R   "
+                f"{lvl}% CI [{self.ci.low:+.3f}, {self.ci.high:+.3f}]\n"
+                f"                     p(edge>0) = {1 - self.p_value:.3f}"
+                f"        ->  {self.label}\n  {note}")
+
+
+def _resample(r: np.ndarray, metric: Metric, n_boot: int, rng) -> np.ndarray:
+    n = len(r)
+    draws = np.empty(n_boot)
+    for i in range(n_boot):
+        draws[i] = metric(rng.choice(r, size=n, replace=True))
+    return draws
+
+
+def bootstrap_ci(trades: TradeLog, metric: Metric = expectancy,
+                 n_boot: int = 10_000, alpha: float = 0.05, seed: int = 0) -> CI:
+    """Bootstrap confidence interval for any per-trade-return metric.
+
+    The point estimate alone badly understates sampling noise at the trade
+    counts real strategies produce (tens to low hundreds); the CI is the honest
+    read. `metric` is any callable over the return array (expectancy,
+    profit_factor, sqn, ...)."""
+    r = trades.r
+    if len(r) == 0:
+        return CI(float("nan"), float("nan"), float("nan"), alpha)
+    rng = np.random.default_rng(seed)
+    draws = _resample(r, metric, n_boot, rng)
+    finite = draws[np.isfinite(draws)]
+    lo = float(np.percentile(finite, alpha / 2 * 100)) if len(finite) else float("nan")
+    hi = float(np.percentile(finite, (1 - alpha / 2) * 100)) if len(finite) else float("nan")
+    return CI(point=float(metric(r)), low=lo, high=hi, alpha=alpha)
+
+
+def p_value_positive(trades: TradeLog, metric: Metric = expectancy,
+                     n_boot: int = 10_000, seed: int = 0) -> float:
+    """One-sided bootstrap probability that the metric is > 0 (1.0 = strong)."""
+    r = trades.r
+    if len(r) == 0:
+        return 0.0
+    rng = np.random.default_rng(seed)
+    draws = _resample(r, metric, n_boot, rng)
+    finite = draws[np.isfinite(draws)]
+    return float((finite > 0).mean()) if len(finite) else 0.0
+
+
+def reality_check(trades: TradeLog, metric: Metric = expectancy,
+                  metric_name: str = "expectancy", n_boot: int = 10_000,
+                  alpha: float = 0.05, seed: int = 0) -> Verdict:
+    """Point estimate + bootstrap CI + p-value, folded into a verdict:
+
+      HELD     point > 0 and CI lower bound > 0
+      FRAGILE  point > 0 but the CI straddles zero
+      FAIL     otherwise
+
+    This is the whole point of the package — the call backtesters never make."""
+    ci = bootstrap_ci(trades, metric, n_boot, alpha, seed)
+    p_pos = p_value_positive(trades, metric, n_boot, seed)
+    if ci.point > 0 and ci.low > 0:
+        label = "HELD"
+    elif ci.point > 0:
+        label = "FRAGILE"
+    else:
+        label = "FAIL"
+    return Verdict(metric=metric_name, point=ci.point, ci=ci,
+                   p_value=1 - p_pos, label=label)
+
+
+def random_entry_null(prices, side: str, n_entries: int, hold: int, *,
+                      tp: float = 2.0, sl: float = 1.0, n_sims: int = 1_000,
+                      seed: int = 0) -> np.ndarray:
+    """The strong test: expectancy of `n_sims` random-entry trade logs, each with
+    `n_entries` random entries held `hold` bars under the same barriers, on the
+    SAME prices. Compare your real edge against this distribution — did the signal
+    beat coin-flip timing on this instrument? Returns the null expectancies."""
+    from crucible.edge.simulator import barrier_trades, random_entries  # avoid cycle
+    rng = np.random.default_rng(seed)
+    out = np.empty(n_sims)
+    for i in range(n_sims):
+        entries = random_entries(prices, n_entries, seed=int(rng.integers(1 << 31)))
+        tl = barrier_trades(prices, entries, side=side, tp=tp, sl=sl, timeout=hold)
+        out[i] = expectancy(tl.r) if len(tl) else np.nan
+    return out

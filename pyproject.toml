@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crucible"
+version = "0.1.0"
+description = "Measure the raw mathematical edge of a trading signal — capital-free, with confidence intervals and a reality check."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Matt Spinola" }]
+keywords = [
+    "trading", "quant", "backtesting", "expectancy", "edge",
+    "mfe", "mae", "sqn", "walk-forward", "bootstrap",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=1.5",
+]
+
+[project.optional-dependencies]
+# The core (metrics + stats + simulator) needs only numpy/pandas. These extras
+# power the heavier layers that the OSS engine grows into — nothing in
+# crucible.edge imports them.
+examples = ["yfinance>=0.2"]   # run the README demo on real data
+report = ["plotly>=5"]          # tearsheets (crucible.report, later)
+ml = ["scikit-learn>=1.2", "xgboost>=1.7"]  # walk-forward ML path (later)
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/mspinola/crucible"
+Source = "https://github.com/mspinola/crucible"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crucible"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
