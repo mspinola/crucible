@@ -1,5 +1,9 @@
 # crucible
 
+[![CI](https://github.com/mspinola/crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/mspinola/crucible/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **Measure the edge before you ever open a $100k account.**
 
 Most trading "edges" are artifacts of a small sample. `crucible.edge` takes a
