@@ -58,6 +58,11 @@ That `FRAGILE` block is the whole point: a positive expectancy that a backtester
 would have shown you as a rising equity curve is, at this sample size,
 **indistinguishable from noise**. crucible says so out loud.
 
+> Runnable versions live in [`examples/`](examples): `quickstart.py` and
+> `validation.py` use synthetic data (no network); `real_data_yfinance.py` pulls
+> real prices from Yahoo Finance (`pip install "crucible[examples]"`) and runs the
+> full pipeline — try `python examples/real_data_yfinance.py --ticker QQQ`.
+
 ## What's in the box
 
 - **`TradeLog`** — one documented schema (`r` in R-multiples, plus optional
