@@ -92,6 +92,14 @@ would have shown you as a rising equity curve is, at this sample size,
   correlated set of return streams really holds (N_eff, the participation ratio of
   the correlation eigenvalues) — the honest denominator for significance. Still
   capital-free: correlation structure only, no equity curve.
+
+  ```python
+  >>> from crucible.breadth import effective_n
+  >>> effective_n(returns).n_eff     # 12-market book: 3 correlated blocs + a lone metal
+  3.8                                # ...so it's really ~4 independent bets
+  ```
+  See [`examples/breadth.py`](examples/breadth.py) for the full factor breakdown.
+
 - **A generic barrier simulator** — `barrier_trades`: OHLC + a boolean entry
   signal → a `TradeLog`. No instrument specifics.
 - **Example signals** — `ma_cross`, `macd_cross`. Demos, not endorsed edges.
