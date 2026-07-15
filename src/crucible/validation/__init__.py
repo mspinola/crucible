@@ -9,6 +9,8 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
                  Reality Check across every variant you searched
   gate           an audited, un-overridable pass/fail gate (and a Gauntlet of them)
   diagnostics    fold-level robustness reads (dispersion, walk-forward efficiency)
+  gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
+                 DURABLE / GENERAL gates + run_gauntlet, gated by Thresholds
 """
 from crucible.validation.holdout import holdout, split_train_test, HoldoutResult
 from crucible.validation.walk_forward import (
@@ -19,6 +21,10 @@ from crucible.validation.permutation import (
 )
 from crucible.validation.gate import Gate, GateCheck, Gauntlet
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
+from crucible.validation.thresholds import Thresholds
+from crucible.validation.gauntlet import (
+    run_gauntlet, gate_real, gate_strong, gate_durable, gate_general,
+)
 
 __all__ = [
     "holdout", "split_train_test", "HoldoutResult",
@@ -26,4 +32,6 @@ __all__ = [
     "sign_permutation_pvalue", "sidak_correction", "whites_reality_check",
     "Gate", "GateCheck", "Gauntlet",
     "fold_dispersion", "walk_forward_efficiency",
+    "Thresholds",
+    "run_gauntlet", "gate_real", "gate_strong", "gate_durable", "gate_general",
 ]
