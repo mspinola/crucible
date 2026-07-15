@@ -61,8 +61,9 @@ the rule fires on, known at entry — and exits are scanned forward from the ent
 knowable only at the moment of the trade — a single peek into the future contaminates the
 whole null distribution.
 
-> **Sources.** The R-multiple as the unit of trade evaluation: Van Tharp, *Trade Your
-> Way to Financial Freedom* (origin of R and SQN, below). Risk-normalized, volatility-
+> **Sources.** The R-multiple as the unit of trade evaluation: **Van Tharp, *Definitive Guide
+> to Position Sizing* (2008), Ch. 2 "Risk (R) and R-Multiples" (p. 11)**; popularized in *Trade
+> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-
 > scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
 > Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
 > the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
@@ -99,8 +100,11 @@ a claim at all.
 >   battery: **Pardo, *The Evaluation and Optimization of Trading Strategies*, 2nd ed.
 >   (2008), the "Evaluation of Trading Strategies" chapter** — this is the canonical list
 >   `edge_report` reproduces.
-> - **SQN**: Van Tharp, *Trade Your Way to Financial Freedom*, 2nd ed. (2007), ch. on
->   "The System Quality Number." Both codebases use Van Tharp's `√min(n,100)` cap:
+> - **SQN**: Van Tharp, *Definitive Guide to Position Sizing* (2008), Ch. 3 "Evaluating the
+>   Quality of Your Trading System" (p. 23) — and, precisely on the small-sample problem the
+>   `√min(n,100)` cap addresses, "One Problem with System Quality Number and How to Overcome It"
+>   (p. 32) and "Statistical Assumptions in Using This Material" (p. 33); popularized in *Trade
+>   Your Way to Financial Freedom* (2007). Both codebases use Van Tharp's `√min(n,100)` cap:
 >   crucible's `sqn()` (`metrics.py:60`) is the single source of truth, and the
 >   framework's `PardoSQNEvaluator.calculate_sqn` delegates to it. (An earlier Pardo
 >   variant used `√100` always to normalize low-frequency books across asset classes,
@@ -494,6 +498,10 @@ distribution of max drawdown, terminal equity, and risk-of-ruin per risk fractio
 > - Monte Carlo drawdown / risk-of-ruin on reshuffled trade sequences: **Pardo (2008),
 >   Monte Carlo and money-management material**; risk of ruin and strategy failure: **AFML
 >   Ch. 15 "Understanding Strategy Risk," §15.4 "The Probability of Strategy Failure."**
+> - Position sizing — the **SURVIVE** layer crucible hands off — is the subject of **Van Tharp,
+>   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models)
+>   and **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
+>   volatility %, capital/margin, portfolio-heat).
 
 ---
 
@@ -608,12 +616,25 @@ a verified page, that is stated explicitly.
    / diversification-multiplier material across a large futures universe — the practical
    counterpart to `crucible.breadth` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
 
-**Supporting reference (not in the provided set):**
-Van Tharp, Van K. — *Trade Your Way to Financial Freedom*, 2nd ed. (McGraw-Hill, 2007) →
-the R-multiple and the **System Quality Number (SQN)**, implemented in `metrics.py:60`.
+7. **Van Tharp, Van K. — *Definitive Guide to Position Sizing*** (IITM, 2008) and ***Trade Your
+   Way to Financial Freedom***, 2nd ed. (McGraw-Hill, 2007). *The R/SQN origin and the
+   position-sizing layer.* Definitive Guide **Ch. 2 "Risk (R) and R-Multiples" (p. 11)** → §1's
+   R-multiple; **Ch. 3 "Evaluating the Quality of Your Trading System" (p. 23)**, with "One
+   Problem with SQN and How to Overcome It" (p. 32) and "Statistical Assumptions" (p. 33) → the
+   SQN and its small-sample caveat (§2); its position-sizing parts are the SURVIVE layer crucible
+   hands off. ("R," "SQN," "Position Sizing" are Tharp / IITM service marks.)
 
+8. **Basso, Tom — *Successful Traders Size Their Positions — Why and How?*** (enjoytheride.world,
+   2019). *Position sizing only — the SURVIVE layer.* Risk %, volatility %, capital/margin, and
+   portfolio-heat sizing — the capital methodology crucible stops short of and hands off (§10).
+
+**Supporting references (papers, not in the six-book set):**
 White, Halbert (2000), "A Reality Check for Data Snooping," *Econometrica* 68(5): 1097–1126 →
-the original Reality Check that `whites_reality_check` reimplements via sign permutation.
+the Reality Check `whites_reality_check` reimplements. &nbsp;·&nbsp; Bailey & López de Prado (2014),
+"The Deflated Sharpe Ratio," *J. Portfolio Management*, and Bailey, Borwein, López de Prado & Zhu
+(2017), "The Probability of Backtest Overfitting," *J. Computational Finance* → §5's
+`deflated_sharpe` / `pbo_cscv`. &nbsp;·&nbsp; Grinold & Kahn, *Active Portfolio Management* → the
+Information Coefficient (§7).
 
 ---
 
@@ -641,3 +662,28 @@ the original Reality Check that `whites_reality_check` reimplements via sign per
 | Meta-labeling harness | `pardo_quant_framework/src/ml/meta_eval.py` |
 | Staged-gate adapter (ML diagnostics + capital stage over crucible) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
 | The gated framework, in prose | `pardo_quant_framework/docs/edge_validation_framework.md` |
+
+---
+
+## Appendix — the underlying statistics, on Wikipedia
+
+Convenience look-ups for the techniques above — *secondary* to the primary sources in the
+bibliography, not a replacement for them.
+
+| Concept | In | Wikipedia |
+|---|---|---|
+| Bootstrapping (resampling) | §3 | [Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics)) |
+| Confidence interval | §3 | [Confidence interval](https://en.wikipedia.org/wiki/Confidence_interval) |
+| Permutation test | §5 | [Permutation test](https://en.wikipedia.org/wiki/Permutation_test) |
+| Data-mining bias | §5 | [Data dredging](https://en.wikipedia.org/wiki/Data_dredging) |
+| Multiple comparisons | §5 | [Multiple comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem) |
+| Šidák correction | §5 | [Šidák correction](https://en.wikipedia.org/wiki/%C5%A0id%C3%A1k_correction) |
+| Backtest overfitting / deflated Sharpe | §5 | [Deflated Sharpe ratio](https://en.wikipedia.org/wiki/Deflated_Sharpe_ratio) |
+| Sharpe ratio | §5 | [Sharpe ratio](https://en.wikipedia.org/wiki/Sharpe_ratio) |
+| Cross-validation | §5, §9 | [Cross-validation (statistics)](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) |
+| Walk-forward optimization | §9 | [Walk forward optimization](https://en.wikipedia.org/wiki/Walk_forward_optimization) |
+| Information coefficient | §7 | [Information coefficient](https://en.wikipedia.org/wiki/Information_coefficient) |
+| Spearman rank correlation | §7 | [Spearman's rank correlation coefficient](https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient) |
+| Skewness &amp; kurtosis | §5 | [Skewness](https://en.wikipedia.org/wiki/Skewness) · [Kurtosis](https://en.wikipedia.org/wiki/Kurtosis) |
+| Principal component analysis | §10 | [Principal component analysis](https://en.wikipedia.org/wiki/Principal_component_analysis) |
+| Monte Carlo method | §10 | [Monte Carlo method](https://en.wikipedia.org/wiki/Monte_Carlo_method) |
