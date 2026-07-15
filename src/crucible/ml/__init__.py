@@ -9,21 +9,24 @@ tried to call.
 Landed so far:
 
   information_coefficient / alpha_gate   how much predictive signal a score holds
-  quantile_decay                         does a higher score mean a better outcome?
+  quantile_decay / decay_tearsheet       does a higher score mean a better outcome?
   fold_ic                                out-of-fold rank IC per feature
   redundancy_droplist / cramers_v        which features overlap, and which to keep
+  asof_window / window_before            point-in-time slices that can't peek ahead
 
-Follow-ons (still in pardo): point-in-time windowing helpers and the Plotly decay
-tearsheet.
+``decay_tearsheet`` needs plotly (the ``report`` extra); everything else is
+numpy/pandas only.
 """
 from crucible.ml.ic import AlphaGateError, alpha_gate, information_coefficient
-from crucible.ml.decay import DecayTable, quantile_decay
+from crucible.ml.decay import DecayTable, decay_tearsheet, quantile_decay
 from crucible.ml.redundancy import (
     RedundancyReport, cramers_v, fold_ic, redundancy_droplist,
 )
+from crucible.ml.pit import asof_window, window_before
 
 __all__ = [
     "information_coefficient", "alpha_gate", "AlphaGateError",
-    "quantile_decay", "DecayTable",
+    "quantile_decay", "decay_tearsheet", "DecayTable",
     "fold_ic", "redundancy_droplist", "cramers_v", "RedundancyReport",
+    "asof_window", "window_before",
 ]

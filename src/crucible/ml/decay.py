@@ -61,3 +61,68 @@ def quantile_decay(preds: pd.DataFrame, *, score: str = "score",
                .rename(columns={"_q": "quantile"}))
     monotonic = bool(np.all(np.diff(table["win_rate"].to_numpy()) >= 0))
     return DecayTable(table=table, monotonic=monotonic, q=q)
+
+
+def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "label",
+                    q: int = 5, title: str = "Signal decay by score quantile",
+                    out_path: str | None = None) -> str:
+    """Render a self-contained HTML tearsheet of a score's decay and return the HTML.
+
+    Two panels: realized win rate by score quantile (from :func:`quantile_decay` —
+    a real edge climbs monotonically), and a winners-vs-losers distribution of the
+    score. Writes the HTML to ``out_path`` as well when given.
+
+    Needs plotly (the ``report`` extra): ``pip install "crucible-quant[report]"``.
+    """
+    try:
+        import plotly.graph_objects as go
+    except ModuleNotFoundError as e:                      # pragma: no cover
+        raise ModuleNotFoundError(
+            'decay_tearsheet needs plotly — install the report extra: '
+            'pip install "crucible-quant[report]"') from e
+
+    decay = quantile_decay(preds, score=score, label=label, q=q)
+    stats = decay.table
+    df = preds[[score, label]].replace([np.inf, -np.inf], np.nan).dropna()
+
+    bars = go.Figure()
+    bars.add_hline(y=0.5, line_dash="dash", line_color="rgba(128,128,128,0.4)",
+                   annotation_text="Coin flip (50%)")
+    bars.add_trace(go.Bar(x=[f"Q{int(qq)}" for qq in stats["quantile"]],
+                          y=stats["win_rate"],
+                          text=[f"{v * 100:.1f}%" for v in stats["win_rate"]],
+                          textposition="auto"))
+    bars.update_layout(title="Win rate by score quantile (worst → best)",
+                       yaxis=dict(tickformat=".0%", title="realized win rate"),
+                       xaxis_title="score quantile", height=380,
+                       margin=dict(l=40, r=40, t=60, b=40))
+
+    dist = go.Figure()
+    dist.add_trace(go.Violin(y=df.loc[df[label] > 0, score], name="winners",
+                             box_visible=True, meanline_visible=True))
+    dist.add_trace(go.Violin(y=df.loc[df[label] <= 0, score], name="losers",
+                             box_visible=True, meanline_visible=True))
+    dist.update_layout(title="Score distribution — winners vs losers",
+                       yaxis_title="score", height=380,
+                       margin=dict(l=40, r=40, t=60, b=40))
+
+    verdict = "monotonic ✓" if decay.monotonic else "not monotonic"
+    pretty = stats.assign(win_rate=(stats["win_rate"] * 100).round(1))
+    html = (
+        f'<!doctype html><html><head><meta charset="utf-8"><title>{title}</title></head>'
+        '<body style="font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;">'
+        f"<h1>{title}</h1>"
+        f"<p>N = {int(stats['count'].sum())} &middot; quantiles = {decay.q} &middot; "
+        f"spread (top &minus; bottom) = {decay.spread * 100:.1f}pp &middot; {verdict}</p>"
+        + bars.to_html(full_html=False, include_plotlyjs="cdn")
+        + dist.to_html(full_html=False, include_plotlyjs=False)
+        + pretty.to_html(index=False)
+        + "</body></html>"
+    )
+
+    if out_path is not None:
+        import os
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(html)
+    return html
