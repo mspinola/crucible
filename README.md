@@ -21,14 +21,15 @@ pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on r
 
 ## What crucible answers
 
-One trade log, one question at a time — each harder than the last, each answered
-out loud by a named function:
+From a single trade log up to the whole correlated book, one question at a time —
+each harder than the last, each answered out loud by a named function:
 
 - ✅ **Describe the edge** — expectancy, profit factor, payoff, SQN, MFE/MAE efficiency → `edge_report`
 - ✅ **Quantify sampling noise** — a bootstrap CI and p-value on every headline metric → `bootstrap_ci` · `p_value_positive`
 - ✅ **Rule out data-mining luck** — sign-permutation p-value (Masters) + a random-entry reality check → `permutation` · `reality_check`
 - ✅ **Rule out drift** — a leakage-controlled early-train / late-confirm split → `validation.holdout`
 - ✅ **Confirm out-of-sample** — Pardo walk-forward with purge / embargo hygiene → `validation.walk_forward`
+- ✅ **Account for correlation** — the effective number of *independent* bets across a correlated book → `breadth.effective_n`
 
 ## 30-second example
 
@@ -86,6 +87,10 @@ would have shown you as a rising equity curve is, at this sample size,
 - **The honesty layer** — `bootstrap_ci`, `p_value_positive`, `reality_check`
   (HELD / FRAGILE / FAIL), and `random_entry_null` (did your signal beat
   coin-flip timing on the same prices?).
+- **Book-level breadth** — `breadth.effective_n`: how many *independent* bets a
+  correlated set of return streams really holds (N_eff, the participation ratio of
+  the correlation eigenvalues) — the honest denominator for significance. Still
+  capital-free: correlation structure only, no equity curve.
 - **A generic barrier simulator** — `barrier_trades`: OHLC + a boolean entry
   signal → a `TradeLog`. No instrument specifics.
 - **Example signals** — `ma_cross`, `macd_cross`. Demos, not endorsed edges.
