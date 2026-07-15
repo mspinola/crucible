@@ -120,8 +120,9 @@ a claim at all.
 ## 3. Quantifying sampling noise: the bootstrap confidence interval
 
 **Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `bootstrap_ci`,
-`p_value_positive`; framework mirror in
-[`pardo .../validation/bootstrap.py`](../../pardo_quant_framework/src/validation/bootstrap.py).
+`p_value_positive`, and `bootstrap_metric_cis` (the whole metric set in one resample pass).
+pqf's [`validation/bootstrap.py`](../../pardo_quant_framework/src/validation/bootstrap.py)
+now delegates here.
 
 A point estimate of expectancy on 60–200 trades badly understates how much it could
 have wobbled. The **bootstrap** turns the single number into a distribution:
@@ -142,9 +143,10 @@ Why it is the honest read: it makes no normality assumption (trade returns are s
 fat-tailed), and it works for *any* metric — expectancy, profit factor, SQN — not just the
 mean. On small samples the band is wide, and that width **is the message**.
 
-The framework gates on this: Stage 4 requires the **CI lower bound**, not the point
-estimate, to clear each threshold (`stage_evaluator.py:142-151`). This directly fixes the
-"PF 1.37 on 60 trades treated as a clean pass" failure the framework was built to prevent.
+crucible's gauntlet gates on this: its **STRONG** gate requires the **CI lower bound**, not
+the point estimate, to clear each threshold (`gate_strong`, §11). This directly fixes the
+"PF 1.37 on 60 trades treated as a clean pass" failure — the same bar pqf's Stage 4 now
+enforces through crucible.
 
 > **Sources.**
 > - **Aronson, *Evidence-Based Technical Analysis* (EBTA, 2006), Ch. 4 "Statistical
@@ -215,8 +217,8 @@ Method**, the public-domain alternative to White's patented Reality Check.
 If you quietly tried 50 parameter sets and reported the best, its raw p-value is a lie of
 selection. Šidák asks: *what's the chance the best of N independent searches looks this
 good by luck?* It is the conservative fallback when you only know the **count** of variants.
-The framework applies it in Stage 3 using the search-space log
-(`stage_evaluator.py:78`).
+crucible's **REAL** gate applies it in the gauntlet (pass your `n_variants`); pqf's Stage 3
+feeds it the same count from its search-space log.
 
 ### 5c. White's Reality Check (you have every variant's returns)
 
@@ -249,6 +251,37 @@ pass **every variant including the discards**, or the correction is toothless.
 >   original max-statistic bootstrap `whites_reality_check` reimplements.
 > - Multiple-comparisons / overfitting the search itself: AFML **Ch. 11 "The Dangers of
 >   Backtesting"** and **Ch. 12 "Backtesting through Cross-Validation."**
+
+### Did the *selection* overfit? — PBO & deflated Sharpe
+
+**Code:** [`validation/pbo.py`](../src/crucible/validation/pbo.py) — `pbo_cscv`, `deflated_sharpe`
+
+White's Reality Check asks whether the best variant's *edge* is noise. Two companion tools ask
+the complementary question: given that you searched N configs and kept the best-in-sample one,
+**how much did the act of choosing overfit?**
+
+- **PBO — Probability of Backtest Overfitting** (`pbo_cscv`) via Combinatorially-Symmetric
+  Cross-Validation. Feed a `T×N` performance matrix (periods × the configs you searched). Over
+  every symmetric IS/OOS split of the period blocks it picks the best-in-sample config and reads
+  its **rank out-of-sample**; PBO is the fraction of splits where the in-sample winner lands
+  **below the OOS median**. Read it in bands — `ROBUST` (≤0.10) / `GUARDED` / `OVERFIT` — not to
+  the decimal, and (like White's) pass *every* config you tried or it reads optimistic.
+
+- **Deflated Sharpe Ratio** (`deflated_sharpe`). The winner's Sharpe must clear a bar that
+  **rises with the number of trials**: `SR0` is the expected maximum Sharpe of N noise trials,
+  and the DSR is the probability the winner's *true* Sharpe beats it — corrected for the return
+  series' own **skew and kurtosis** (fat left tails widen the error bar). Read `≥ 95%` like a
+  passed significance test.
+
+Where the permutation test corrects the *p-value* for the search, these correct the *IS ranking*
+and the *Sharpe* for it — the same multiple-testing disease, caught two more ways. Capital-free
+(stdlib `NormalDist`, no scipy).
+
+> **Sources.** **PBO / CSCV**: Bailey, Borwein, López de Prado & Zhu (2017), "The Probability of
+> Backtest Overfitting," *Journal of Computational Finance*; **AFML Ch. 11–12**. **Deflated /
+> Probabilistic Sharpe**: Bailey & López de Prado (2014), "The Deflated Sharpe Ratio," *Journal of
+> Portfolio Management*, and (2012) the Probabilistic Sharpe Ratio; **AFML Ch. 14 "Backtest
+> Statistics."**
 
 ---
 
@@ -283,7 +316,7 @@ is needed.
 
 ---
 
-## 7. Defining the trade honestly: triple-barrier labeling (framework)
+## 7. The ML track: honest labels, and is the signal real?
 
 **Code:** [`pardo .../ml/labels.py`](../../pardo_quant_framework/src/ml/labels.py) —
 `compute_triple_barrier_labels`; barrier version in
@@ -310,6 +343,46 @@ rules book already generated (meta-label = "did this trade win?"). This is Lópe
 *size/precision*, and judge it only if take/skip beats take-all out-of-sample.
 
 > **Sources.** **AFML §3.6 "Meta-Labeling"** and **§3.7 "How to Use Meta-Labeling."**
+
+### Is the ML score real? — `crucible.ml`
+
+**Code:** [`ml/ic.py`](../src/crucible/ml/ic.py), [`ml/decay.py`](../src/crucible/ml/decay.py),
+[`ml/redundancy.py`](../src/crucible/ml/redundancy.py), [`ml/pit.py`](../src/crucible/ml/pit.py)
+
+Once a model emits a **score**, the same honesty question §4 asks of a trade log applies to the
+score: does a higher score actually rank better outcomes, or is it noise, leakage, or a feature
+wearing a new name? `crucible.ml` answers it capital-free (numpy/pandas only), on the model's
+predictions rather than an equity curve.
+
+- **Information Coefficient** (`information_coefficient`) — the Spearman **rank** correlation
+  between a score and its realized label. Rank-based, so it's invariant to the label encoding
+  (+1/−1 or 0/1) and to any monotonic transform of the score: it measures only whether higher
+  scores line up with better outcomes. `alpha_gate(ic, min_ic=…)` raises below the bar — a
+  PASS/FAIL you wire into a training loop to kill an edge-less or leaking model before it reaches
+  a backtester. Computed **out-of-fold** (`fold_ic`), and — echoing §5 — its **sign-stability
+  across folds** matters more than its magnitude: a weak-but-consistently-positive IC is a better
+  sign than a strong one that flips.
+
+- **Quantile decay** (`quantile_decay`) — bucket the score into equal-count quantiles and read
+  the realized win rate per bucket. A genuine, well-ordered edge makes win rate climb
+  **monotonically** Q1→Q5 (`.monotonic`, `.spread`); a flat or ragged profile is the tell of a
+  score that ranks nothing. `decay_tearsheet` renders it as self-contained HTML.
+
+- **Feature redundancy** (`redundancy_droplist`) — clusters features by |Spearman| / Cramér's V
+  and keeps the highest-|IC| member of each cluster. This is the feature-space analogue of §10's
+  N_eff: three features that are one feature in disguise are one bet, not three, and counting them
+  as independent inflates any significance claim downstream.
+
+- **Point-in-time slices** (`asof_window` / `window_before`) — a leakage-safe window so a live
+  feature is built identically to its training twin: the feature-space cousin of §8's
+  purge/embargo. §8 stops the *label* from peeking ahead; this stops the *features* from doing so.
+
+> **Sources.** The Information Coefficient and the link between per-bet skill and portfolio
+> performance: **Grinold & Kahn, *Active Portfolio Management*** (the IC and the Fundamental Law of
+> Active Management) — outside the six-book set, but the canonical IC reference. Out-of-fold
+> feature importance, judging features on unseen data: **AFML Ch. 8 "Feature Importance."** No-look-
+> ahead feature construction: **AFML Ch. 7 §7.4** — the purge/embargo principle applied to features.
+> Quantile-decay monotonicity is the standard factor-research check (the alphalens lineage).
 
 ---
 
@@ -359,10 +432,12 @@ Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
 ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
 
-The framework hardens this against a specific trap (`stage_evaluator.py` Stage 5): a healthy
-*average* WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check —
-what fraction of folds are individually tradable (SQN > 0) and the coefficient of variation
-of fold SQN. High dispersion is itself a rejection, independent of the average.
+crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
+[`validation/diagnostics.py`](../src/crucible/validation/diagnostics.py)): a healthy *average*
+WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check — what fraction
+of folds are individually tradable (SQN > 0) and the coefficient of variation of fold SQN. High
+dispersion is itself a rejection, independent of the average. (pqf's Stage 5 layers its ML-only
+IC / feature-stability checks on top of the same crucible diagnostics.)
 
 > **Sources.**
 > - **Pardo (2008)** — the walk-forward method and the **Walk-Forward Efficiency** metric
@@ -551,13 +626,18 @@ the original Reality Check that `whites_reality_check` reimplements via sign per
 | Edge metrics (expectancy, PF, SQN, excursion…) | `crucible/src/crucible/edge/metrics.py` |
 | Bootstrap CI, p-value, reality_check verdict, random-entry null | `crucible/src/crucible/edge/stats.py` |
 | Sign-permutation, Šidák, White's Reality Check | `crucible/src/crucible/validation/permutation.py` |
+| Bootstrap metric-set CIs | `crucible/src/crucible/edge/stats.py` |
+| PBO (CSCV) + deflated Sharpe | `crucible/src/crucible/validation/pbo.py` |
+| ML signal quality — IC, decay, redundancy, PIT | `crucible/src/crucible/ml/` |
 | Purged/embargoed holdout | `crucible/src/crucible/validation/holdout.py` |
 | Walk-forward + WFE | `crucible/src/crucible/validation/walk_forward.py` |
-| Bootstrap metric CIs (framework) | `pardo_quant_framework/src/validation/bootstrap.py` |
-| Staged gates (Stage 3/4/5) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
-| Detrended random-timing benchmark | `pardo_quant_framework/src/validation/benchmark.py` |
+| Fold dispersion / WFE diagnostics | `crucible/src/crucible/validation/diagnostics.py` |
+| Audited gate + Gauntlet | `crucible/src/crucible/validation/gate.py` |
+| The gauntlet (REAL/STRONG/DURABLE/GENERAL) + Thresholds | `crucible/src/crucible/validation/gauntlet.py` |
 | Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
+| Detrended random-timing benchmark | `pardo_quant_framework/src/validation/benchmark.py` |
 | Portfolio Monte Carlo (block bootstrap) | `pardo_quant_framework/src/validation/portfolio_mc.py` |
 | Triple-barrier labels | `pardo_quant_framework/src/ml/labels.py` |
 | Meta-labeling harness | `pardo_quant_framework/src/ml/meta_eval.py` |
+| Staged-gate adapter (ML diagnostics + capital stage over crucible) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
 | The gated framework, in prose | `pardo_quant_framework/docs/edge_validation_framework.md` |
