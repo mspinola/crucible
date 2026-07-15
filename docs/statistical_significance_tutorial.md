@@ -413,24 +413,61 @@ independence and therefore *understates* drawdown — block resampling is the co
 
 ---
 
-## 11. The whole pipeline, as a gate
+## 11. The whole pipeline, as one gate — `crucible.validation.run_gauntlet`
 
-`pardo_quant_framework/docs/edge_validation_framework.md` assembles every primitive above
-into an ordered, hard-gated checklist. Each stage answers one of four questions:
+Every primitive above answers one question. The **gauntlet** runs them as an ordered set
+of audited hard gates and returns a single, capital-free pass/fail — crucible's own
+naming, no stage numbers borrowed from anywhere:
 
-| Stage | Question | crucible / framework primitive |
+```
+DECLARE   preamble  — a mechanical rule + a log of every variant you tried
+CLEAN     preamble  — leakage-controlled construction (use holdout / walk_forward)
+──────────────── the gauntlet crucible computes ────────────────
+REAL      — distinguishable from noise, corrected for the search
+STRONG    — economically meaningful at the CI lower bound
+DURABLE   — holds out-of-sample over time
+GENERAL   — travels to markets it wasn't built on (optional)
+─────────────────────────────────────────────────────────────────
+SURVIVE   handoff   — capital survivability (out of scope; hand the surviving log off)
+```
+
+```python
+from crucible.validation import run_gauntlet
+
+gauntlet = run_gauntlet(
+    wf.stitched,        # the honest log — stitched out-of-sample
+    prices=px,          # enables REAL's random-entry null
+    wf=wf,              # adds the DURABLE gate
+    n_variants=4,       # size of your search -> REAL's Šidák correction
+)
+print(gauntlet.audit_report())
+print(gauntlet.passed)  # True only if every gate that ran passed
+```
+
+| Gate | Proves | Built from |
 |---|---|---|
-| 0 | Is the rule mechanical and pre-registered? | (human) EBTA Ch. 1 |
-| 1 | Is the data leakage-free? | purge/embargo — §8 |
-| 2 | Calibrated without memorizing noise, every variant logged? | search-space log — §5 |
-| 3 | **Real effect after correcting for the search?** | permutation + Šidák/Reality Check + bootstrap CI + detrended benchmark — §3,5,6 |
-| 4 | Economically strong at the **CI lower bound**? | edge metrics, CI-gated — §2,3 |
-| 5 | Robust over time, fold by fold? | walk-forward + WFE + fold dispersion — §9 |
-| 6 | Generalizes to held-out assets? | cross-asset Reality Check — §5,10 |
-| 7 | Survivable under real sizing? | portfolio Monte Carlo — §10 |
+| **DECLARE** *(preamble)* | the rule is mechanical; the search is logged | EBTA Ch. 1 (§0); the variant count feeds §5 |
+| **CLEAN** *(preamble)* | no look-ahead | purge/embargo — §8; the look-ahead-free simulator — §1 |
+| **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
+| **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
+| **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
+| **GENERAL** | travels across markets | cross-market Reality Check — §5; breadth / N_eff — §10 |
+| **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
 
-The non-negotiable rule: **a FAIL at any hard gate sends you back to Stage 0, never to
-tweaking the failing number.** That is the anti-data-mining discipline made procedural.
+Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
+a strong later gate can't redeem an early failure. The non-negotiable rule: **a FAIL sends
+you back to DECLARE, never to tweaking the failing number.** That is the anti-data-mining
+discipline made procedural. Full write-up in
+[`docs/edge_gate.md`](edge_gate.md).
+
+**Where `pardo_quant_framework` extends it.** crucible stops at "the edge is real, strong,
+durable, and general." pqf wraps the same gauntlet in a heavier, capital-aware pipeline
+([`edge_validation_framework.md`](../../pardo_quant_framework/docs/edge_validation_framework.md)):
+it layers on the **ML-only diagnostics** (IC sign-stability, feature-importance stability),
+a **detrended benchmark** (a fractional-return cousin of the random-entry null), the
+**cross-asset universe orchestration** behind GENERAL, and — past crucible's boundary — the
+**SURVIVE** stage itself: portfolio Monte Carlo, MAR, and correlation on a real capital
+model (§10). Same gates, more machinery around them.
 
 ---
 
