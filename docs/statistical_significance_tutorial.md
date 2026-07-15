@@ -42,22 +42,32 @@ statistical logic, and where to read the primary source.
 
 Every technique downstream operates on one object: a `TradeLog` whose required column
 `r` is the per-trade return in **R-multiples** — profit measured in units of the risk
-taken at entry (`1R = sl × ATR` in the barrier simulator). R-normalization is what lets
+taken at entry — the entry-to-stop distance (`1R = entry − stop`, which the barrier
+simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
-The simulator that manufactures a log from a signal is deliberately **look-ahead-free**:
-barriers are sized off the *signal* bar (known at entry) and exits are scanned forward
-from entry (`simulator.py:64`, `:75`). This matters because every p-value later assumes
-each `r` was knowable only at the time — a single peek into the future contaminates the
+The `TradeLog` is deliberately agnostic about *how* the trades were produced. A
+hand-coded moving-average rule, a set of discretionary fills exported from a broker or a
+RealTest run, and an ML take/skip filter all reduce to the same schema — a column of
+R-multiples (plus optional MFE/MAE, holding period, entry/exit dates). The honesty layer
+never sees the strategy; it sees only the returns, which is exactly why one set of tests
+serves rule-based and model-based books alike.
+
+When you *do* generate the log from an entry rule, the barrier simulator that manufactures
+it is deliberately **look-ahead-free**: barriers are sized off the signal bar — the bar
+the rule fires on, known at entry — and exits are scanned forward from the entry bar
+(`simulator.py:64`, `:75`). This matters because every p-value later assumes each `r` was
+knowable only at the moment of the trade — a single peek into the future contaminates the
 whole null distribution.
 
 > **Sources.** The R-multiple as the unit of trade evaluation: Van Tharp, *Trade Your
 > Way to Financial Freedom* (origin of R and SQN, below). Risk-normalized, volatility-
 > scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
-> Targeting"** and **Ch. 10 "Position Sizing"**. Forward-looking labeling done without
-> leakage (the barrier construction): López de Prado, *Advances in Financial Machine
-> Learning* (AFML), **§3.4 "The Triple-Barrier Method"** — see §7 below.
+> Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
+> the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
+> Financial Machine Learning*, **§3.4 "The Triple-Barrier Method"**, cross-referenced in
+> §7) — but here it turns *any* entry rule into trades, ML or not.
 
 ---
 
@@ -72,7 +82,7 @@ Before any significance test, you summarize the sample. These are point estimate
 |---|---|---|
 | **Expectancy** | `wr·avg_win − lr·avg_loss` (in R), `metrics.py:28` | mean profit per trade |
 | **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
-| **Payoff ratio** | avg win / avg loss, `:51` | terminal win/loss geometry |
+| **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:72`,`:81` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:87` | "let winners run, cut losers" |
