@@ -130,6 +130,31 @@ Also here: `sidak_correction` and `whites_reality_check` (max-statistic across e
 variant you searched) for when a grid search flatters the best result.
 See [`examples/validation.py`](examples/validation.py).
 
+## One verdict for the whole edge — `crucible.validation.run_gauntlet`
+
+The individual tools above each answer one question. The **gauntlet** runs them as an
+ordered set of hard gates and returns a single audited pass/fail — the honest
+scorecard, capital-free:
+
+```python
+from crucible.validation import run_gauntlet
+
+gauntlet = run_gauntlet(
+    wf.stitched,        # the honest log — stitched out-of-sample
+    prices=px,          # enables REAL's random-timing null
+    wf=wf,              # adds the DURABLE gate
+    n_variants=4,       # size of your search -> REAL's Šidák correction
+)
+print(gauntlet.audit_report())
+print(gauntlet.passed)  # True only if every gate that ran passed
+```
+
+The gates — **REAL** (not noise, corrected for the search) → **STRONG** (real at the
+CI lower bound) → **DURABLE** (holds out-of-sample) → **GENERAL** (travels across
+markets) — with two bring-your-own preambles (**DECLARE**, **CLEAN**) and a deliberate
+handoff (**SURVIVE**: capital survivability is out of scope). Thresholds live in one
+overridable `Thresholds`. Full write-up in [`docs/edge_gate.md`](docs/edge_gate.md).
+
 ## A shareable tearsheet — `crucible.report`
 
 ```bash
