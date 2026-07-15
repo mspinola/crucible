@@ -10,14 +10,20 @@ Landed so far:
 
   information_coefficient / alpha_gate   how much predictive signal a score holds
   quantile_decay                         does a higher score mean a better outcome?
+  fold_ic                                out-of-fold rank IC per feature
+  redundancy_droplist / cramers_v        which features overlap, and which to keep
 
-Follow-ons (still in pardo): purged cross-validated IC, feature-redundancy
-droplists, point-in-time windowing, and the Plotly decay tearsheet.
+Follow-ons (still in pardo): point-in-time windowing helpers and the Plotly decay
+tearsheet.
 """
 from crucible.ml.ic import AlphaGateError, alpha_gate, information_coefficient
 from crucible.ml.decay import DecayTable, quantile_decay
+from crucible.ml.redundancy import (
+    RedundancyReport, cramers_v, fold_ic, redundancy_droplist,
+)
 
 __all__ = [
     "information_coefficient", "alpha_gate", "AlphaGateError",
     "quantile_decay", "DecayTable",
+    "fold_ic", "redundancy_droplist", "cramers_v", "RedundancyReport",
 ]
