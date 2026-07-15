@@ -33,6 +33,7 @@ dependencies = [
 # power the heavier layers that the OSS engine grows into — nothing in
 # crucible.edge imports them.
 examples = ["yfinance>=0.2"]   # run the README demo on real data
+data = ["cotdata>=0.1"]         # futures/COT data layer (import cotdata) — sibling package
 report = ["plotly>=5"]          # tearsheets (crucible.report, later)
 ml = ["scikit-learn>=1.2", "xgboost>=1.7"]  # walk-forward ML path (later)
 dev = ["pytest>=7"]
