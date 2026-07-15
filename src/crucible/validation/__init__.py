@@ -7,6 +7,8 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
   walk_forward   Pardo anchored/rolling walk-forward with per-fold efficiency
   permutation    sign-permutation p-value, data-mining correction, White's
                  Reality Check across every variant you searched
+  pbo            probability of backtest overfitting (CSCV) + deflated Sharpe —
+                 how much the ACT OF SELECTING the best config overfit
   gate           an audited, un-overridable pass/fail gate (and a Gauntlet of them)
   diagnostics    fold-level robustness reads (dispersion, walk-forward efficiency)
   gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
@@ -19,6 +21,9 @@ from crucible.validation.walk_forward import (
 from crucible.validation.permutation import (
     sign_permutation_pvalue, sidak_correction, whites_reality_check,
 )
+from crucible.validation.pbo import (
+    pbo_cscv, PBOResult, deflated_sharpe, DeflatedSharpe,
+)
 from crucible.validation.gate import Gate, GateCheck, Gauntlet
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.thresholds import Thresholds
@@ -30,6 +35,7 @@ __all__ = [
     "holdout", "split_train_test", "HoldoutResult",
     "walk_forward", "WalkForwardResult", "Fold",
     "sign_permutation_pvalue", "sidak_correction", "whites_reality_check",
+    "pbo_cscv", "PBOResult", "deflated_sharpe", "DeflatedSharpe",
     "Gate", "GateCheck", "Gauntlet",
     "fold_dispersion", "walk_forward_efficiency",
     "Thresholds",
