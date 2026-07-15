@@ -236,6 +236,24 @@ interval will look tighter than reality.
 July 2026. RealTest is actively developed; check its docs for the current
 feature set.)*
 
+## Ecosystem
+
+crucible is one piece of a small, deliberately unbundled toolchain. Each part
+owns one layer and stops there:
+
+- **[cotdata](https://github.com/mspinola/cotdata)** — the *data* layer. A local,
+  file-based store for futures prices and CFTC Commitments-of-Traders positioning,
+  with a producer/consumer split so research, backtests, and dashboards all read
+  identical data. Point it at a store, `import cotdata`, and you have the OHLC
+  frames and COT series you build a signal from.
+- **crucible** *(this package)* — the *edge* layer. Turn that signal into a trade
+  log and find out whether the edge is real.
+
+The flow runs one direction: **`cotdata` (data) → your signal → `crucible`
+(edge)**. Neither imports the other, so either works alone — but together they
+take you from raw CFTC/price data to a capital-free verdict with no vendor SDK at
+runtime.
+
 ## Releasing
 
 Releases publish to PyPI via GitHub Actions using **Trusted Publishing** (OIDC —
