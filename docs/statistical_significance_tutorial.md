@@ -1,0 +1,507 @@
+# From Trade Log to Verdict: The Statistics of a Significant Edge
+
+**A tutorial on the statistical techniques in `crucible` (and, to a lesser extent,
+`pardo_quant_framework`), and how each one contributes to declaring a trade log
+statistically significant — with references to the source literature.**
+
+---
+
+## 0. What "statistically significant trade log" actually means
+
+A backtester hands you a rising equity curve and a headline number — "profit factor
+1.37, 214 trades." The number is *real* in the sense that it happened on the data. The
+question this tutorial is about is different:
+
+> Given how few trades I have, and how many variants I tried before landing on this
+> one, could a curve this good have come from **no edge at all**?
+
+Answering that turns a point estimate into a **verdict**. Two distinct failure modes
+have to be ruled out (the framing is Aronson's, carried into
+`pardo_quant_framework/docs/edge_validation_framework.md`):
+
+1. **Luck mistaken for skill** — a small sample, or a large search, threw up a good
+   number by chance. *(Statistical validity.)*
+2. **A real pattern that doesn't travel** — genuine in-sample, gone out-of-sample or on
+   another market. *(Robustness / generalization.)*
+
+`crucible` is the tool that answers these at the **trade-log level**, before any
+capital, position sizing, or equity curve enters the picture. `pardo_quant_framework`
+wraps the same primitives in a staged, gated pipeline for a real COT-based book.
+
+Everything below is organized as a pipeline: **describe the edge → quantify sampling
+noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account
+for correlation**. Each section names the technique, the code that implements it, the
+statistical logic, and where to read the primary source.
+
+---
+
+## 1. The substrate: a risk-normalized trade log (R-multiples)
+
+**Code:** [`edge/trade_log.py`](../src/crucible/edge/trade_log.py),
+[`edge/simulator.py`](../src/crucible/edge/simulator.py)
+
+Every technique downstream operates on one object: a `TradeLog` whose required column
+`r` is the per-trade return in **R-multiples** — profit measured in units of the risk
+taken at entry (`1R = sl × ATR` in the barrier simulator). R-normalization is what lets
+returns from different instruments and volatility regimes pool into one sample that the
+statistics can treat as draws from a single distribution.
+
+The simulator that manufactures a log from a signal is deliberately **look-ahead-free**:
+barriers are sized off the *signal* bar (known at entry) and exits are scanned forward
+from entry (`simulator.py:64`, `:75`). This matters because every p-value later assumes
+each `r` was knowable only at the time — a single peek into the future contaminates the
+whole null distribution.
+
+> **Sources.** The R-multiple as the unit of trade evaluation: Van Tharp, *Trade Your
+> Way to Financial Freedom* (origin of R and SQN, below). Risk-normalized, volatility-
+> scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
+> Targeting"** and **Ch. 10 "Position Sizing"**. Forward-looking labeling done without
+> leakage (the barrier construction): López de Prado, *Advances in Financial Machine
+> Learning* (AFML), **§3.4 "The Triple-Barrier Method"** — see §7 below.
+
+---
+
+## 2. Describing the edge: capital-free metrics
+
+**Code:** [`edge/metrics.py`](../src/crucible/edge/metrics.py)
+
+Before any significance test, you summarize the sample. These are point estimates — they
+*describe*, they do not yet *defend*.
+
+| Metric | Definition (code) | Reads on |
+|---|---|---|
+| **Expectancy** | `wr·avg_win − lr·avg_loss` (in R), `metrics.py:28` | mean profit per trade |
+| **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
+| **Payoff ratio** | avg win / avg loss, `:51` | terminal win/loss geometry |
+| **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
+| **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:72`,`:81` | is there directional edge *before* the exit rule? |
+| **Time asymmetry** | avg bars in wins / avg bars in losses, `:87` | "let winners run, cut losers" |
+| **Exit efficiency** | captured / available MFE, `:98` | how much of the move the exit banked |
+
+The one to single out is **SQN** (System Quality Number, Van Tharp):
+`mean(R) / std(R) × √n`. It is a Sharpe-like *t*-statistic on the per-trade returns — the
+same quantity a significance test formalizes. A high mean means nothing if the standard
+deviation is huge or `n` is tiny; SQN is the first hint of whether the sample can support
+a claim at all.
+
+> **Sources.**
+> - Expectancy, profit factor, payoff, drawdown and the rest of the classic evaluation
+>   battery: **Pardo, *The Evaluation and Optimization of Trading Strategies*, 2nd ed.
+>   (2008), the "Evaluation of Trading Strategies" chapter** — this is the canonical list
+>   `edge_report` reproduces.
+> - **SQN**: Van Tharp, *Trade Your Way to Financial Freedom*, 2nd ed. (2007), ch. on
+>   "The System Quality Number." Both codebases use Van Tharp's `√min(n,100)` cap:
+>   crucible's `sqn()` (`metrics.py:60`) is the single source of truth, and the
+>   framework's `PardoSQNEvaluator.calculate_sqn` delegates to it. (An earlier Pardo
+>   variant used `√100` always to normalize low-frequency books across asset classes,
+>   but that credited small samples with confidence they hadn't earned — inflating a
+>   30-trade SQN by √(100/30) ≈ 1.8× — and was replaced. Its walk-forward ratio
+>   WFE_SQN stays computed on the sample-size-independent per-trade quality (mean/std),
+>   so a fold's robustness score isn't distorted by IS/OOS window-length asymmetry.)
+> - Excursion (MFE/MAE) analysis: Sweeney, *Campaign Trading*; Curtis Faith, *Way of the
+>   Turtle* (the E-ratio) — cited in the `metrics.py` module docstring.
+> - The *risk-adjusted* framing (why std matters as much as mean): Carver, *Advanced
+>   Futures Trading Strategies* (2021), the chapters on the **Sharpe ratio and evaluating
+>   returns** — Carver stresses that a Sharpe/SQN is itself an estimate with a wide error
+>   bar, which is exactly what §3 addresses.
+
+---
+
+## 3. Quantifying sampling noise: the bootstrap confidence interval
+
+**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `bootstrap_ci`,
+`p_value_positive`; framework mirror in
+[`pardo .../validation/bootstrap.py`](../../pardo_quant_framework/src/validation/bootstrap.py).
+
+A point estimate of expectancy on 60–200 trades badly understates how much it could
+have wobbled. The **bootstrap** turns the single number into a distribution:
+
+```
+for i in 1..10000:           # stats.py:54  _resample
+    draw = sample r WITH REPLACEMENT, size n
+    record metric(draw)
+CI = [2.5th percentile, 97.5th percentile]     # stats.py:76
+```
+
+Resampling the trade log with replacement simulates "other histories you could plausibly
+have drawn from the same edge." The **2.5–97.5 percentile band** is the 95% confidence
+interval; `p_value_positive` reports the fraction of resamples where the metric stayed
+positive.
+
+Why it is the honest read: it makes no normality assumption (trade returns are skewed and
+fat-tailed), and it works for *any* metric — expectancy, profit factor, SQN — not just the
+mean. On small samples the band is wide, and that width **is the message**.
+
+The framework gates on this: Stage 4 requires the **CI lower bound**, not the point
+estimate, to clear each threshold (`stage_evaluator.py:142-151`). This directly fixes the
+"PF 1.37 on 60 trades treated as a clean pass" failure the framework was built to prevent.
+
+> **Sources.**
+> - **Aronson, *Evidence-Based Technical Analysis* (EBTA, 2006), Ch. 4 "Statistical
+>   Analysis" (p. 165) and Ch. 5 "Hypothesis Tests and Confidence Intervals" (p. 217)** —
+>   sampling distributions, the bootstrap, and confidence intervals for trading
+>   statistics. This is the direct antecedent of `bootstrap_ci`.
+> - AFML **Ch. 14 "Backtest Statistics"** — the family of statistics a backtest should
+>   report as distributions, not points.
+> - Carver, *Systematic Trading*, **Appendix C "Portfolio Optimisation → More details on
+>   bootstrapping"** — bootstrap resampling applied to strategy/portfolio estimates.
+
+---
+
+## 4. The verdict: folding point + CI + p-value into a label
+
+**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `reality_check`, `Verdict`
+(`stats.py:93`)
+
+`reality_check` is the call the README calls "the whole point of the package." It collapses
+the three numbers into a decision:
+
+```
+HELD     point > 0  AND  CI lower bound > 0     # the edge clears zero across resamples
+FRAGILE  point > 0  BUT  CI straddles zero       # positive, but indistinguishable from noise
+FAIL     otherwise
+```
+
+`FRAGILE` is the state a backtester never shows you: a positive expectancy whose confidence
+interval includes zero. The equity curve looked like an edge; the statistics say *don't
+size it up.* This is significance testing expressed as an operating instruction rather than
+a p-value to be argued over.
+
+> **Sources.** The philosophy — a rule earns belief only when the evidence clears a
+> pre-set statistical bar, not when it merely looks good — is the thesis of **EBTA Ch. 3
+> "The Scientific Method and Technical Analysis" (p. 103)** and **Ch. 5 (p. 217)**. The
+> "hard gate, no discretionary override" posture is spelled out in
+> `edge_validation_framework.md` → *Two-Tier Gating Philosophy*.
+
+---
+
+## 5. Ruling out data-mining luck: permutation tests
+
+This is the heart of the significance story and the reason Aronson & Masters matter.
+
+### 5a. Sign-permutation test (one strategy)
+
+**Code:** [`validation/permutation.py`](../src/crucible/validation/permutation.py) —
+`sign_permutation_pvalue`
+
+```
+observed = mean(r)
+for k in 1..5000:                              # permutation.py:42
+    flip each trade's sign at random (±1)
+    record mean(signs · |r|)
+p = (# permuted means ≥ observed + 1) / (N + 1)
+```
+
+The **null hypothesis** is "no directional skill" — under it, each trade's *sign* is a coin
+flip while its *magnitude* is whatever it was. Shuffling signs builds the distribution of
+outcomes a skill-less system would produce on these same magnitudes; the p-value is how
+often chance matches or beats you. This is **Timothy Masters' Monte Carlo Permutation
+Method**, the public-domain alternative to White's patented Reality Check.
+
+### 5b. Šidák correction (you tried N variants)
+
+**Code:** `permutation.py:47` — `sidak_correction`; `corrected = 1 − (1 − p)^N`
+
+If you quietly tried 50 parameter sets and reported the best, its raw p-value is a lie of
+selection. Šidák asks: *what's the chance the best of N independent searches looks this
+good by luck?* It is the conservative fallback when you only know the **count** of variants.
+The framework applies it in Stage 3 using the search-space log
+(`stage_evaluator.py:78`).
+
+### 5c. White's Reality Check (you have every variant's returns)
+
+**Code:** `permutation.py:59` — `whites_reality_check`
+
+```
+for each permutation:                          # permutation.py:84
+    flip signs for EVERY variant
+    record the BEST mean across all variants   # the max-statistic
+compare observed best against this "distribution of the best"
+```
+
+Taking the **maximum inside each permutation** is what corrects for the size of the search:
+you compare your winner not against zero, but against *the best number a pure-noise search
+of the same size would have thrown up.* The docstring's warning is load-bearing — you must
+pass **every variant including the discards**, or the correction is toothless.
+
+> **Sources.**
+> - **EBTA Ch. 6 "Data-Mining Bias: The Fool's Gold of Objective TA" (p. 255)** — the
+>   definitive treatment of data-mining bias, the Monte Carlo permutation method, and
+>   White's Reality Check, applied in the **Ch. 8 case study (p. 389)** across 6,402 rules.
+> - EBTA **Acknowledgments (p. ix)** credits **Timothy Masters** with innovating the Monte
+>   Carlo permutation method and placing it in the public domain — the exact method in
+>   `sign_permutation_pvalue`.
+> - **Aronson & Masters, *Statistically Sound Machine Learning for Algorithmic Trading*
+>   (SSML, 2013)** — the applied companion; see the Introduction's **"Performance Criteria"**
+>   and the permutation-test / selection-bias sections (the book is organized by topic
+>   around the TSSB tool).
+> - White, H. (2000), "A Reality Check for Data Snooping," *Econometrica* 68(5) — the
+>   original max-statistic bootstrap `whites_reality_check` reimplements.
+> - Multiple-comparisons / overfitting the search itself: AFML **Ch. 11 "The Dangers of
+>   Backtesting"** and **Ch. 12 "Backtesting through Cross-Validation."**
+
+---
+
+## 6. Ruling out drift: the random-entry / detrended benchmark
+
+**Code:** `edge/stats.py:115` — `random_entry_null` (crucible);
+[`pardo .../validation/benchmark.py`](../../pardo_quant_framework/src/validation/benchmark.py)
+— `detrended_benchmark_test` (framework)
+
+Beating zero is not enough on an instrument that drifts up. The right null is *"did my
+signal beat coin-flip timing on this same instrument?"*
+
+- **crucible** `random_entry_null`: run `n_sims` trade logs with **random entries**, same
+  barriers, same prices; compare your real expectancy against that distribution.
+- **framework** `detrended_benchmark_test`: build randomly-timed trades **matched to your
+  actual directions and holding periods**, on a **drift-removed** return series, and require
+  your per-trade expectancy to beat the 95th percentile of that no-skill distribution
+  (`benchmark.py:63-73`).
+
+Detrending is what isolates *timing skill* from *riding the market*. It also makes the
+benchmark automatically asset-class-appropriate: an equity index's structural long drift is
+removed the same way a currency's near-zero drift is, so no hand-picked per-class benchmark
+is needed.
+
+> **Sources.**
+> - **EBTA Appendix "Proof That Detrending Is Equivalent to Benchmarking Based on Position
+>   Bias" (p. 475)** — the theoretical justification for the detrended benchmark; also
+>   **Ch. 1 "Objective Rules and Their Evaluation" (p. 15)** on benchmarking a rule against
+>   its position bias.
+> - SSML Introduction, **"Model Performance Versus Financial Performance"** and **"Financial
+>   Relevance and Generalizability"** — beating a naive-exposure benchmark, not just zero.
+
+---
+
+## 7. Defining the trade honestly: triple-barrier labeling (framework)
+
+**Code:** [`pardo .../ml/labels.py`](../../pardo_quant_framework/src/ml/labels.py) —
+`compute_triple_barrier_labels`; barrier version in
+[`crucible .../simulator.py`](../src/crucible/edge/simulator.py)
+
+Before you can test a trade log you must define what a "trade outcome" *is*, mechanically
+and without hindsight. The **triple-barrier method** labels each entry by whichever of three
+events fires first: a profit barrier (`+tp·ATR`), a stop barrier (`−sl·ATR`), or a vertical
+time barrier (`horizon`). Volatility-scaled (ATR) barriers keep the labels comparable across
+regimes. Because the label *looks forward* until a barrier is touched, it creates the
+leakage risk that §8's purge/embargo exists to neutralize.
+
+> **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (and §3.2–3.3 on
+> fixed-time-horizon and dynamic thresholds) — the exact construction `labels.py` implements.
+> Pairs with **§3.5 "Learning Side and Size."**
+
+### Meta-labeling (framework)
+
+**Code:** [`pardo .../ml/meta_eval.py`](../../pardo_quant_framework/src/ml/meta_eval.py)
+
+The ML layer does not predict direction; it predicts **whether to take or skip** a trade the
+rules book already generated (meta-label = "did this trade win?"). This is López de Prado's
+**meta-labeling**: keep a transparent primary model for *side*, add an ML filter for
+*size/precision*, and judge it only if take/skip beats take-all out-of-sample.
+
+> **Sources.** **AFML §3.6 "Meta-Labeling"** and **§3.7 "How to Use Meta-Labeling."**
+
+---
+
+## 8. Confirming out-of-sample: holdout, purge & embargo
+
+**Code:** [`validation/holdout.py`](../src/crucible/validation/holdout.py) — `holdout`,
+`split_train_test`
+
+For a **fixed** strategy, the honest test is temporal: measure the edge early, freeze it,
+confirm on a late period the analysis never touched. Two leakage controls make the split
+real (`holdout.py:36-48`):
+
+- **Purge:** a training trade must have both *entered and exited* before the split — a trade
+  whose forward window straddles the boundary can't leak future information into the fitted
+  side.
+- **Embargo:** drop the first `embargo_weeks` of the test period, killing residual
+  autocorrelation across the seam.
+
+The `HoldoutResult` runs a full `reality_check` on each side and declares **the untouched
+TEST period the verdict** (`holdout.py:56`, `:69`). Train is expected to look good — that's
+where an edge would have been chosen; only test counts.
+
+> **Sources.**
+> - **AFML Ch. 7 "Cross-Validation in Finance," §7.4 "A Solution: Purged K-Fold CV"** — the
+>   origin of purge + embargo for overlapping financial labels. Directly cited in the
+>   framework doc's Stage 1.
+> - **Pardo (2008), the "Walk-Forward Analysis" chapter** — the in-sample/out-of-sample
+>   discipline this generalizes.
+> - Carver, *Systematic Trading*, **Ch. 3 "Fitting"** — why in-sample results prove nothing
+>   and the case for simple, robust, hard-to-overfit parameters.
+
+---
+
+## 9. Confirming it *keeps* working: walk-forward analysis & efficiency
+
+**Code:** [`validation/walk_forward.py`](../src/crucible/validation/walk_forward.py) —
+`walk_forward`, `_wfe`
+
+One holdout is a single split; **walk-forward** rolls it through history: optimize params on
+an in-sample window, apply the winner to the next untouched out-of-sample window, step
+forward, repeat, then **stitch all OOS slices into one trade log**. If the stitched OOS edge
+survives `reality_check`, the strategy generalized through time; if it dies, the in-sample
+result was curve-fit (`walk_forward.py` module docstring).
+
+Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
+`walk_forward.py:136-138`) and reports **Walk-Forward Efficiency (WFE)** — Pardo's named
+ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
+healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
+
+The framework hardens this against a specific trap (`stage_evaluator.py` Stage 5): a healthy
+*average* WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check —
+what fraction of folds are individually tradable (SQN > 0) and the coefficient of variation
+of fold SQN. High dispersion is itself a rejection, independent of the average.
+
+> **Sources.**
+> - **Pardo (2008)** — the walk-forward method and the **Walk-Forward Efficiency** metric
+>   are his; the WFA chapter is the primary source. `walk_forward.py` is a capital-free
+>   reimplementation of it.
+> - **AFML Ch. 12 "Backtesting through Cross-Validation," §12.2 "The Walk-Forward Method"**
+>   and **§12.4 "The Combinatorial Purged Cross-Validation Method"** — the modern critique
+>   and generalization of single-path walk-forward.
+> - SSML Introduction, **"Walkforward Testing"** and **"Overlap Considerations."**
+
+---
+
+## 10. Correcting for correlation: effective sample size & portfolio Monte Carlo (framework)
+
+A book of 665 trades across 20 markets is not 665 independent bets — eight currency futures
+are roughly one dollar bet. Two framework tools account for this; both bear directly on
+whether a significance claim is honest.
+
+**Effective N** —
+[`pardo .../validation/effective_n.py`](../../pardo_quant_framework/src/validation/effective_n.py):
+computes `N_eff = (Σλ)² / Σλ²`, the **participation ratio** of the eigenvalues of the
+return-correlation matrix (`effective_n.py:71`). N perfectly independent markets give
+`N_eff = N`; perfectly correlated give `N_eff = 1`. It is *"the honest denominator for
+significance"* — a permutation p-value computed as if trades were independent is optimistic
+when they cluster into a few factors, which a PCA breakdown then names.
+
+**Portfolio Monte Carlo** —
+[`pardo .../validation/portfolio_mc.py`](../../pardo_quant_framework/src/validation/portfolio_mc.py):
+a **circular block bootstrap** of the monthly portfolio-return series (`block_bootstrap`,
+`portfolio_mc.py:49`). Contiguous blocks preserve within-period clustering and
+autocorrelation that a naive per-trade shuffle destroys; the output is a distribution of max
+drawdown, terminal equity, and risk-of-ruin per risk fraction. A per-trade shuffle assumes
+independence and therefore *understates* drawdown — block resampling is the correction.
+
+> **Sources.**
+> - Concurrency / overlap and effective sample size: **AFML Ch. 4 "Sample Weights," §4.3
+>   "Number of Concurrent Labels" and §4.4 "Average Uniqueness of a Label"**; correlation-
+>   based structure in **Ch. 16 "Machine Learning Asset Allocation"** (HRP; §16.A.1
+>   "Correlation-Based Metric").
+> - Number of *independent bets* and the **diversification multiplier**: **Carver,
+>   *Systematic Trading*, Ch. 11 "Portfolios" and Appendix D "Framework Details →
+>   Calculation of diversification multiplier"**; extended in **Carver, *Advanced Futures
+>   Trading Strategies*** (instrument diversification and its multiplier across a large
+>   universe).
+> - Monte Carlo drawdown / risk-of-ruin on reshuffled trade sequences: **Pardo (2008),
+>   Monte Carlo and money-management material**; risk of ruin and strategy failure: **AFML
+>   Ch. 15 "Understanding Strategy Risk," §15.4 "The Probability of Strategy Failure."**
+
+---
+
+## 11. The whole pipeline, as a gate
+
+`pardo_quant_framework/docs/edge_validation_framework.md` assembles every primitive above
+into an ordered, hard-gated checklist. Each stage answers one of four questions:
+
+| Stage | Question | crucible / framework primitive |
+|---|---|---|
+| 0 | Is the rule mechanical and pre-registered? | (human) EBTA Ch. 1 |
+| 1 | Is the data leakage-free? | purge/embargo — §8 |
+| 2 | Calibrated without memorizing noise, every variant logged? | search-space log — §5 |
+| 3 | **Real effect after correcting for the search?** | permutation + Šidák/Reality Check + bootstrap CI + detrended benchmark — §3,5,6 |
+| 4 | Economically strong at the **CI lower bound**? | edge metrics, CI-gated — §2,3 |
+| 5 | Robust over time, fold by fold? | walk-forward + WFE + fold dispersion — §9 |
+| 6 | Generalizes to held-out assets? | cross-asset Reality Check — §5,10 |
+| 7 | Survivable under real sizing? | portfolio Monte Carlo — §10 |
+
+The non-negotiable rule: **a FAIL at any hard gate sends you back to Stage 0, never to
+tweaking the failing number.** That is the anti-data-mining discipline made procedural.
+
+---
+
+## Bibliography
+
+Listed in rough order of contribution to the significance machinery. Where a book is
+organized by topic rather than fixed pagination (SSML) or where I cite a chapter rather than
+a verified page, that is stated explicitly.
+
+1. **Aronson, David R. — *Evidence-Based Technical Analysis*** (Wiley, 2006/2007).
+   *The statistical backbone.* Ch. 4 "Statistical Analysis" (p. 165); Ch. 5 "Hypothesis
+   Tests and Confidence Intervals" (p. 217) → bootstrap CIs, hypothesis testing; **Ch. 6
+   "Data-Mining Bias: The Fool's Gold of Objective TA" (p. 255)** → the permutation test,
+   White's Reality Check, multiple comparisons; Ch. 8 "Case Study of Rule Data Mining for
+   the S&P 500" (p. 389) → the method applied to 6,402 rules; Appendix "Proof That
+   Detrending Is Equivalent to Benchmarking Based on Position Bias" (p. 475) → the detrended
+   benchmark. Acknowledgments (p. ix) credit Timothy Masters with the Monte Carlo
+   permutation method.
+
+2. **Aronson, David R. & Masters, Timothy — *Statistically Sound Machine Learning for
+   Algorithmic Trading of Financial Instruments*** (2013). *Applied companion to EBTA,
+   organized by topic around the TSSB tool.* Introduction → "Walkforward Testing," "Cross
+   Validation," "Overlap Considerations," "Performance Criteria," "Model Performance Versus
+   Financial Performance," "Financial Relevance and Generalizability"; plus the permutation-
+   test / selection-bias sections. Source for the sign-permutation implementation and the
+   model-vs-financial-performance distinction.
+
+3. **López de Prado, Marcos — *Advances in Financial Machine Learning*** (Wiley, 2018).
+   *The leakage-control and ML-labeling backbone.* Ch. 3 "Labeling" §3.4 "The Triple-Barrier
+   Method," §3.6–3.7 "Meta-Labeling"; Ch. 4 "Sample Weights" §4.3–4.4 (concurrency,
+   uniqueness → effective sample); **Ch. 7 "Cross-Validation in Finance" §7.4 "Purged K-Fold
+   CV"** (purge & embargo); Ch. 11 "The Dangers of Backtesting"; Ch. 12 "Backtesting through
+   Cross-Validation" §12.2 (walk-forward), §12.4 (CPCV); Ch. 14 "Backtest Statistics"; Ch. 15
+   "Understanding Strategy Risk" §15.4 "The Probability of Strategy Failure"; Ch. 16 "ML Asset
+   Allocation" (correlation structure).
+
+4. **Pardo, Robert — *The Evaluation and Optimization of Trading Strategies*, 2nd ed.**
+   (Wiley, 2008). *The temporal-robustness backbone.* The "Evaluation of Trading Strategies"
+   chapter → the classic performance metrics (`edge_report`); the "Walk-Forward Analysis"
+   chapter → walk-forward method and the **Walk-Forward Efficiency (WFE)** metric; the
+   optimization/robustness and Monte-Carlo money-management material. *(Cited by chapter;
+   the scanned copy's page numbers were not individually verified here.)*
+
+5. **Carver, Robert — *Systematic Trading*** (Harriman House, 2015). *Overfitting discipline
+   and portfolio structure.* Ch. 3 "Fitting" → in-sample/out-of-sample, robust simple
+   parameters; Ch. 9 "Volatility Targeting," Ch. 10 "Position Sizing" → risk-normalized
+   returns; Ch. 11 "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
+   rule-of-thumb correlations) and Appendix D "→ Calculation of diversification multiplier"
+   → the number-of-independent-bets idea behind `N_eff`.
+
+6. **Carver, Robert — *Advanced Futures Trading Strategies*** (Harriman House, 2021).
+   *Referenced to a lesser extent.* The Sharpe-ratio / return-evaluation chapters (a
+   performance statistic is itself an estimate with error) and the instrument-diversification
+   / diversification-multiplier material across a large futures universe — the practical
+   counterpart to `effective_n.py` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
+
+**Supporting reference (not in the provided set):**
+Van Tharp, Van K. — *Trade Your Way to Financial Freedom*, 2nd ed. (McGraw-Hill, 2007) →
+the R-multiple and the **System Quality Number (SQN)**, implemented in `metrics.py:60`.
+
+White, Halbert (2000), "A Reality Check for Data Snooping," *Econometrica* 68(5): 1097–1126 →
+the original Reality Check that `whites_reality_check` reimplements via sign permutation.
+
+---
+
+## Code map (where each technique lives)
+
+| Technique | File |
+|---|---|
+| Trade-log schema, R-multiples | `crucible/src/crucible/edge/trade_log.py` |
+| Look-ahead-free barrier simulator | `crucible/src/crucible/edge/simulator.py` |
+| Edge metrics (expectancy, PF, SQN, excursion…) | `crucible/src/crucible/edge/metrics.py` |
+| Bootstrap CI, p-value, reality_check verdict, random-entry null | `crucible/src/crucible/edge/stats.py` |
+| Sign-permutation, Šidák, White's Reality Check | `crucible/src/crucible/validation/permutation.py` |
+| Purged/embargoed holdout | `crucible/src/crucible/validation/holdout.py` |
+| Walk-forward + WFE | `crucible/src/crucible/validation/walk_forward.py` |
+| Bootstrap metric CIs (framework) | `pardo_quant_framework/src/validation/bootstrap.py` |
+| Staged gates (Stage 3/4/5) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
+| Detrended random-timing benchmark | `pardo_quant_framework/src/validation/benchmark.py` |
+| Effective N / factor PCA | `pardo_quant_framework/src/validation/effective_n.py` |
+| Portfolio Monte Carlo (block bootstrap) | `pardo_quant_framework/src/validation/portfolio_mc.py` |
+| Triple-barrier labels | `pardo_quant_framework/src/ml/labels.py` |
+| Meta-labeling harness | `pardo_quant_framework/src/ml/meta_eval.py` |
+| The gated framework, in prose | `pardo_quant_framework/docs/edge_validation_framework.md` |
