@@ -173,6 +173,43 @@ MFE/MAE excursion, and the bootstrap expectancy distribution behind the CI. Stil
 capital-free — it charts summed **R**, never an equity curve. See
 [`examples/tearsheet.py`](examples/tearsheet.py).
 
+## Is the ML signal real? — `crucible.ml`
+
+The same honesty question, aimed at a model's **scores** instead of a trade log:
+does a predicted probability actually rank outcomes, or is it noise, leakage, or a
+redundant feature wearing a new name? Model-agnostic and capital-free — the core is
+numpy/pandas (no sklearn/xgboost); only the tearsheet needs the `report` extra.
+
+```python
+from crucible.ml import (
+    information_coefficient, alpha_gate,   # predictive power, + a PASS/FAIL gate
+    quantile_decay, decay_tearsheet,       # does a higher score mean a better outcome?
+    fold_ic, redundancy_droplist,          # out-of-fold IC; which features overlap
+    asof_window,                           # a point-in-time slice that can't peek ahead
+)
+
+# `preds`: a frame with a continuous `score` and the realized `label` (+1 win / -1 or 0 loss)
+ic = information_coefficient(preds)        # Spearman rank IC of score vs outcome
+alpha_gate(ic, min_ic=0.03)                # raises AlphaGateError below the bar
+
+decay = quantile_decay(preds)              # realized win rate per score quintile
+print(decay.monotonic, decay.spread)       # a real edge climbs Q1 -> Q5
+
+rep = redundancy_droplist(panel, features, target="fwd")
+print(rep.kept, rep.dropped)               # keep the highest-|IC| of each redundant cluster
+```
+
+- **`information_coefficient` / `alpha_gate`** — Spearman rank IC of a score against
+  its realized label, plus a PASS/FAIL gate to stop an edge-less or leaking model early.
+- **`quantile_decay` / `decay_tearsheet`** — realized win rate per score quantile (a
+  genuine edge rises monotonically Q1→Q5); the tearsheet renders it as self-contained HTML.
+- **`fold_ic` / `redundancy_droplist`** — per-feature out-of-fold IC, and a
+  keep-highest-|IC| drop-list that groups features by |Spearman| / Cramér's V.
+- **`asof_window` / `window_before`** — leakage-safe point-in-time slices, so a live
+  feature is built identically to its training twin.
+
+Still capital-free: it judges *signals and features*, never an equity curve.
+
 ## What this is — and isn't
 
 ✅ Trade-level edge metrics, excursion efficiency, bootstrap CIs, a random-entry
