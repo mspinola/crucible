@@ -19,6 +19,17 @@ pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on r
 
 > Installed as **`crucible-quant`**, imported as **`crucible`** (`import crucible`).
 
+## What crucible answers
+
+One trade log, one question at a time — each harder than the last, each answered
+out loud by a named function:
+
+- ✅ **Describe the edge** — expectancy, profit factor, payoff, SQN, MFE/MAE efficiency → `edge_report`
+- ✅ **Quantify sampling noise** — a bootstrap CI and p-value on every headline metric → `bootstrap_ci` · `p_value_positive`
+- ✅ **Rule out data-mining luck** — sign-permutation p-value (Masters) + a random-entry reality check → `permutation` · `reality_check`
+- ✅ **Rule out drift** — a leakage-controlled early-train / late-confirm split → `validation.holdout`
+- ✅ **Confirm out-of-sample** — Pardo walk-forward with purge / embargo hygiene → `validation.walk_forward`
+
 ## 30-second example
 
 ```python
