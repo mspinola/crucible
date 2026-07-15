@@ -12,9 +12,20 @@ from typing import Callable
 import numpy as np
 
 from crucible.edge.trade_log import TradeLog
-from crucible.edge.metrics import expectancy
+from crucible.edge.metrics import expectancy, profit_factor, sqn, win_rate
 
 Metric = Callable[[np.ndarray], float]
+
+# The default metric set for `bootstrap_metric_cis` — the headline numbers a gate
+# reasons over. Each is unit-consistent with the trade returns fed in (expectancy
+# in R, profit_factor / win_rate ratios, sqn a t-like ratio), so the same call
+# works on an R-multiple TradeLog.
+_DEFAULT_METRICS: "dict[str, Metric]" = {
+    "expectancy": expectancy,
+    "profit_factor": profit_factor,
+    "sqn": sqn,
+    "win_rate": win_rate,
+}
 
 
 @dataclass
@@ -76,6 +87,49 @@ def bootstrap_ci(trades: TradeLog, metric: Metric = expectancy,
     lo = float(np.percentile(finite, alpha / 2 * 100)) if len(finite) else float("nan")
     hi = float(np.percentile(finite, (1 - alpha / 2) * 100)) if len(finite) else float("nan")
     return CI(point=float(metric(r)), low=lo, high=hi, alpha=alpha)
+
+
+def bootstrap_metric_cis(trades, metrics: "dict[str, Metric] | None" = None,
+                         n_boot: int = 10_000, alpha: float = 0.05,
+                         seed: int = 0) -> "dict[str, CI]":
+    """Bootstrap CIs for a whole SET of metrics at once — the multi-metric
+    companion to :func:`bootstrap_ci`.
+
+    One resample loop, every metric read off each draw, returned as a
+    ``{name: CI}`` mapping so a gate can compare each metric's CI **lower bound**
+    against a threshold instead of trusting the single realized point estimate.
+    Defaults to expectancy / profit_factor / sqn / win_rate; pass `metrics` to
+    override. `trades` may be a TradeLog or a plain return array."""
+    r = trades.r if isinstance(trades, TradeLog) else np.asarray(trades, dtype=float)
+    r = r[~np.isnan(r)]
+    metrics = metrics or _DEFAULT_METRICS
+    if len(r) == 0:
+        nan = float("nan")
+        return {name: CI(nan, nan, nan, alpha) for name in metrics}
+
+    rng = np.random.default_rng(seed)
+    n = len(r)
+    draws = {name: np.empty(n_boot) for name in metrics}
+    for i in range(n_boot):
+        s = rng.choice(r, size=n, replace=True)
+        for name, fn in metrics.items():
+            draws[name][i] = fn(s)
+
+    out: "dict[str, CI]" = {}
+    for name, fn in metrics.items():
+        vals = draws[name]
+        finite = vals[np.isfinite(vals)]
+        if len(finite) == 0:
+            # e.g. profit_factor on resamples that never have a loser -> all +inf
+            lo = hi = float("inf")
+        else:
+            # inf draws (a resample with no losers) keep the percentile well
+            # defined but trip a spurious inf-inf "invalid value" warning — mute it.
+            with np.errstate(invalid="ignore"):
+                lo = float(np.percentile(vals, alpha / 2 * 100))
+                hi = float(np.percentile(vals, (1 - alpha / 2) * 100))
+        out[name] = CI(point=float(fn(r)), low=lo, high=hi, alpha=alpha)
+    return out
 
 
 def p_value_positive(trades: TradeLog, metric: Metric = expectancy,
