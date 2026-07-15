@@ -30,6 +30,7 @@ each harder than the last, each answered out loud by a named function:
 - ✅ **Rule out drift** — a leakage-controlled early-train / late-confirm split → `validation.holdout`
 - ✅ **Confirm out-of-sample** — Pardo walk-forward with purge / embargo hygiene → `validation.walk_forward`
 - ✅ **Account for correlation** — the effective number of *independent* bets across a correlated book → `breadth.effective_n`
+- ✅ **…then all of it, as one gate** — run every check above as an ordered, audited gauntlet (REAL → STRONG → DURABLE → GENERAL) that passes only if every gate does → `validation.run_gauntlet`
 
 ## 30-second example
 
