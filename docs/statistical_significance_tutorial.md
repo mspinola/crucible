@@ -375,27 +375,36 @@ of fold SQN. High dispersion is itself a rejection, independent of the average.
 
 ---
 
-## 10. Correcting for correlation: effective sample size & portfolio Monte Carlo (framework)
+## 10. Correcting for correlation: effective sample size (crucible) & portfolio survivability (framework)
 
 A book of 665 trades across 20 markets is not 665 independent bets — eight currency futures
-are roughly one dollar bet. Two framework tools account for this; both bear directly on
-whether a significance claim is honest.
+are roughly one dollar bet. Two tools account for this: one **capital-free** and native to
+crucible, one **capital-aware** and left to the framework. Both bear directly on whether a
+significance claim is honest.
 
-**Effective N** —
-[`pardo .../validation/effective_n.py`](../../pardo_quant_framework/src/validation/effective_n.py):
-computes `N_eff = (Σλ)² / Σλ²`, the **participation ratio** of the eigenvalues of the
-return-correlation matrix (`effective_n.py:71`). N perfectly independent markets give
+**Effective N** — [`breadth.py`](../src/crucible/breadth.py): `effective_n(returns)` returns a
+`Breadth` whose `n_eff = (Σλ)² / Σλ²` is the **participation ratio** of the eigenvalues of the
+return-correlation matrix (`participation_ratio`). N perfectly independent markets give
 `N_eff = N`; perfectly correlated give `N_eff = 1`. It is *"the honest denominator for
 significance"* — a permutation p-value computed as if trades were independent is optimistic
-when they cluster into a few factors, which a PCA breakdown then names.
+when they cluster into a few factors, which the returned PCA `loadings` then name (dollar /
+rates / grains / …). Capital-free: correlation structure only, no equity curve.
+
+```python
+>>> from crucible.breadth import effective_n
+>>> effective_n(returns).n_eff     # 20-market book, ~3 correlated blocs + a lone metal
+3.8                                # ...so it's really ~4 independent bets
+```
 
 **Portfolio Monte Carlo** —
 [`pardo .../validation/portfolio_mc.py`](../../pardo_quant_framework/src/validation/portfolio_mc.py):
-a **circular block bootstrap** of the monthly portfolio-return series (`block_bootstrap`,
-`portfolio_mc.py:49`). Contiguous blocks preserve within-period clustering and
-autocorrelation that a naive per-trade shuffle destroys; the output is a distribution of max
-drawdown, terminal equity, and risk-of-ruin per risk fraction. A per-trade shuffle assumes
-independence and therefore *understates* drawdown — block resampling is the correction.
+the capital-aware sibling, left in the framework because it needs a capital model crucible
+deliberately doesn't have. A **circular block bootstrap** of the monthly portfolio-return
+series (`block_bootstrap`, `portfolio_mc.py:49`): contiguous blocks preserve within-period
+clustering and autocorrelation that a naive per-trade shuffle destroys; the output is a
+distribution of max drawdown, terminal equity, and risk-of-ruin per risk fraction. So
+`crucible.breadth` measures the independence *structure*; `portfolio_mc` measures the drawdown
+*consequence* of it — the SURVIVE handoff of §11.
 
 > **Sources.**
 > - Concurrency / overlap and effective sample size: **AFML Ch. 4 "Sample Weights," §4.3
@@ -522,7 +531,7 @@ a verified page, that is stated explicitly.
    *Referenced to a lesser extent.* The Sharpe-ratio / return-evaluation chapters (a
    performance statistic is itself an estimate with error) and the instrument-diversification
    / diversification-multiplier material across a large futures universe — the practical
-   counterpart to `effective_n.py` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
+   counterpart to `crucible.breadth` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
 
 **Supporting reference (not in the provided set):**
 Van Tharp, Van K. — *Trade Your Way to Financial Freedom*, 2nd ed. (McGraw-Hill, 2007) →
@@ -547,7 +556,7 @@ the original Reality Check that `whites_reality_check` reimplements via sign per
 | Bootstrap metric CIs (framework) | `pardo_quant_framework/src/validation/bootstrap.py` |
 | Staged gates (Stage 3/4/5) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
 | Detrended random-timing benchmark | `pardo_quant_framework/src/validation/benchmark.py` |
-| Effective N / factor PCA | `pardo_quant_framework/src/validation/effective_n.py` |
+| Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
 | Portfolio Monte Carlo (block bootstrap) | `pardo_quant_framework/src/validation/portfolio_mc.py` |
 | Triple-barrier labels | `pardo_quant_framework/src/ml/labels.py` |
 | Meta-labeling harness | `pardo_quant_framework/src/ml/meta_eval.py` |
