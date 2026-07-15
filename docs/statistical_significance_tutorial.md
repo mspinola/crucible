@@ -42,22 +42,32 @@ statistical logic, and where to read the primary source.
 
 Every technique downstream operates on one object: a `TradeLog` whose required column
 `r` is the per-trade return in **R-multiples** — profit measured in units of the risk
-taken at entry (`1R = sl × ATR` in the barrier simulator). R-normalization is what lets
+taken at entry — the entry-to-stop distance (`1R = entry − stop`, which the barrier
+simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
-The simulator that manufactures a log from a signal is deliberately **look-ahead-free**:
-barriers are sized off the *signal* bar (known at entry) and exits are scanned forward
-from entry (`simulator.py:64`, `:75`). This matters because every p-value later assumes
-each `r` was knowable only at the time — a single peek into the future contaminates the
+The `TradeLog` is deliberately agnostic about *how* the trades were produced. A
+hand-coded moving-average rule, a set of discretionary fills exported from a broker or a
+RealTest run, and an ML take/skip filter all reduce to the same schema — a column of
+R-multiples (plus optional MFE/MAE, holding period, entry/exit dates). The honesty layer
+never sees the strategy; it sees only the returns, which is exactly why one set of tests
+serves rule-based and model-based books alike.
+
+When you *do* generate the log from an entry rule, the barrier simulator that manufactures
+it is deliberately **look-ahead-free**: barriers are sized off the signal bar — the bar
+the rule fires on, known at entry — and exits are scanned forward from the entry bar
+(`simulator.py:64`, `:75`). This matters because every p-value later assumes each `r` was
+knowable only at the moment of the trade — a single peek into the future contaminates the
 whole null distribution.
 
 > **Sources.** The R-multiple as the unit of trade evaluation: Van Tharp, *Trade Your
 > Way to Financial Freedom* (origin of R and SQN, below). Risk-normalized, volatility-
 > scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
-> Targeting"** and **Ch. 10 "Position Sizing"**. Forward-looking labeling done without
-> leakage (the barrier construction): López de Prado, *Advances in Financial Machine
-> Learning* (AFML), **§3.4 "The Triple-Barrier Method"** — see §7 below.
+> Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
+> the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
+> Financial Machine Learning*, **§3.4 "The Triple-Barrier Method"**, cross-referenced in
+> §7) — but here it turns *any* entry rule into trades, ML or not.
 
 ---
 
@@ -72,7 +82,7 @@ Before any significance test, you summarize the sample. These are point estimate
 |---|---|---|
 | **Expectancy** | `wr·avg_win − lr·avg_loss` (in R), `metrics.py:28` | mean profit per trade |
 | **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
-| **Payoff ratio** | avg win / avg loss, `:51` | terminal win/loss geometry |
+| **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:72`,`:81` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:87` | "let winners run, cut losers" |
@@ -403,24 +413,61 @@ independence and therefore *understates* drawdown — block resampling is the co
 
 ---
 
-## 11. The whole pipeline, as a gate
+## 11. The whole pipeline, as one gate — `crucible.validation.run_gauntlet`
 
-`pardo_quant_framework/docs/edge_validation_framework.md` assembles every primitive above
-into an ordered, hard-gated checklist. Each stage answers one of four questions:
+Every primitive above answers one question. The **gauntlet** runs them as an ordered set
+of audited hard gates and returns a single, capital-free pass/fail — crucible's own
+naming, no stage numbers borrowed from anywhere:
 
-| Stage | Question | crucible / framework primitive |
+```
+DECLARE   preamble  — a mechanical rule + a log of every variant you tried
+CLEAN     preamble  — leakage-controlled construction (use holdout / walk_forward)
+──────────────── the gauntlet crucible computes ────────────────
+REAL      — distinguishable from noise, corrected for the search
+STRONG    — economically meaningful at the CI lower bound
+DURABLE   — holds out-of-sample over time
+GENERAL   — travels to markets it wasn't built on (optional)
+─────────────────────────────────────────────────────────────────
+SURVIVE   handoff   — capital survivability (out of scope; hand the surviving log off)
+```
+
+```python
+from crucible.validation import run_gauntlet
+
+gauntlet = run_gauntlet(
+    wf.stitched,        # the honest log — stitched out-of-sample
+    prices=px,          # enables REAL's random-entry null
+    wf=wf,              # adds the DURABLE gate
+    n_variants=4,       # size of your search -> REAL's Šidák correction
+)
+print(gauntlet.audit_report())
+print(gauntlet.passed)  # True only if every gate that ran passed
+```
+
+| Gate | Proves | Built from |
 |---|---|---|
-| 0 | Is the rule mechanical and pre-registered? | (human) EBTA Ch. 1 |
-| 1 | Is the data leakage-free? | purge/embargo — §8 |
-| 2 | Calibrated without memorizing noise, every variant logged? | search-space log — §5 |
-| 3 | **Real effect after correcting for the search?** | permutation + Šidák/Reality Check + bootstrap CI + detrended benchmark — §3,5,6 |
-| 4 | Economically strong at the **CI lower bound**? | edge metrics, CI-gated — §2,3 |
-| 5 | Robust over time, fold by fold? | walk-forward + WFE + fold dispersion — §9 |
-| 6 | Generalizes to held-out assets? | cross-asset Reality Check — §5,10 |
-| 7 | Survivable under real sizing? | portfolio Monte Carlo — §10 |
+| **DECLARE** *(preamble)* | the rule is mechanical; the search is logged | EBTA Ch. 1 (§0); the variant count feeds §5 |
+| **CLEAN** *(preamble)* | no look-ahead | purge/embargo — §8; the look-ahead-free simulator — §1 |
+| **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
+| **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
+| **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
+| **GENERAL** | travels across markets | cross-market Reality Check — §5; breadth / N_eff — §10 |
+| **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
 
-The non-negotiable rule: **a FAIL at any hard gate sends you back to Stage 0, never to
-tweaking the failing number.** That is the anti-data-mining discipline made procedural.
+Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
+a strong later gate can't redeem an early failure. The non-negotiable rule: **a FAIL sends
+you back to DECLARE, never to tweaking the failing number.** That is the anti-data-mining
+discipline made procedural. Full write-up in
+[`docs/edge_gate.md`](edge_gate.md).
+
+**Where `pardo_quant_framework` extends it.** crucible stops at "the edge is real, strong,
+durable, and general." pqf wraps the same gauntlet in a heavier, capital-aware pipeline
+([`edge_validation_framework.md`](../../pardo_quant_framework/docs/edge_validation_framework.md)):
+it layers on the **ML-only diagnostics** (IC sign-stability, feature-importance stability),
+a **detrended benchmark** (a fractional-return cousin of the random-entry null), the
+**cross-asset universe orchestration** behind GENERAL, and — past crucible's boundary — the
+**SURVIVE** stage itself: portfolio Monte Carlo, MAR, and correlation on a real capital
+model (§10). Same gates, more machinery around them.
 
 ---
 
