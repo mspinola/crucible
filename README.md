@@ -29,6 +29,7 @@ each harder than the last, each answered out loud by a named function:
 - ✅ **Rule out data-mining luck** — sign-permutation p-value (Masters) + a random-entry reality check → `permutation` · `reality_check`
 - ✅ **Rule out drift** — a leakage-controlled early-train / late-confirm split → `validation.holdout`
 - ✅ **Confirm out-of-sample** — Pardo walk-forward with purge / embargo hygiene → `validation.walk_forward`
+- ✅ **Price the search itself** — how much did *selecting* the best config overfit? Probability of Backtest Overfitting (CSCV) + deflated Sharpe → `validation.pbo`
 - ✅ **Account for correlation** — the effective number of *independent* bets across a correlated book → `breadth.effective_n`
 - ✅ **…then all of it, as one gate** — run every check above as an ordered, audited gauntlet (REAL → STRONG → DURABLE → GENERAL) that passes only if every gate does → `validation.run_gauntlet`
 
@@ -128,7 +129,11 @@ print(reality_check(wf.stitched))  # the stitched-OOS verdict — the honest one
 ```
 
 Also here: `sidak_correction` and `whites_reality_check` (max-statistic across every
-variant you searched) for when a grid search flatters the best result.
+variant you searched) for when a grid search flatters the best result — and, one
+step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
+how much the *act of selecting* the best config overfit: the Probability of Backtest
+Overfitting (Bailey/López de Prado CSCV) over a trial matrix, and the Sharpe deflated
+for the number of trials and its own skew/kurtosis.
 See [`examples/validation.py`](examples/validation.py).
 
 ## One verdict for the whole edge — `crucible.validation.run_gauntlet`
