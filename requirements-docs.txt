@@ -1,2 +1,9 @@
 # Docs site (MkDocs Material) — used by .github/workflows/pages.yml
 mkdocs-material>=9.5,<10
+
+# PDF export (docs/gen_pdf.py) — pure-Python, no system libraries.
+# Markdown + Pygments arrive via mkdocs-material; pinned here so the PDF step is
+# self-documenting. xhtml2pdf turns the styled HTML into the paginated PDF.
+Markdown>=3.5
+Pygments>=2.17
+xhtml2pdf>=0.2.16

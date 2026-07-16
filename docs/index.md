@@ -4,6 +4,8 @@
 contributes to declaring a trade log statistically significant, worked end to end on an
 example system, with references to the source literature.**
 
+📄 [**Download this tutorial as a PDF**](https://mspinola.github.io/crucible/tutorial.pdf)
+
 ---
 
 ## 0. What "statistically significant trade log" actually means

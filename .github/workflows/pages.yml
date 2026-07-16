@@ -35,6 +35,8 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-docs.txt
       - run: mkdocs build --strict
+      # Generate the downloadable PDF into the built site (served at /tutorial.pdf).
+      - run: python docs/gen_pdf.py --out site/tutorial.pdf
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
