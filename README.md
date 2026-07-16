@@ -4,6 +4,7 @@
 [![CI](https://github.com/mspinola/crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/mspinola/crucible/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Tutorial](https://img.shields.io/badge/docs-tutorial-1c6b73)](https://mspinola.github.io/crucible/)
 
 **Measure the edge before you ever open a $100k account.**
 
@@ -18,6 +19,10 @@ pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on r
 ```
 
 > Installed as **`crucible-quant`**, imported as **`crucible`** (`import crucible`).
+
+> 📖 **[Read the tutorial →](https://mspinola.github.io/crucible/)** — *From Trade Log to
+> Verdict: the statistics of a significant edge* — every technique worked end to end on a
+> Donchian breakout. ([Markdown source](docs/statistical_significance_tutorial.md).)
 
 ## What crucible answers
 
