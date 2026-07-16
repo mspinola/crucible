@@ -134,6 +134,14 @@ def test_verdict_banner_lists_all_four_pillars(ohlc):
         assert p in banner
 
 
+def test_verdict_banner_rows_pill_and_pillars_together(ohlc):
+    _, g = _full_gauntlet(ohlc)
+    banner = verdict_banner(g, title="book")
+    # pill + pillar chips live in one flex row, pill first then chips
+    row = banner.index("cr-verdict-row")
+    assert row < banner.index("cr-verdict'") < banner.index("cr-pillars")
+
+
 def test_verdict_banner_marks_unrun_pillars(ohlc):
     tl = barrier_trades(ohlc, ma_cross(ohlc), side="long")
     g = run_gauntlet(tl)                          # REAL + STRONG only
