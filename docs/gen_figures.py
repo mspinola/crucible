@@ -195,6 +195,37 @@ def render_png(html: str, out: Path, pad: int = 22) -> None:
     print(f"wrote {out.relative_to(REPO)}  ({im.width}x{im.height})")
 
 
+def render_logo(out: Path, size: int = 96, pad: int = 6) -> None:
+    """Render the crucible mark to a transparent, alpha-cropped PNG for the
+    tutorial title area and the PDF cover. Uses the favicon colorway (a fixed
+    slate vessel that reads on both light and dark) since a committed PNG gets no
+    page context to drive ``currentColor``."""
+    from PIL import Image
+    from crucible.report.tearsheet import _logo_svg
+    svg = _logo_svg(size=size, vessel="#7a808a", molten="#e0812b", up="#1a7f37", down="#b42318")
+    html = f'<!doctype html><html><head><meta charset="utf-8">' \
+           f'<style>html,body{{margin:0;background:transparent}}</style></head>' \
+           f'<body>{svg}</body></html>'
+    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as fh:
+        fh.write(html)
+        src = fh.name
+    raw = out.with_suffix(".raw.png")
+    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                    "--force-device-scale-factor=2", "--default-background-color=00000000",
+                    f"--window-size={size + 20},{size + 20}",
+                    f"--screenshot={raw}", f"file://{src}"],
+                   check=True, capture_output=True)
+    im = Image.open(raw).convert("RGBA")
+    bbox = im.split()[-1].getbbox()  # crop to the alpha (non-transparent) bounds
+    if bbox:
+        l, t, r, b = bbox
+        im = im.crop((max(0, l - pad), max(0, t - pad),
+                      min(im.width, r + pad), min(im.height, b + pad)))
+    im.save(out)
+    raw.unlink(missing_ok=True)
+    print(f"wrote {out.relative_to(REPO)}  ({im.width}x{im.height}, transparent)")
+
+
 def main() -> None:
     IMG.mkdir(exist_ok=True)
     sheets = dict(report_sheets())
@@ -202,6 +233,7 @@ def main() -> None:
     sheets["gate_ladder"] = GATE_LADDER_HTML
     for name, html in sheets.items():
         render_png(html, IMG / f"{name}.png")
+    render_logo(IMG / "crucible_logo.png")
 
 
 if __name__ == "__main__":

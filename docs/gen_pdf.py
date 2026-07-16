@@ -75,6 +75,7 @@ def build_html(src: str) -> str:
 <html><head><meta charset="utf-8"><style>{CSS}</style></head>
 <body>
 <div id="cover">
+  <img src="img/crucible_logo.png" class="cover-logo" alt="crucible" />
   <div class="kicker">crucible</div>
   <h1 class="cover-title">From Trade Log to Verdict</h1>
   <div class="cover-sub">The Statistics of a Significant Edge</div>
@@ -93,7 +94,8 @@ CSS = """
   @frame footer { -pdf-frame-content: footerContent; bottom: 1.1cm; margin-left: 1.8cm; margin-right: 1.8cm; height: 1cm; }
 }
 body { font-family: Helvetica, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1a2226; }
-#cover { margin-top: 5cm; margin-bottom: 1cm; border-bottom: 2pt solid #009688; padding-bottom: 0.6cm; }
+#cover { margin-top: 4.4cm; margin-bottom: 1cm; border-bottom: 2pt solid #009688; padding-bottom: 0.6cm; }
+.cover-logo { width: 62px; height: 60px; margin-bottom: 0.35cm; }
 .kicker { color: #00897b; font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; }
 .cover-title { font-size: 30pt; color: #00695c; margin: 0.3cm 0 0.1cm 0; border: none; }
 .cover-sub { font-size: 15pt; color: #37474f; }
