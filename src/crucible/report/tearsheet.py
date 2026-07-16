@@ -96,12 +96,14 @@ def report_css() -> str:
   .cr-verdict-row .cr-verdict, .cr-verdict-row .cr-pillars {{ margin: 0; }}
   .cr-pillars .ok {{ color: var(--cr-pass); font-weight: 600; }}
   .cr-pillars .no {{ color: var(--cr-fail); font-weight: 600; }}
+  .cr-pillars .warn {{ color: var(--cr-warn); font-weight: 600; }}
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
   .cr-summary {{ margin: 6px 0 16px; max-width: 70ch; color: var(--cr-fg); font-size: 14.5px; }}
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-summary .ok {{ color: var(--cr-pass); font-weight: 600; }}
+  .cr-summary .warn {{ color: var(--cr-warn); font-weight: 600; }}
   .cr-metrics {{ display: flex; flex-wrap: wrap; gap: 12px 26px; margin: 14px 0 18px;
                 padding: 12px 0; border-top: 1px solid var(--cr-border);
                 border-bottom: 1px solid var(--cr-border); }}
@@ -196,6 +198,26 @@ _PILLAR_FAIL = {
 }
 
 
+# REAL/STRONG/DURABLE answer "is the edge real?" — the core question. GENERAL asks
+# the separate "does it generalize beyond the markets it was built on?" A book that
+# clears the core but not GENERAL has a real, deployable edge whose *scope* is bounded
+# — a caveat, not a failed edge — so it reads as scope-limited (amber), not FAIL (red).
+_CORE_PILLARS = ("REAL", "STRONG", "DURABLE")
+
+
+def _verdict_state(gauntlet) -> str:
+    """'pass' — every gate that ran passed. 'scope' — the core edge (REAL/STRONG/
+    DURABLE) passed and the ONLY failure is GENERAL: real edge, generalization
+    unproven. 'fail' — a core gate failed, so the edge itself is in question."""
+    if gauntlet.passed:
+        return "pass"
+    by = {g.name: g for g in gauntlet.gates}
+    core = [by[p] for p in _CORE_PILLARS if p in by]
+    core_pass = bool(core) and all(g.passed for g in core)
+    failed = {g.name for g in gauntlet.gates if not g.passed}
+    return "scope" if (core_pass and failed <= {"GENERAL"}) else "fail"
+
+
 def verdict_summary(gauntlet) -> str:
     """A one-line plain-English reading of the gauntlet: the overall verdict plus
     what passing/failing the pillars that ran means for the book. Rendered under
@@ -206,16 +228,27 @@ def verdict_summary(gauntlet) -> str:
         return ""
     passed = [g.name for g in gates if g.passed]
     failed = [g.name for g in gates if not g.passed]
+    state = _verdict_state(gauntlet)
 
-    if gauntlet.passed:
+    if state == "pass":
         lead = (f"<span class='lead ok'>Validated.</span> "
                 f"This book {_join(_PILLAR_PASS.get(nm, nm) for nm in passed)} — "
                 f"a real, deployable edge on this evidence.")
         return f"<p class='cr-summary'>{lead}</p>"
 
-    # The banner + pillar chips already carry the PASS/FAIL count and which pillar
-    # broke, so the summary drops that enumeration and keeps only the plain-English
-    # reading — what passing/failing actually means for the book.
+    if state == "scope":
+        # Core edge holds; only GENERAL fell short. Lead with the edge and frame the
+        # generalization miss as scope, not a red flag — don't discard a real edge over it.
+        lead = "<span class='lead ok'>Validated on its universe.</span> "
+        body = (f"This book {_join(_PILLAR_PASS.get(nm, nm) for nm in passed)} — a real, "
+                f"deployable edge on the markets it was built on. Its cross-market "
+                f"generalization is <span class='warn'>unproven</span> (it "
+                f"{_PILLAR_FAIL.get('GENERAL', 'GENERAL')}): read that as scope, not a "
+                f"verdict on the edge — trade the set it's proven on rather than "
+                f"extrapolating to new markets on faith.")
+        return f"<p class='cr-summary'>{lead}{body}</p>"
+
+    # state == "fail": a core gate broke — the edge itself is in question.
     lead = "<span class='lead no'>Not validated.</span> "
     if passed:
         body = (f"It {_join(_PILLAR_PASS.get(nm, nm) for nm in passed)}, but "
@@ -338,24 +371,36 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
     ``{'GENERAL': '→ strategy report'}`` on a single-market page where GENERAL is
     assessed at the strategy level."""
     pillar_notes = pillar_notes or {}
-    passed = bool(gauntlet.passed)
-    color = "#1a7f37" if passed else "#b42318"
+    state = _verdict_state(gauntlet)
+    # scope-limited (core edge holds, only GENERAL fell short) reads amber, not red —
+    # a real edge with bounded scope, not a failed one.
+    label, color = {
+        "pass": ("GAUNTLET PASS", "#1a7f37"),
+        "scope": ("EDGE VALIDATED", "#9a6700"),
+        "fail": ("GAUNTLET FAIL", "#b42318"),
+    }[state]
     by_name = {g.name: g for g in gauntlet.gates}
     chips = []
     for p in _PILLARS:
         if p in by_name:
-            ok = by_name[p].passed
-            chips.append(f"<span class='{'ok' if ok else 'no'}'>{p} "
-                         f"{'✓' if ok else '✗'}</span>")
+            g = by_name[p]
+            if g.passed:
+                cls, mark = "ok", "✓"
+            elif p in _CORE_PILLARS:
+                cls, mark = "no", "✗"          # core miss — the edge is in question (red)
+            else:
+                cls, mark = "warn", "⚠"        # GENERAL miss — a scope caveat (amber)
+            chips.append(f"<span class='{cls}'>{p} {mark}</span>")
         else:
             chips.append(f"<span class='na'>{p} {pillar_notes.get(p, '—')}</span>")
     summary = " &nbsp;·&nbsp; ".join(chips)
     head = (f"<div class='cr-title'>{_logo_svg(size=34)}<h1>{title}</h1></div>") if title else ""
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
-    label = "PASS" if passed else "FAIL"
+    pill = (f"<div class='cr-verdict' style='background:{color}'>{label}"
+            f"{' <small>scope-limited</small>' if state == 'scope' else ''}</div>")
     return (f"{head}{sub}"
             f"<div class='cr-verdict-row'>"
-            f"<div class='cr-verdict' style='background:{color}'>GAUNTLET {label}</div>"
+            f"{pill}"
             f"<div class='cr-pillars'>{summary}</div>"
             f"</div>")
 
