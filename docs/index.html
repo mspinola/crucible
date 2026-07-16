@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="A standalone tutorial on the statistical techniques in crucible that make a trade log significant — worked end to end on a Donchian breakout.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📊%3C/text%3E%3C/svg%3E">
+<title>From Trade Log to Verdict — The Statistics of a Significant Edge</title>
+<style>
+  :root{
+    --bg:#e9edee;
+    --surface:#ffffff;
+    --surface-2:#f4f7f7;
+    --ink:#15191c;
+    --muted:#59636b;
+    --faint:#7d8890;
+    --line:#d5dcdf;
+    --line-soft:#e4e9eb;
+    --accent:#1c6b73;
+    --accent-ink:#124b51;
+    --accent-soft:#e2efef;
+    --held:#2f8a58;
+    --fragile:#b0781a;
+    --fail:#bf3b2f;
+    --code-bg:#f1f5f5;
+    --code-ink:#0f4a50;
+    --shadow:0 1px 2px rgba(20,40,45,.05),0 8px 30px rgba(20,40,45,.06);
+    --measure:68ch;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e1215;
+      --surface:#161b1f;
+      --surface-2:#1b2226;
+      --ink:#e7ebec;
+      --muted:#9aa4ab;
+      --faint:#7a848b;
+      --line:#293237;
+      --line-soft:#222a2f;
+      --accent:#4fb3bc;
+      --accent-ink:#7fcbd2;
+      --accent-soft:#12292c;
+      --held:#48b374;
+      --fragile:#d19a3a;
+      --fail:#e0655a;
+      --code-bg:#12191c;
+      --code-ink:#7fc9d0;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#e9edee;--surface:#ffffff;--surface-2:#f4f7f7;--ink:#15191c;--muted:#59636b;--faint:#7d8890;
+    --line:#d5dcdf;--line-soft:#e4e9eb;--accent:#1c6b73;--accent-ink:#124b51;--accent-soft:#e2efef;
+    --held:#2f8a58;--fragile:#b0781a;--fail:#bf3b2f;--code-bg:#f1f5f5;--code-ink:#0f4a50;
+    --shadow:0 1px 2px rgba(20,40,45,.05),0 8px 30px rgba(20,40,45,.06);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1215;--surface:#161b1f;--surface-2:#1b2226;--ink:#e7ebec;--muted:#9aa4ab;--faint:#7a848b;
+    --line:#293237;--line-soft:#222a2f;--accent:#4fb3bc;--accent-ink:#7fcbd2;--accent-soft:#12292c;
+    --held:#48b374;--fragile:#d19a3a;--fail:#e0655a;--code-bg:#12191c;--code-ink:#7fc9d0;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:17px;line-height:1.66;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif}
+  code,kbd,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+
+  .wrap{max-width:1140px;margin:0 auto;padding:0 clamp(18px,4vw,40px)}
+
+  /* ---- masthead ---- */
+  header.mast{padding:clamp(44px,7vw,88px) 0 clamp(28px,4vw,44px)}
+  .eyebrow{
+    font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);
+    font-weight:700;margin:0 0 18px
+  }
+  h1.title{
+    font-weight:600;font-size:clamp(2.1rem,5.4vw,3.5rem);line-height:1.04;letter-spacing:-.015em;
+    margin:0;text-wrap:balance;max-width:16ch
+  }
+  .dek{
+    font-size:clamp(1.05rem,2.2vw,1.28rem);color:var(--muted);margin:20px 0 0;max-width:52ch;
+    line-height:1.5
+  }
+  .mast-meta{
+    display:flex;flex-wrap:wrap;gap:10px 8px;margin-top:26px;align-items:center;
+    font-size:.82rem;color:var(--faint)
+  }
+  .pill{
+    display:inline-flex;align-items:center;gap:.5em;border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);color:var(--muted);font-weight:500
+  }
+  .pill .mono{font-size:.78rem;color:var(--accent-ink)}
+
+  .hr{height:1px;background:var(--line);border:0;margin:0}
+
+  /* ---- layout ---- */
+  .grid{display:grid;grid-template-columns:1fr;gap:0}
+  @media(min-width:1000px){
+    .grid{grid-template-columns:220px minmax(0,1fr);gap:clamp(32px,4vw,64px);align-items:start}
+  }
+
+  /* ---- index rail ---- */
+  nav.toc{position:relative;padding:34px 0}
+  @media(min-width:1000px){nav.toc{position:sticky;top:0;max-height:100vh;overflow:auto;padding:44px 0}}
+  .toc h2{
+    font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
+    margin:0 0 14px;font-weight:700
+  }
+  .toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+  .toc a{
+    display:grid;grid-template-columns:1.7em 1fr;gap:8px;align-items:baseline;
+    text-decoration:none;color:var(--muted);padding:6px 8px;border-radius:7px;
+    font-size:.86rem;line-height:1.3;border:1px solid transparent
+  }
+  .toc a .n{
+    font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:var(--accent);
+    font-variant-numeric:tabular-nums;text-align:right
+  }
+  .toc a:hover{background:var(--surface);color:var(--ink);border-color:var(--line-soft)}
+  .toc a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  details.toc-m{margin:20px 0 0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  @media(min-width:1000px){details.toc-m{display:none}}
+  details.toc-m summary{cursor:pointer;padding:14px 16px;font-weight:600;font-size:.9rem;list-style:none}
+  details.toc-m summary::-webkit-details-marker{display:none}
+  details.toc-m summary::after{content:"⌄";float:right;color:var(--accent);font-size:1.1rem;line-height:1}
+  details.toc-m[open] summary::after{content:"⌃"}
+  details.toc-m .inner{padding:0 8px 10px}
+  nav.toc.desk{display:none}
+  @media(min-width:1000px){nav.toc.desk{display:block}}
+
+  /* ---- article ---- */
+  main{padding-bottom:96px;min-width:0}
+  article{max-width:var(--measure)}
+  section{padding:38px 0;border-top:1px solid var(--line-soft)}
+  section:first-of-type{border-top:0}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin:0 0 6px}
+  .sec-num{
+    font-family:ui-monospace,Menlo,monospace;font-size:.8rem;color:var(--accent);font-weight:700;
+    border:1px solid var(--accent);border-radius:6px;padding:2px 7px;flex:none;
+    letter-spacing:.02em;transform:translateY(-2px)
+  }
+  h2.sec{font-weight:600;font-size:clamp(1.35rem,3vw,1.72rem);line-height:1.18;margin:0;letter-spacing:-.01em;text-wrap:balance}
+  .codepath{
+    margin:12px 0 2px;font-size:.8rem;color:var(--muted)
+  }
+  .codepath code{
+    background:var(--code-bg);color:var(--code-ink);padding:2px 7px;border-radius:5px;
+    font-size:.82em;border:1px solid var(--line-soft)
+  }
+  p{margin:16px 0}
+  article :is(p,li){max-width:var(--measure)}
+  strong{font-weight:650;color:var(--ink)}
+  em{font-style:italic}
+  a.ext{color:var(--accent-ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px}
+  a.ext:hover{text-decoration-color:var(--accent)}
+
+  p code,li code,td code{
+    background:var(--code-bg);color:var(--code-ink);padding:1px 6px;border-radius:5px;font-size:.85em;
+    border:1px solid var(--line-soft)
+  }
+
+  ul,ol.body{margin:16px 0;padding-left:1.25em}
+  li{margin:7px 0}
+
+  /* formula block */
+  .formula{
+    display:block;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:14px 18px;margin:20px 0;overflow-x:auto;
+    font-family:ui-monospace,Menlo,monospace;font-size:.92rem;color:var(--ink);white-space:pre
+  }
+
+  /* sources aside */
+  .sources{
+    margin:24px 0 6px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:12px;
+    padding:16px 20px
+  }
+  .sources .lbl{
+    font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);font-weight:700;
+    margin:0 0 8px;display:flex;align-items:center;gap:8px
+  }
+  .sources .lbl::before{content:"";width:14px;height:1px;background:var(--accent)}
+  .sources ul{margin:6px 0 0;padding-left:1.1em}
+  .sources li{margin:8px 0;font-size:.92rem;color:var(--muted);line-height:1.55}
+  .sources li strong{color:var(--ink)}
+  .sources.compact p{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
+
+  /* tables */
+  .tbl-scroll{overflow-x:auto;margin:22px 0;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:520px}
+  thead th{
+    text-align:left;font-weight:650;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--faint);padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap;
+    background:var(--surface-2)
+  }
+  tbody td{padding:11px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--muted)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody td:first-child{color:var(--ink);font-weight:550}
+  tbody td code{font-size:.82em;white-space:nowrap}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* verdict chips */
+  .verdicts{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}
+  .vchip{
+    flex:1 1 170px;border:1px solid var(--line);border-radius:11px;padding:13px 15px;background:var(--surface)
+  }
+  .vchip .tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.86rem;letter-spacing:.03em}
+  .vchip .dot{width:9px;height:9px;border-radius:50%}
+  .vchip p{margin:8px 0 0;font-size:.82rem;color:var(--muted);line-height:1.45;max-width:none}
+  .v-held{border-top:3px solid var(--held)} .v-held .tag{color:var(--held)} .v-held .dot{background:var(--held)}
+  .v-frag{border-top:3px solid var(--fragile)} .v-frag .tag{color:var(--fragile)} .v-frag .dot{background:var(--fragile)}
+  .v-fail{border-top:3px solid var(--fail)} .v-fail .tag{color:var(--fail)} .v-fail .dot{background:var(--fail)}
+
+  /* callout */
+  .lede{
+    font-size:1.06rem;color:var(--ink);border-left:3px solid var(--accent);padding:2px 0 2px 20px;
+    margin:22px 0;line-height:1.55
+  }
+  blockquote{
+    margin:20px 0;padding:14px 20px;background:var(--accent-soft);border-radius:10px;color:var(--ink);
+    font-size:.98rem
+  }
+
+  /* bibliography */
+  .bib{counter-reset:bib;list-style:none;padding:0;margin:20px 0}
+  .bib>li{
+    display:grid;grid-template-columns:2.2em 1fr;gap:10px;padding:16px 0;border-top:1px solid var(--line-soft)
+  }
+  .bib>li:first-child{border-top:0}
+  .bib>li::before{
+    counter-increment:bib;content:counter(bib);font-family:ui-monospace,Menlo,monospace;
+    color:var(--accent);font-weight:700;font-size:.92rem;font-variant-numeric:tabular-nums;
+    padding-top:2px
+  }
+  .bib .who{font-weight:650;color:var(--ink)}
+  .bib .what{font-size:.92rem;color:var(--muted);margin-top:4px;line-height:1.55}
+  .bib-note{font-size:.86rem;color:var(--faint);margin:14px 0 0;padding-left:2.2em}
+
+  footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--faint);font-size:.84rem}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between}
+
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+  html{scroll-behavior:smooth}
+  :target{scroll-margin-top:20px}
+</style>
+</head>
+<body>
+
+
+<header class="mast">
+  <div class="wrap">
+    <p class="eyebrow">crucible · evidence-based edge validation</p>
+    <h1 class="title serif">From Trade Log to Verdict</h1>
+    <p class="dek">The statistical techniques that turn a raw trade log into a defensible claim of significance — and how each one earns its place in the pipeline.</p>
+    <div class="mast-meta">
+      <span class="pill"><span class="mono">crucible.edge</span></span>
+      <span class="pill"><span class="mono">crucible.validation</span></span>
+      <span class="pill"><span class="mono">crucible.ml</span> · <span class="mono">breadth</span></span>
+    </div>
+  </div>
+</header>
+<hr class="hr">
+
+<div class="wrap">
+<div class="grid">
+
+  <nav class="toc desk" aria-label="Contents">
+    <h2>The pipeline</h2>
+    <ol>
+      <li><a href="#s0"><span class="n">00</span><span>What significance means</span></a></li>
+      <li><a href="#s1"><span class="n">01</span><span>The R-multiple trade log</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Capital-free edge metrics</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Bootstrap confidence intervals</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>The verdict</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Permutation tests</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>The detrended benchmark</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>The ML track</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Holdout, purge &amp; embargo</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Walk-forward &amp; WFE</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>Correlation &amp; effective N</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>The whole thing, as a gate</span></a></li>
+      <li><a href="#s12"><span class="n">12</span><span>Worked example: Donchian</span></a></li>
+      <li><a href="#bib"><span class="n">§</span><span>Bibliography</span></a></li>
+      <li><a href="#map"><span class="n">§</span><span>Code map</span></a></li>
+      <li><a href="#wiki"><span class="n">§</span><span>Wikipedia appendix</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+  <details class="toc-m">
+    <summary>Contents — the pipeline</summary>
+    <div class="inner">
+      <nav class="toc" aria-label="Contents">
+        <ol>
+          <li><a href="#s0"><span class="n">00</span><span>What significance means</span></a></li>
+          <li><a href="#s1"><span class="n">01</span><span>The R-multiple trade log</span></a></li>
+          <li><a href="#s2"><span class="n">02</span><span>Capital-free edge metrics</span></a></li>
+          <li><a href="#s3"><span class="n">03</span><span>Bootstrap confidence intervals</span></a></li>
+          <li><a href="#s4"><span class="n">04</span><span>The verdict</span></a></li>
+          <li><a href="#s5"><span class="n">05</span><span>Permutation tests</span></a></li>
+          <li><a href="#s6"><span class="n">06</span><span>The detrended benchmark</span></a></li>
+          <li><a href="#s7"><span class="n">07</span><span>The ML track</span></a></li>
+          <li><a href="#s8"><span class="n">08</span><span>Holdout, purge &amp; embargo</span></a></li>
+          <li><a href="#s9"><span class="n">09</span><span>Walk-forward &amp; WFE</span></a></li>
+          <li><a href="#s10"><span class="n">10</span><span>Correlation &amp; effective N</span></a></li>
+          <li><a href="#s11"><span class="n">11</span><span>The whole thing, as a gate</span></a></li>
+          <li><a href="#s12"><span class="n">12</span><span>Worked example: Donchian</span></a></li>
+          <li><a href="#bib"><span class="n">§</span><span>Bibliography</span></a></li>
+          <li><a href="#map"><span class="n">§</span><span>Code map</span></a></li>
+      <li><a href="#wiki"><span class="n">§</span><span>Wikipedia appendix</span></a></li>
+        </ol>
+      </nav>
+    </div>
+  </details>
+
+  <article>
+
+    <section id="s0">
+      <div class="sec-head"><span class="sec-num">00</span><h2 class="sec serif">What a “statistically significant trade log” actually means</h2></div>
+      <p>A backtester hands you a rising equity curve and a headline number — “profit factor 1.37, 214 trades.” The number is <em>real</em> in the sense that it happened on the data. The question this tutorial is about is different:</p>
+      <p class="lede">Given how few trades I have, and how many variants I tried before landing on this one, could a curve this good have come from <strong>no edge at all</strong>?</p>
+      <p>Answering that turns a point estimate into a <strong>verdict</strong>. Two distinct failure modes have to be ruled out — the framing is Aronson’s:</p>
+      <ol class="body">
+        <li><strong>Luck mistaken for skill</strong> — a small sample, or a large search, threw up a good number by chance. <em>(Statistical validity.)</em></li>
+        <li><strong>A real pattern that doesn’t travel</strong> — genuine in-sample, gone out-of-sample or on another market. <em>(Robustness / generalization.)</em></li>
+      </ol>
+      <p><code>crucible</code> answers these at the <strong>trade-log level</strong>, before any capital, position sizing, or equity curve enters the picture — everything here is capital-free. The concepts come first (§01–§11); then <strong>§12 works the whole pipeline end to end on a Donchian breakout</strong>, so you can see exactly how to read every number and verdict.</p>
+      <p>Everything below is a pipeline: <strong>describe the edge → quantify sampling noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account for correlation</strong>. Each section names the technique, the code that implements it, the statistical logic, and where to read the primary source.</p>
+    </section>
+
+    <section id="s1">
+      <div class="sec-head"><span class="sec-num">01</span><h2 class="sec serif">The substrate: a risk-normalized trade log (R-multiples)</h2></div>
+      <p class="codepath">Code · <code>edge/trade_log.py</code> · <code>edge/simulator.py</code></p>
+      <p>Every technique downstream operates on one object: a <code>TradeLog</code> whose required column <code>r</code> is the per-trade return in <strong>R-multiples</strong> — profit measured in units of the risk taken at entry — the entry-to-stop distance (<code>1R = entry − stop</code>, which the barrier simulator sizes as <code>sl × ATR</code>). R-normalization is what lets returns from different instruments and volatility regimes pool into one sample the statistics can treat as draws from a single distribution.</p>
+      <p>The <code>TradeLog</code> is deliberately agnostic about <em>how</em> the trades were produced. A hand-coded moving-average rule, a set of discretionary fills exported from a broker or a RealTest run, and an ML take/skip filter all reduce to the same schema — a column of R-multiples (plus optional MFE/MAE, holding period, entry/exit dates). The honesty layer never sees the strategy; it sees only the returns, which is exactly why one set of tests serves rule-based and model-based books alike.</p>
+      <p>When you <em>do</em> generate the log from an entry rule, the barrier simulator that manufactures it is deliberately <strong>look-ahead-free</strong>: barriers are sized off the signal bar — the bar the rule fires on, known at entry — and exits are scanned forward from the entry bar. This matters because every p-value later assumes each <code>r</code> was knowable only at the moment of the trade — a single peek into the future contaminates the whole null distribution.</p>
+      <div class="sources compact">
+        <p class="lbl">Sources</p>
+        <p>The R-multiple as the unit of trade evaluation: <strong>Van Tharp, <em>Definitive Guide to Position Sizing</em> (2008), Ch. 2 “Risk (R) and R-Multiples” (p. 11)</strong>; popularized in <em>Trade Your Way to Financial Freedom</em> (2nd ed. 2007). Risk-normalized, volatility-scaled return accounting: <strong>Carver</strong>, <em>Systematic Trading</em>, <strong>Ch. 9 “Volatility Targeting”</strong> &amp; <strong>Ch. 10 “Position Sizing.”</strong> The leakage-free barrier construction is the same geometry ML uses to label forward outcomes (<strong>López de Prado, AFML §3.4 “The Triple-Barrier Method,”</strong> see §07) — but here it turns <em>any</em> entry rule into trades, ML or not.</p>
+      </div>
+    </section>
+
+    <section id="s2">
+      <div class="sec-head"><span class="sec-num">02</span><h2 class="sec serif">Describing the edge: capital-free metrics</h2></div>
+      <p class="codepath">Code · <code>edge/metrics.py</code></p>
+      <p>Before any significance test, you summarize the sample. These are point estimates — they <em>describe</em>, they do not yet <em>defend</em>.</p>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Metric</th><th>Definition</th><th>Reads on</th></tr></thead>
+          <tbody>
+            <tr><td>Expectancy</td><td><code>wr·avg_win − lr·avg_loss</code> (R)</td><td>mean profit per trade</td></tr>
+            <tr><td>Profit factor</td><td>gross win / gross loss</td><td>reward-to-risk of the whole book</td></tr>
+            <tr><td>Payoff ratio <span style="color:var(--faint);font-weight:400">(RR)</span></td><td>avg win / avg loss</td><td>terminal reward-to-risk geometry</td></tr>
+            <tr><td>SQN</td><td><code>mean/std · √min(n,100)</code></td><td><em>signal-to-noise</em> — risk-adjusted quality</td></tr>
+            <tr><td>Excursion / E-ratio</td><td>mean MFE / mean|MAE|</td><td>directional edge <em>before</em> the exit rule?</td></tr>
+            <tr><td>Time asymmetry</td><td>avg bars in wins / in losses</td><td>“let winners run, cut losers”</td></tr>
+            <tr><td>Exit efficiency</td><td>captured / available MFE</td><td>how much of the move the exit banked</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The one to single out is <strong>SQN</strong> (System Quality Number, Van Tharp): <code>mean(R)/std(R) × √n</code>. It is a Sharpe-like <em>t</em>-statistic on the per-trade returns — the same quantity a significance test formalizes. A high mean means nothing if the standard deviation is huge or <code>n</code> is tiny; SQN is the first hint of whether the sample can support a claim at all.</p>
+      <blockquote>crucible’s <code>sqn()</code> uses Van Tharp’s <code>√min(n,100)</code> cap. A <code>√100</code>-always variant would inflate a 30-trade SQN by ≈1.8×, crediting it with the confidence of a 100-trade book it hasn’t earned — the actual trade count is the honest scale.</blockquote>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li>Expectancy, profit factor, payoff, drawdown: <strong>Pardo, <em>The Evaluation and Optimization of Trading Strategies</em>, 2nd ed. (2008)</strong> — the “Evaluation of Trading Strategies” chapter is the canonical list <code>edge_report</code> reproduces.</li>
+          <li><strong>SQN</strong>: Van Tharp, <em>Definitive Guide to Position Sizing</em> (2008), Ch. 3 “Evaluating the Quality of Your Trading System” (p. 23) — and, precisely on the small-sample problem the <code>√min(n,100)</code> cap addresses, “One Problem with System Quality Number and How to Overcome It” (p. 32) and “Statistical Assumptions” (p. 33); popularized in <em>Trade Your Way to Financial Freedom</em> (2007).</li>
+          <li>Excursion (MFE/MAE): Sweeney, <em>Campaign Trading</em>; Curtis Faith, <em>Way of the Turtle</em> (the E-ratio).</li>
+          <li>The risk-adjusted framing (why std matters as much as mean): <strong>Carver, <em>Advanced Futures Trading Strategies</em> (2021)</strong> — a Sharpe/SQN is itself an estimate with a wide error bar, which §03 addresses.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s3">
+      <div class="sec-head"><span class="sec-num">03</span><h2 class="sec serif">Quantifying sampling noise: the bootstrap confidence interval</h2></div>
+      <p class="codepath">Code · <code>edge/stats.py</code> — <code>bootstrap_ci</code>, <code>p_value_positive</code>, <code>bootstrap_metric_cis</code></p>
+      <p>A point estimate of expectancy on 60–200 trades badly understates how much it could have wobbled. The <strong>bootstrap</strong> turns the single number into a distribution:</p>
+      <code class="formula">for i in 1..10000:              # resample
+    draw = sample r WITH REPLACEMENT, size n
+    record metric(draw)
+CI = [2.5th percentile, 97.5th percentile]</code>
+      <p>Resampling the trade log with replacement simulates “other histories you could plausibly have drawn from the same edge.” The <strong>2.5–97.5 percentile band</strong> is the 95% confidence interval; <code>p_value_positive</code> reports the fraction of resamples where the metric stayed positive.</p>
+      <p>Why it is the honest read: it makes no normality assumption (trade returns are skewed and fat-tailed), and it works for <em>any</em> metric — expectancy, profit factor, SQN — not just the mean. On small samples the band is wide, and that width <strong>is the message</strong>.</p>
+      <p>crucible's gauntlet gates on this: its <strong>STRONG</strong> gate requires the <strong>CI lower bound</strong>, not the point estimate, to clear each threshold (<code>gate_strong</code>, §11) — directly fixing the “PF 1.37 on 60 trades treated as a clean pass” failure: a positive point estimate whose CI lower bound is negative doesn’t clear the gate.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>Aronson, <em>Evidence-Based Technical Analysis</em> (EBTA, 2006), Ch. 4 “Statistical Analysis” (p. 165)</strong> and <strong>Ch. 5 “Hypothesis Tests and Confidence Intervals” (p. 217)</strong> — sampling distributions, the bootstrap, confidence intervals for trading statistics. The direct antecedent of <code>bootstrap_ci</code>.</li>
+          <li><strong>AFML Ch. 14 “Backtest Statistics”</strong> — the family of statistics a backtest should report as distributions, not points.</li>
+          <li><strong>Carver, <em>Systematic Trading</em>, Appendix C “Portfolio Optimisation → More details on bootstrapping.”</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s4">
+      <div class="sec-head"><span class="sec-num">04</span><h2 class="sec serif">The verdict: point + CI + p-value, folded into a label</h2></div>
+      <p class="codepath">Code · <code>edge/stats.py</code> — <code>reality_check</code>, <code>Verdict</code></p>
+      <p><code>reality_check</code> is the call the README calls “the whole point of the package.” It collapses the three numbers into a decision:</p>
+      <div class="verdicts">
+        <div class="vchip v-held"><span class="tag"><span class="dot"></span>HELD</span><p>point &gt; 0 <strong>and</strong> CI lower bound &gt; 0 — the edge clears zero across resamples.</p></div>
+        <div class="vchip v-frag"><span class="tag"><span class="dot"></span>FRAGILE</span><p>point &gt; 0 <strong>but</strong> the CI straddles zero — positive, yet indistinguishable from noise. Do not size it up.</p></div>
+        <div class="vchip v-fail"><span class="tag"><span class="dot"></span>FAIL</span><p>otherwise — no positive edge to defend.</p></div>
+      </div>
+      <p><strong>FRAGILE</strong> is the state a backtester never shows you: a positive expectancy whose confidence interval includes zero. The equity curve looked like an edge; the statistics say <em>don’t size it up.</em> This is significance testing expressed as an operating instruction rather than a p-value to be argued over.</p>
+      <div class="sources compact">
+        <p class="lbl">Sources</p>
+        <p>The philosophy — a rule earns belief only when the evidence clears a pre-set statistical bar, not when it merely looks good — is the thesis of <strong>EBTA Ch. 3 “The Scientific Method and Technical Analysis” (p. 103)</strong> and <strong>Ch. 5 (p. 217)</strong>. The “hard gate, no discretionary override” posture is the gauntlet’s own (§11): a failing hard check can’t be waived by a reviewer who likes the strategy.</p>
+      </div>
+    </section>
+
+    <section id="s5">
+      <div class="sec-head"><span class="sec-num">05</span><h2 class="sec serif">Ruling out data-mining luck: permutation tests</h2></div>
+      <p class="codepath">Code · <code>validation/permutation.py</code></p>
+      <p>This is the heart of the significance story and the reason Aronson &amp; Masters matter.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:26px 0 2px">5a · Sign-permutation test (one strategy)</h3>
+      <code class="formula">observed = mean(r)
+for k in 1..5000:
+    flip each trade's sign at random (±1)
+    record mean(signs · |r|)
+p = (# permuted means ≥ observed + 1) / (N + 1)</code>
+      <p>The <strong>null hypothesis</strong> is “no directional skill” — under it, each trade’s <em>sign</em> is a coin flip while its <em>magnitude</em> is whatever it was. Shuffling signs builds the distribution of outcomes a skill-less system would produce on these same magnitudes; the p-value is how often chance matches or beats you. This is <strong>Timothy Masters’ Monte Carlo Permutation Method</strong>, the public-domain alternative to White’s patented Reality Check.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:26px 0 2px">5b · Šidák correction (you tried N variants)</h3>
+      <p><code>corrected = 1 − (1 − p)^N</code>. If you quietly tried 50 parameter sets and reported the best, its raw p-value is a lie of selection. Šidák asks: <em>what’s the chance the best of N independent searches looks this good by luck?</em> It is the conservative fallback when you only know the <strong>count</strong> of variants tried.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:26px 0 2px">5c · White’s Reality Check (you have every variant’s returns)</h3>
+      <code class="formula">for each permutation:
+    flip signs for EVERY variant
+    record the BEST mean across all variants   # the max-statistic
+compare observed best against this "distribution of the best"</code>
+      <p>Taking the <strong>maximum inside each permutation</strong> is what corrects for the size of the search: you compare your winner not against zero, but against <em>the best number a pure-noise search of the same size would have thrown up.</em> The warning is load-bearing — you must pass <strong>every variant including the discards</strong>, or the correction is toothless.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>EBTA Ch. 6 “Data-Mining Bias: The Fool’s Gold of Objective TA” (p. 255)</strong> — the definitive treatment of data-mining bias, the Monte Carlo permutation method, and White’s Reality Check; applied in the <strong>Ch. 8 case study (p. 389)</strong> across 6,402 rules.</li>
+          <li>EBTA <strong>Acknowledgments (p. ix)</strong> credit <strong>Timothy Masters</strong> with innovating the Monte Carlo permutation method and placing it in the public domain — the exact method in <code>sign_permutation_pvalue</code>.</li>
+          <li><strong>Aronson &amp; Masters, <em>Statistically Sound Machine Learning for Algorithmic Trading</em> (SSML, 2013)</strong> — Introduction’s <strong>“Performance Criteria”</strong> and the permutation-test / selection-bias sections.</li>
+          <li>White, H. (2000), “A Reality Check for Data Snooping,” <em>Econometrica</em> 68(5) — the original max-statistic bootstrap.</li>
+          <li>Multiple-comparisons / overfitting the search: <strong>AFML Ch. 11 “The Dangers of Backtesting”</strong> and <strong>Ch. 12 “Backtesting through Cross-Validation.”</strong></li>
+        </ul>
+      </div>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:26px 0 2px">Did the <em>selection</em> overfit? — PBO &amp; deflated Sharpe</h3>
+      <p class="codepath" style="margin-top:8px">Code · <code>validation/pbo.py</code> — <code>pbo_cscv</code>, <code>deflated_sharpe</code></p>
+      <p>White’s Reality Check asks whether the best variant’s <em>edge</em> is noise. Two companions ask the complementary question: given that you searched N configs and kept the best-in-sample one, <strong>how much did the act of choosing overfit?</strong></p>
+      <ul>
+        <li><strong>PBO — Probability of Backtest Overfitting</strong> (<code>pbo_cscv</code>), via Combinatorially-Symmetric Cross-Validation. Feed a <code>T×N</code> performance matrix (periods × the configs you searched); over every symmetric IS/OOS split of the period blocks it picks the best-in-sample config and reads its <strong>rank out-of-sample</strong>. PBO is the fraction of splits where the in-sample winner lands <strong>below the OOS median</strong>. Read it in bands — <code>ROBUST</code> (≤0.10) / <code>GUARDED</code> / <code>OVERFIT</code> — and (like White’s) pass <em>every</em> config you tried.</li>
+        <li><strong>Deflated Sharpe Ratio</strong> (<code>deflated_sharpe</code>). The winner’s Sharpe must clear a bar that <strong>rises with the number of trials</strong>: <code>SR0</code> is the expected maximum Sharpe of N noise trials, and the DSR is the probability the winner’s <em>true</em> Sharpe beats it — corrected for the return series’ own <strong>skew and kurtosis</strong> (fat left tails widen the error bar). Read <code>≥ 95%</code> like a passed significance test.</li>
+      </ul>
+      <p>Where the permutation test corrects the <em>p-value</em> for the search, these correct the <em>in-sample ranking</em> and the <em>Sharpe</em> for it — the same multiple-testing disease, caught two more ways. Capital-free (stdlib <code>NormalDist</code>, no scipy).</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>PBO / CSCV</strong>: Bailey, Borwein, López de Prado &amp; Zhu (2017), “The Probability of Backtest Overfitting,” <em>Journal of Computational Finance</em>; <strong>AFML Ch. 11–12</strong>.</li>
+          <li><strong>Deflated / Probabilistic Sharpe</strong>: Bailey &amp; López de Prado (2014), “The Deflated Sharpe Ratio,” <em>Journal of Portfolio Management</em>; <strong>AFML Ch. 14 “Backtest Statistics.”</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s6">
+      <div class="sec-head"><span class="sec-num">06</span><h2 class="sec serif">Ruling out drift: the random-entry / detrended benchmark</h2></div>
+      <p class="codepath">Code · <code>edge/stats.py</code> — <code>random_entry_null</code>, <code>detrended_timing_null</code></p>
+      <p>Beating zero is not enough on an instrument that drifts up. The right null is <em>“did my signal beat coin-flip timing on this same instrument?”</em> crucible offers two, both capital-free:</p>
+      <ul>
+        <li><strong><code>random_entry_null</code></strong>: run many trade logs with <strong>random entries</strong>, same barriers, same prices; compare your real expectancy against that distribution. This is the one the gauntlet’s REAL gate uses.</li>
+        <li><strong><code>detrended_timing_null</code></strong>: draw randomly-timed trades <strong>matched to your actual directions and holding periods</strong>, on a <strong>drift-removed</strong> version of the asset’s own bar returns, and compare your per-trade mean against its percentiles — the same question, without going through the barriers.</li>
+      </ul>
+      <p>Detrending is what isolates <em>timing skill</em> from <em>riding the market</em>. It also makes the benchmark automatically asset-class-appropriate: an equity index’s structural long drift is removed the same way a currency’s near-zero drift is, so no hand-picked per-class benchmark is needed.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>EBTA Appendix “Proof That Detrending Is Equivalent to Benchmarking Based on Position Bias” (p. 475)</strong> — the theoretical justification; also <strong>Ch. 1 “Objective Rules and Their Evaluation” (p. 15)</strong> on benchmarking a rule against its position bias.</li>
+          <li>SSML Introduction, <strong>“Model Performance Versus Financial Performance”</strong> and <strong>“Financial Relevance and Generalizability”</strong> — beating a naive-exposure benchmark, not just zero.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s7">
+      <div class="sec-head"><span class="sec-num">07</span><h2 class="sec serif">The ML track: is the signal real?</h2></div>
+      <p class="codepath">Code · <code>ml/</code> · <code>edge/simulator.py</code></p>
+      <p>The same honesty tests apply whether your entries come from a rule or a model — crucible only ever sees the returns. Two definitions sit underneath any ML book, and crucible covers both. <code>barrier_trades</code> (§01) is a <strong>triple-barrier labeler</strong>: each entry is scored by whichever fires first — a profit barrier (<code>+tp·ATR</code>), a stop (<code>−sl·ATR</code>), or a time cap. Because the label looks forward until a barrier is touched, it creates the leakage the §08 purge/embargo controls. If a <em>model</em> then chooses which labeled trades to take (<strong>meta-labeling</strong> — a take/skip filter on a primary signal), you judge that filter’s score with <code>crucible.ml</code>.</p>
+      <div class="sources compact">
+        <p class="lbl">Sources</p>
+        <p><strong>AFML Ch. 3 “Labeling,” §3.4 “The Triple-Barrier Method”</strong> (with §3.5 “Learning Side and Size” and §3.6 “Meta-Labeling”) — the labeling and take/skip framing.</p>
+      </div>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:26px 0 2px">Is the ML score real? — <code>crucible.ml</code></h3>
+      <p class="codepath" style="margin-top:8px">Code · <code>ml/ic.py</code> · <code>ml/decay.py</code> · <code>ml/redundancy.py</code> · <code>ml/pit.py</code></p>
+      <p>Once a model emits a <strong>score</strong>, the same honesty question §04 asks of a trade log applies to the score: does a higher score actually rank better outcomes, or is it noise, leakage, or a feature wearing a new name? <code>crucible.ml</code> answers it capital-free (numpy/pandas only), on the model’s predictions rather than an equity curve.</p>
+      <ul>
+        <li><strong>Information Coefficient</strong> (<code>information_coefficient</code>) — the Spearman <strong>rank</strong> correlation between a score and its realized label, invariant to the label encoding and any monotonic transform of the score. <code>alpha_gate(ic, min_ic=…)</code> raises below the bar — a PASS/FAIL to kill an edge-less or leaking model before the backtester. Computed <strong>out-of-fold</strong> (<code>fold_ic</code>); echoing §05, its <strong>sign-stability across folds</strong> matters more than its magnitude.</li>
+        <li><strong>Quantile decay</strong> (<code>quantile_decay</code>) — bucket the score into quantiles and read the realized win rate per bucket. A real edge climbs <strong>monotonically</strong> Q1→Q5 (<code>.monotonic</code>, <code>.spread</code>); a flat profile is a score that ranks nothing. <code>decay_tearsheet</code> renders it as HTML.</li>
+        <li><strong>Feature redundancy</strong> (<code>redundancy_droplist</code>) — clusters features by |Spearman| / Cramér’s V and keeps the highest-|IC| of each cluster. The feature-space analogue of §10’s N_eff: three features that are one in disguise are one bet, not three.</li>
+        <li><strong>Point-in-time slices</strong> (<code>asof_window</code> / <code>window_before</code>) — a leakage-safe window so a live feature is built identically to its training twin. §08 stops the <em>label</em> from peeking ahead; this stops the <em>features</em> from doing so.</li>
+      </ul>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li>The Information Coefficient and per-bet skill → portfolio performance: <strong>Grinold &amp; Kahn, <em>Active Portfolio Management</em></strong> (the IC and the Fundamental Law) — outside the six-book set, but the canonical IC reference.</li>
+          <li>Out-of-fold feature importance, judging features on unseen data: <strong>AFML Ch. 8 “Feature Importance”</strong>; no-look-ahead feature construction: <strong>AFML Ch. 7 §7.4</strong>. Quantile-decay monotonicity is the standard factor-research check (the alphalens lineage).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s8">
+      <div class="sec-head"><span class="sec-num">08</span><h2 class="sec serif">Confirming out-of-sample: holdout, purge &amp; embargo</h2></div>
+      <p class="codepath">Code · <code>validation/holdout.py</code> — <code>holdout</code>, <code>split_train_test</code></p>
+      <p>For a <strong>fixed</strong> strategy, the honest test is temporal: measure the edge early, freeze it, confirm on a late period the analysis never touched. Two leakage controls make the split real:</p>
+      <ul>
+        <li><strong>Purge:</strong> a training trade must have both <em>entered and exited</em> before the split — a trade whose forward window straddles the boundary can’t leak future information into the fitted side.</li>
+        <li><strong>Embargo:</strong> drop the first <code>embargo_weeks</code> of the test period, killing residual autocorrelation across the seam.</li>
+      </ul>
+      <p>The <code>HoldoutResult</code> runs a full <code>reality_check</code> on each side and declares <strong>the untouched TEST period the verdict</strong>. Train is expected to look good — that’s where an edge would have been chosen; only test counts.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>AFML Ch. 7 “Cross-Validation in Finance,” §7.4 “A Solution: Purged K-Fold CV”</strong> — the origin of purge + embargo for overlapping financial labels.</li>
+          <li><strong>Pardo (2008), the “Walk-Forward Analysis” chapter</strong> — the in-sample/out-of-sample discipline this generalizes.</li>
+          <li><strong>Carver, <em>Systematic Trading</em>, Ch. 3 “Fitting”</strong> — why in-sample results prove nothing, and the case for simple, robust, hard-to-overfit parameters.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s9">
+      <div class="sec-head"><span class="sec-num">09</span><h2 class="sec serif">Confirming it <em>keeps</em> working: walk-forward &amp; efficiency</h2></div>
+      <p class="codepath">Code · <code>validation/walk_forward.py</code> — <code>walk_forward</code>, <code>_wfe</code></p>
+      <p>One holdout is a single split; <strong>walk-forward</strong> rolls it through history: optimize params on an in-sample window, apply the winner to the next untouched out-of-sample window, step forward, repeat, then <strong>stitch every OOS slice into one trade log</strong>. If the stitched OOS edge survives <code>reality_check</code>, the strategy generalized through time; if it dies, the in-sample result was curve-fit.</p>
+      <p>Each fold carries the same purge/embargo hygiene and reports <strong>Walk-Forward Efficiency (WFE)</strong> — Pardo’s named ratio of <em>annualized OOS return / annualized IS return</em>. WFE ≈ 50–80% is healthy; below ~30% is fragile, above 100% is “too good to be true” (usually a bug or luck).</p>
+      <p>crucible's <strong>DURABLE</strong> gate hardens this against a specific trap (<code>fold_dispersion</code> in <code>validation/diagnostics.py</code>): a healthy <em>average</em> WFE can hide individually chaotic folds, so it adds a <strong>fold-dispersion</strong> check — what fraction of folds are individually tradable (SQN &gt; 0) and the coefficient of variation of fold SQN. High dispersion is itself a rejection, independent of the average.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li><strong>Pardo (2008)</strong> — the walk-forward method and the <strong>Walk-Forward Efficiency</strong> metric are his; the WFA chapter is the primary source. <code>walk_forward.py</code> is a capital-free reimplementation of it.</li>
+          <li><strong>AFML Ch. 12 “Backtesting through Cross-Validation,” §12.2 “The Walk-Forward Method”</strong> and <strong>§12.4 “The Combinatorial Purged Cross-Validation Method”</strong> — the modern critique and generalization of single-path walk-forward.</li>
+          <li>SSML Introduction, <strong>“Walkforward Testing”</strong> and <strong>“Overlap Considerations.”</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10">
+      <div class="sec-head"><span class="sec-num">10</span><h2 class="sec serif">Correcting for correlation: effective sample size &amp; portfolio survivability</h2></div>
+      <p class="codepath">Code · <code>crucible/breadth.py</code></p>
+      <p>A book of 665 trades across 20 markets is not 665 independent bets — eight currency futures are roughly one dollar bet. Two tools account for this: one <strong>capital-free</strong> and native to crucible, one <strong>capital-aware</strong> and out of crucible’s scope. Both bear directly on whether a significance claim is honest.</p>
+      <p><strong>Effective N</strong> — <code>crucible.breadth.effective_n(returns)</code> returns a <code>Breadth</code> whose <code>n_eff = (Σλ)² / Σλ²</code> is the <strong>participation ratio</strong> of the eigenvalues of the return-correlation matrix. N perfectly independent markets give <code>N_eff = N</code>; perfectly correlated give <code>N_eff = 1</code>. It is <em>“the honest denominator for significance”</em> — a permutation p-value computed as if trades were independent is optimistic when they cluster into a few factors, which the returned PCA <code>loadings</code> then name (dollar / rates / grains / …). Capital-free: correlation structure only, no equity curve.</p>
+      <p><strong>Portfolio Monte Carlo</strong> is the capital-aware sibling — deliberately <strong>out of crucible’s scope</strong>, because it needs a capital model crucible doesn’t have. The idea: a <strong>circular block bootstrap</strong> of the monthly portfolio-return series (contiguous blocks preserve the clustering and autocorrelation a naive per-trade shuffle destroys) yields a distribution of max drawdown, terminal equity, and risk-of-ruin per risk fraction. <code>crucible.breadth</code> measures the independence <em>structure</em>; the drawdown <em>consequence</em> is the <strong>SURVIVE</strong> handoff (§11) — hand the <code>TradeLog</code> to a capital-aware tool.</p>
+      <div class="sources">
+        <p class="lbl">Sources</p>
+        <ul>
+          <li>Concurrency / overlap and effective sample size: <strong>AFML Ch. 4 “Sample Weights,” §4.3 “Number of Concurrent Labels”</strong> and <strong>§4.4 “Average Uniqueness of a Label”</strong>; correlation-based structure in <strong>Ch. 16 “Machine Learning Asset Allocation”</strong> (HRP; §16.A.1 “Correlation-Based Metric”).</li>
+          <li>Number of <em>independent bets</em> and the <strong>diversification multiplier</strong>: <strong>Carver, <em>Systematic Trading</em>, Ch. 11 “Portfolios”</strong> and <strong>Appendix D “→ Calculation of diversification multiplier”</strong>; extended in <strong>Carver, <em>Advanced Futures Trading Strategies</em></strong>.</li>
+          <li>Monte Carlo drawdown / risk-of-ruin on reshuffled trade sequences: <strong>Pardo (2008)</strong>; risk of ruin and strategy failure: <strong>AFML Ch. 15 “Understanding Strategy Risk,” §15.4 “The Probability of Strategy Failure.”</strong></li>
+          <li>Position sizing — the <strong>SURVIVE</strong> layer crucible hands off — is the subject of <strong>Van Tharp, <em>Definitive Guide to Position Sizing</em> (2008)</strong> and <strong>Tom Basso, <em>Successful Traders Size Their Positions — Why and How?</em> (2019)</strong> (risk %, volatility %, capital/margin, portfolio-heat).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11">
+      <div class="sec-head"><span class="sec-num">11</span><h2 class="sec serif">The whole pipeline, as one gate — <code>run_gauntlet</code></h2></div>
+      <p>Every primitive above answers one question. The <strong>gauntlet</strong> runs them as an ordered set of audited hard gates and returns a single, capital-free pass/fail — crucible's own naming, no stage numbers borrowed from anywhere. Each gate is an audited AND of its hard checks: a failing hard check can't be waived, and a strong later gate can't redeem an early failure.</p>
+      <code class="formula">gauntlet = run_gauntlet(
+    wf.stitched,     # the honest log — stitched out-of-sample
+    prices=px,       # enables REAL's random-entry null
+    wf=wf,           # adds the DURABLE gate
+    n_variants=4,    # size of your search -> REAL's Šidák correction
+)
+gauntlet.passed      # True only if every gate that ran passed</code>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Gate</th><th>Proves</th><th>Built from</th></tr></thead>
+          <tbody>
+            <tr><td>DECLARE <span style="color:var(--faint);font-weight:400">(preamble)</span></td><td>the rule is mechanical; the search is logged</td><td>EBTA Ch. 1 (§00); variant count feeds §05</td></tr>
+            <tr><td>CLEAN <span style="color:var(--faint);font-weight:400">(preamble)</span></td><td>no look-ahead</td><td>purge/embargo — §08; look-ahead-free simulator — §01</td></tr>
+            <tr><td>REAL</td><td><strong>not noise, corrected for the search</strong></td><td>permutation + Šidák / Reality Check — §05; random-entry null — §06</td></tr>
+            <tr><td>STRONG</td><td>economically real at the <strong>CI lower bound</strong></td><td>edge metrics — §02; bootstrap CIs — §03</td></tr>
+            <tr><td>DURABLE</td><td>survives IS → OOS over time</td><td>walk-forward + WFE + fold dispersion — §09</td></tr>
+            <tr><td>GENERAL</td><td>travels across markets</td><td>cross-market Reality Check — §05; breadth / N_eff — §10</td></tr>
+            <tr><td>SURVIVE <span style="color:var(--faint);font-weight:400">(handoff)</span></td><td>capital can trade it</td><td><strong>out of scope</strong> — sizing, drawdown, ruin</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">The non-negotiable rule: a FAIL sends you back to DECLARE, never to tweaking the failing number. That is the anti-data-mining discipline made procedural. §12 runs the whole gauntlet on a real example, gate by gate.</p>
+    </section>
+
+    <section id="s12">
+      <div class="sec-head"><span class="sec-num">12</span><h2 class="sec serif">Worked example: a Donchian breakout, read end to end</h2></div>
+      <p class="codepath">Code · <code>examples/donchian_gauntlet.py</code> — runnable, synthetic (no network), prints these exact numbers</p>
+      <p>Everything above, run as one script on a <strong>Donchian channel breakout</strong> — go long when price closes above the prior 20-bar high; exit on a 2.5R target, a 1R stop, or a 30-bar cap.</p>
+      <code class="formula">def donchian(df, lookback=20):
+    return df["Close"] &gt; df["High"].rolling(lookback).max().shift(1)
+
+entries = donchian(px, lookback=20)                  # your signal
+trades  = barrier_trades(px, entries, side="long", tp=2.5, sl=1.0, timeout=30)</code>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:28px 0 2px">Step 1 — describe the edge (§02)</h3>
+      <code class="formula">edge_report(trades)
+   Trades        : 162          Payoff ratio  : 2.50
+   Win rate      : 43.2 %       SQN-100       : 2.95
+   Expectancy    : +0.512 R     Excursion     : 1.77   [PASS]
+   Profit factor : 1.90         Time asymmetry: 2.19   [PASS]</code>
+      <p><strong>How to read it.</strong> A textbook trend-following shape: a <em>low</em> win rate (43%) paired with a payoff of 2.5 — winners run about 2.5× the size of losers — nets a positive expectancy and PF 1.90. Excursion and time-asymmetry both above 1 say the signal has directional edge <em>before</em> the exit rule even acts. But these are point estimates on 162 trades: they <strong>describe</strong>, they don’t yet <strong>defend</strong>. SQN 2.95 hints the sample can support a claim — keep going.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:28px 0 2px">Step 2 — is it real, or small-sample luck? (§03–§04)</h3>
+      <code class="formula">reality_check(trades)
+   VERDICT (expectancy): +0.512 R   95% CI [+0.253, +0.772]
+                         p(edge&gt;0) = 1.000   -&gt;  HELD</code>
+      <p><strong>How to read it.</strong> The bootstrap CI lower bound (<strong>+0.253</strong>) clears zero — across 10,000 resamples the edge stays positive. Verdict <strong>HELD</strong>: on the whole history this is not small-sample noise. A backtester would stop right here, with a rising equity curve. crucible doesn’t — HELD on the pooled log is necessary, not sufficient.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:28px 0 2px">Step 3 — does it survive out of sample, over time? (§09)</h3>
+      <code class="formula">walk_forward(px, donchian, {"lookback": [20, 40]}, is_days=3yr, oos_days=1yr)
+   OOS year   IS E     OOS E    WFE          OOS year   IS E     OOS E    WFE
+   2011      +0.925   +2.150   3.52          2016      +1.000   −1.000  −0.14
+   2012      +1.258   +1.227   1.40          …
+   2013      +1.220   +1.000   0.71          2022      +0.690   +0.969   3.66
+   2014      +1.214   −1.000  −0.31          2023      +0.716   +0.925   3.77
+   2015      +1.087   −0.125  −0.06          folds=14  mean WFE=1.34  stitched=105</code>
+      <p><strong>How to read it.</strong> Optimize the lookback in-sample, apply the winner to the next <em>unseen</em> year, step forward, stitch the out-of-sample slices into one log. The in-sample expectancy is steadily positive — but the <strong>OOS</strong> column lurches: +2.15, +1.23, +1.00, then −1.00, −0.13, −1.00 … a few great years and a run of losing ones, and only half the years profitable. The mean WFE of 1.34 looks respectable until you notice it’s <em>above 1.00</em> — the out-of-sample outran the in-sample, which §09 flagged as too-good-to-be-true. A few outlier years (fold WFEs of 3.5, 3.7, 5.3) inflated the average. Step 4 makes the call.</p>
+
+      <h3 class="serif" style="font-size:1.08rem;margin:28px 0 2px">Step 4 — the verdict (§11)</h3>
+      <code class="formula">run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
+   REAL     ✓   corrected p = 0.0008   ·   beats 100% of random-entry timing
+   STRONG   ✓   expectancy CI-low +0.40 · PF CI-low 1.67 · SQN CI-low 2.32
+   DURABLE  ✗   wfe_aggregate 1.34 above the [0.30, 1.00] ceiling  ·  fold_dispersion CV 1.51 → PASS
+   ──────────────────────────────────────────────────────────────
+   GAUNTLET: FAIL   (2 of 3 gates passed — failing: DURABLE)</code>
+      <div class="verdicts">
+        <div class="vchip v-held"><span class="tag"><span class="dot"></span>REAL ✓</span><p>Sign-permutation p = 0.0008 (Šidák-adjusted for the 2 lookbacks searched), and the expectancy beats <strong>100%</strong> of random-entry books on the same prices. Not noise, and not just riding the drift.</p></div>
+        <div class="vchip v-held"><span class="tag"><span class="dot"></span>STRONG ✓</span><p>Every hard metric clears its bar at the <strong>pessimistic CI lower bound</strong>: expectancy-low +0.40 (&gt; 0), PF-low 1.67 (&gt; 1.25), SQN-low 2.32 (&gt; 1.6). Economically real even under sampling noise.</p></div>
+        <div class="vchip v-fail"><span class="tag"><span class="dot"></span>DURABLE ✗</span><p>The aggregate WFE is 1.34 — <em>above</em> the 1.00 too-good-to-be-true ceiling: the out-of-sample outran the in-sample, inflated by a few outlier years (fold WFEs of 3.5–5.3) — the opposite of the graceful 50–80% degradation a robust edge shows. Fold dispersion itself passes, but barely: only <strong>half</strong> the folds are individually tradable (CV 1.51 vs. bar 2.0).</p></div>
+      </div>
+      <p class="lede">Pooled — and even out-of-sample in aggregate — this breakout is real and strong: <code>reality_check</code> said HELD, and two of three gates are green. A backtester’s equity curve would have sold it to you. But DURABLE, the gate crucible won’t let you skip, exposes it — the edge doesn’t hold up <em>through time</em>. Overall FAIL: back to DECLARE, don’t size it up.</p>
+      <p>A <strong>PASS</strong> reads the same way with three green gates and <code>GAUNTLET: PASS</code> — an edge that’s real, strong, <em>and</em> durable, leaving only <strong>SURVIVE</strong> (capital), which you take to a position-sizing tool (§10’s sources). Most naive signals look like this Donchian: convincing on the surface, caught by DURABLE or REAL.</p>
+    </section>
+
+    <section id="bib">
+      <div class="sec-head"><span class="sec-num">§</span><h2 class="sec serif">Bibliography</h2></div>
+      <p>In rough order of contribution to the significance machinery. Where a book is organized by topic rather than fixed pagination (SSML), or where a chapter is cited rather than a verified page, that is stated explicitly.</p>
+      <ol class="bib">
+        <li><div>
+          <div class="who">Aronson, David R. — <em>Evidence-Based Technical Analysis</em> (Wiley, 2006/2007).</div>
+          <div class="what"><em>The statistical backbone.</em> Ch. 4 “Statistical Analysis” (p. 165); Ch. 5 “Hypothesis Tests and Confidence Intervals” (p. 217) → bootstrap CIs, hypothesis testing; <strong>Ch. 6 “Data-Mining Bias: The Fool’s Gold of Objective TA” (p. 255)</strong> → the permutation test, White’s Reality Check, multiple comparisons; Ch. 8 case study (p. 389) → the method applied to 6,402 rules; Appendix (p. 475) → the detrended benchmark. Acknowledgments (p. ix) credit Timothy Masters with the Monte Carlo permutation method.</div>
+        </div></li>
+        <li><div>
+          <div class="who">Aronson, D. &amp; Masters, T. — <em>Statistically Sound Machine Learning for Algorithmic Trading of Financial Instruments</em> (2013).</div>
+          <div class="what"><em>Applied companion to EBTA, organized by topic around the TSSB tool.</em> Introduction → “Walkforward Testing,” “Cross Validation,” “Overlap Considerations,” “Performance Criteria,” “Model Performance Versus Financial Performance,” “Financial Relevance and Generalizability”; plus the permutation-test / selection-bias sections. Source for the sign-permutation implementation and the model-vs-financial-performance distinction.</div>
+        </div></li>
+        <li><div>
+          <div class="who">López de Prado, Marcos — <em>Advances in Financial Machine Learning</em> (Wiley, 2018).</div>
+          <div class="what"><em>The leakage-control and ML-labeling backbone.</em> Ch. 3 §3.4 “Triple-Barrier,” §3.6–3.7 “Meta-Labeling”; Ch. 4 §4.3–4.4 (concurrency, uniqueness → effective sample); <strong>Ch. 7 §7.4 “Purged K-Fold CV”</strong> (purge &amp; embargo); Ch. 11 “The Dangers of Backtesting”; Ch. 12 §12.2 (walk-forward), §12.4 (CPCV); Ch. 14 “Backtest Statistics”; Ch. 15 §15.4 “The Probability of Strategy Failure”; Ch. 16 “ML Asset Allocation.”</div>
+        </div></li>
+        <li><div>
+          <div class="who">Pardo, Robert — <em>The Evaluation and Optimization of Trading Strategies</em>, 2nd ed. (Wiley, 2008).</div>
+          <div class="what"><em>The temporal-robustness backbone.</em> The “Evaluation of Trading Strategies” chapter → the classic performance metrics; the “Walk-Forward Analysis” chapter → walk-forward method and the <strong>Walk-Forward Efficiency (WFE)</strong> metric; the optimization/robustness and Monte-Carlo money-management material. <em>(Cited by chapter; the scanned copy’s page numbers were not individually verified.)</em></div>
+        </div></li>
+        <li><div>
+          <div class="who">Carver, Robert — <em>Systematic Trading</em> (Harriman House, 2015).</div>
+          <div class="what"><em>Overfitting discipline and portfolio structure.</em> Ch. 3 “Fitting” → in-sample/out-of-sample, robust simple parameters; Ch. 9 “Volatility Targeting,” Ch. 10 “Position Sizing” → risk-normalized returns; Ch. 11 “Portfolios” and Appendix C (bootstrapping, rule-of-thumb correlations) and Appendix D (“Calculation of diversification multiplier”) → the number-of-independent-bets idea behind <code>N_eff</code>.</div>
+        </div></li>
+        <li><div>
+          <div class="who">Carver, Robert — <em>Advanced Futures Trading Strategies</em> (Harriman House, 2021).</div>
+          <div class="what"><em>Referenced to a lesser extent.</em> The Sharpe-ratio / return-evaluation chapters (a performance statistic is itself an estimate with error) and the instrument-diversification / diversification-multiplier material across a large futures universe — the practical counterpart to <code>crucible.breadth</code> and <code>portfolio_mc.py</code>. <em>(Cited at concept/chapter level.)</em></div>
+        </div></li>
+        <li><div>
+          <div class="who">Van Tharp, Van K. — <em>Definitive Guide to Position Sizing</em> (IITM, 2008) and <em>Trade Your Way to Financial Freedom</em>, 2nd ed. (McGraw-Hill, 2007).</div>
+          <div class="what"><em>The R/SQN origin and the position-sizing layer.</em> Definitive Guide <strong>Ch. 2 “Risk (R) and R-Multiples” (p. 11)</strong> → §1's R-multiple; <strong>Ch. 3 “Evaluating the Quality of Your Trading System” (p. 23)</strong>, with “One Problem with SQN and How to Overcome It” (p. 32) and “Statistical Assumptions” (p. 33) → the SQN and its small-sample caveat (§2); its position-sizing parts are the SURVIVE layer crucible hands off. (“R,” “SQN,” “Position Sizing” are Tharp / IITM service marks.)</div>
+        </div></li>
+        <li><div>
+          <div class="who">Basso, Tom — <em>Successful Traders Size Their Positions — Why and How?</em> (enjoytheride.world, 2019).</div>
+          <div class="what"><em>Position sizing only — the SURVIVE layer.</em> Risk %, volatility %, capital/margin, and portfolio-heat sizing — the capital methodology crucible stops short of and hands off (§10).</div>
+        </div></li>
+      </ol>
+      <p class="bib-note"><strong>Supporting papers (not in the six-book set):</strong> White, H. (2000), “A Reality Check for Data Snooping,” <em>Econometrica</em> 68(5): 1097–1126 → <code>whites_reality_check</code>. &nbsp;·&nbsp; Bailey &amp; López de Prado (2014), “The Deflated Sharpe Ratio,” <em>J. Portfolio Management</em>, and Bailey, Borwein, López de Prado &amp; Zhu (2017), “The Probability of Backtest Overfitting,” <em>J. Computational Finance</em> → §5's <code>deflated_sharpe</code> / <code>pbo_cscv</code>. &nbsp;·&nbsp; Grinold &amp; Kahn, <em>Active Portfolio Management</em> → the Information Coefficient (§7).</p>
+    </section>
+
+    <section id="map">
+      <div class="sec-head"><span class="sec-num">§</span><h2 class="sec serif">Code map</h2></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Technique</th><th>File</th></tr></thead>
+          <tbody>
+            <tr><td>Trade-log schema, R-multiples</td><td><code>crucible/…/edge/trade_log.py</code></td></tr>
+            <tr><td>Look-ahead-free barrier simulator</td><td><code>crucible/…/edge/simulator.py</code></td></tr>
+            <tr><td>Edge metrics (expectancy, PF, SQN, excursion…)</td><td><code>crucible/…/edge/metrics.py</code></td></tr>
+            <tr><td>Bootstrap CI + metric-set CIs, p-value, reality_check</td><td><code>crucible/…/edge/stats.py</code></td></tr>
+            <tr><td>Random-entry null + detrended timing null</td><td><code>crucible/…/edge/stats.py</code></td></tr>
+            <tr><td>Sign-permutation, Šidák, White’s Reality Check</td><td><code>crucible/…/validation/permutation.py</code></td></tr>
+            <tr><td>PBO (CSCV) + deflated Sharpe</td><td><code>crucible/…/validation/pbo.py</code></td></tr>
+            <tr><td>ML signal quality — IC, decay, redundancy, PIT</td><td><code>crucible/…/ml/</code></td></tr>
+            <tr><td>Purged/embargoed holdout</td><td><code>crucible/…/validation/holdout.py</code></td></tr>
+            <tr><td>Walk-forward + WFE</td><td><code>crucible/…/validation/walk_forward.py</code></td></tr>
+            <tr><td>Fold dispersion / WFE diagnostics</td><td><code>crucible/…/validation/diagnostics.py</code></td></tr>
+            <tr><td>Audited gate + Gauntlet</td><td><code>crucible/…/validation/gate.py</code></td></tr>
+            <tr><td>The gauntlet (REAL/STRONG/DURABLE/GENERAL) + Thresholds</td><td><code>crucible/…/validation/gauntlet.py</code></td></tr>
+            <tr><td>Effective N / factor PCA</td><td><code>crucible/…/breadth.py</code></td></tr>
+            <tr><td>Worked example (Donchian breakout)</td><td><code>crucible/examples/donchian_gauntlet.py</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="wiki">
+      <div class="sec-head"><span class="sec-num">§</span><h2 class="sec serif">Appendix — the statistics, on Wikipedia</h2></div>
+      <p>Convenience look-ups for the techniques above — <em>secondary</em> to the primary sources in the bibliography, not a replacement for them.</p>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Concept</th><th>In</th><th>Wikipedia</th></tr></thead>
+          <tbody>
+            <tr><td>Bootstrapping (resampling)</td><td class="num">§03</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Bootstrapping_(statistics)">Bootstrapping (statistics)</a></td></tr>
+            <tr><td>Confidence interval</td><td class="num">§03</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Confidence_interval">Confidence interval</a></td></tr>
+            <tr><td>Permutation test</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Permutation_test">Permutation test</a></td></tr>
+            <tr><td>Data-mining bias</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Data_dredging">Data dredging</a></td></tr>
+            <tr><td>Multiple comparisons</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Multiple_comparisons_problem">Multiple comparisons problem</a></td></tr>
+            <tr><td>Šidák correction</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/%C5%A0id%C3%A1k_correction">Šidák correction</a></td></tr>
+            <tr><td>Backtest overfitting / deflated Sharpe</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Deflated_Sharpe_ratio">Deflated Sharpe ratio</a></td></tr>
+            <tr><td>Sharpe ratio</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Sharpe_ratio">Sharpe ratio</a></td></tr>
+            <tr><td>Cross-validation</td><td class="num">§05, 09</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Cross-validation_(statistics)">Cross-validation (statistics)</a></td></tr>
+            <tr><td>Walk-forward optimization</td><td class="num">§09</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Walk_forward_optimization">Walk forward optimization</a></td></tr>
+            <tr><td>Information coefficient</td><td class="num">§07</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Information_coefficient">Information coefficient</a></td></tr>
+            <tr><td>Spearman rank correlation</td><td class="num">§07</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient">Spearman's rank correlation coefficient</a></td></tr>
+            <tr><td>Skewness &amp; kurtosis</td><td class="num">§05</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Skewness">Skewness</a> · <a class="ext" href="https://en.wikipedia.org/wiki/Kurtosis">Kurtosis</a></td></tr>
+            <tr><td>Principal component analysis</td><td class="num">§10</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Principal_component_analysis">Principal component analysis</a></td></tr>
+            <tr><td>Monte Carlo method</td><td class="num">§10</td><td><a class="ext" href="https://en.wikipedia.org/wiki/Monte_Carlo_method">Monte Carlo method</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </article>
+  </main>
+</div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>From Trade Log to Verdict — statistical significance in <span class="mono">crucible</span>.</span>
+    <span>Pardo · Aronson · Masters · López de Prado · Carver</span>
+  </div>
+</footer>
+
+</body>
+</html>
