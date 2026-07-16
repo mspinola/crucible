@@ -1,0 +1,8 @@
+/* The crucible mark inline in the tutorial's H1 title — scale it to the title
+   and centre it vertically (baseline alignment sits it too low). */
+.md-typeset h1 img.logo {
+  height: 0.92em;
+  width: auto;
+  vertical-align: -0.12em;
+  margin-right: 0.3rem;
+}
