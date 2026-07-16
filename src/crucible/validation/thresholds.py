@@ -31,6 +31,9 @@ class Thresholds:
     wfe_target_high: float = 0.80
     min_folds_tradable_pct: float = 0.5     # majority of folds must be tradable (SQN>0)
     max_fold_sqn_cv: float = 2.0            # cap on fold-SQN coefficient of variation
+    # SQN-based WFE (wfe="sqn"): scale-invariant, for R-multiple (rules) books
+    min_wfe_sqn: float = 0.5               # hard: mean OOS/IS SQN ratio > this
+    wfe_sqn_anomaly: float = 2.0          # soft: a ratio far above 1 is suspect
 
     # ── resampling budgets / determinism ────────────────────────────────────
     n_boot: int = 10_000                    # bootstrap draws
