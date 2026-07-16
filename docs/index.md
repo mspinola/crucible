@@ -671,6 +671,25 @@ gauntlet_report(gauntlet, wf.stitched, path="gauntlet.html")   # one self-contai
 *Each gate block states its plain-English claim and its PASS/FAIL; the failing gate expands
 to the exact checks and thresholds. `tearsheet()` renders a single book the same way.*
 
+#### The verdict reads in three states, not two
+
+REAL / STRONG / DURABLE answer *"is the edge real?"* — the **core** question. GENERAL answers a
+separate one — *"does it generalize beyond the markets it was built on?"* — so the report frames
+the banner in three states rather than a flat pass/fail:
+
+- **`GAUNTLET PASS`** *(green)* — every gate that ran passed.
+- **`EDGE VALIDATED · scope-limited`** *(amber)* — the core (REAL/STRONG/DURABLE) holds and the
+  **only** miss is GENERAL. The edge is real and deployable **on the markets it was built on**;
+  only its cross-market reach is unproven. That's a documented **scope boundary**, not a rejected
+  edge — trade the set it's proven on rather than extrapolating to new markets on faith.
+- **`GAUNTLET FAIL`** *(red)* — a **core** gate missed, so the edge itself is in question.
+
+![An amber scope-limited verdict: REAL, STRONG and DURABLE pass, GENERAL shows an amber warning, and the banner reads EDGE VALIDATED · scope-limited.](img/gauntlet_scope.png){ width="660" }
+*Same report, amber instead of red: a GENERAL-only miss is a bounded-scope caveat, not a failed
+edge. This is a **presentation** distinction — `gauntlet.passed` stays strict (`True` only if
+**every** gate that ran, GENERAL included, passed), so a scope-limited book still returns
+`passed == False`. The gate math and thresholds are unchanged; only the framing is.*
+
 ---
 
 ## 12. Worked example: a Donchian breakout, read end to end
@@ -759,7 +778,9 @@ run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
 
 ![The gauntlet report for this run: GAUNTLET FAIL, with REAL and STRONG passing and DURABLE failing; the metric row and the plain-English 'Not validated' verdict.](img/gauntlet_hero.png){ width="660" }
 *The same verdict as `gauntlet_report()` renders it (§11): pillar chips, the metric row, and a
-plain-English read — real and strong, but not durable, so **not validated**.*
+plain-English read — real and strong, but not durable, so **not validated**. This run fails on
+**DURABLE**, a core gate, so it's a genuine red FAIL; had REAL/STRONG/DURABLE held and only
+GENERAL missed, the same report would read amber — **EDGE VALIDATED · scope-limited** (§11).*
 
 **Reading it gate by gate:**
 
