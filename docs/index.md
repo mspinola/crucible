@@ -37,8 +37,8 @@ statistical logic, and where to read the primary source.
 
 ## 1. The substrate: a risk-normalized trade log (R-multiples)
 
-**Code:** [`edge/trade_log.py`](../src/crucible/edge/trade_log.py),
-[`edge/simulator.py`](../src/crucible/edge/simulator.py)
+**Code:** [`edge/trade_log.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/trade_log.py),
+[`edge/simulator.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/simulator.py)
 
 Every technique downstream operates on one object: a `TradeLog` whose required column
 `r` is the per-trade return in **R-multiples** — profit measured in units of the risk
@@ -74,7 +74,7 @@ whole null distribution.
 
 ## 2. Describing the edge: capital-free metrics
 
-**Code:** [`edge/metrics.py`](../src/crucible/edge/metrics.py)
+**Code:** [`edge/metrics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/metrics.py)
 
 Before any significance test, you summarize the sample. These are point estimates — they
 *describe*, they do not yet *defend*.
@@ -119,7 +119,7 @@ a claim at all.
 
 ## 3. Quantifying sampling noise: the bootstrap confidence interval
 
-**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `bootstrap_ci`,
+**Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `bootstrap_ci`,
 `p_value_positive`, and `bootstrap_metric_cis` (the whole metric set in one resample pass).
 
 A point estimate of expectancy on 60–200 trades badly understates how much it could
@@ -160,7 +160,7 @@ lower bound is negative does not clear the gate.
 
 ## 4. The verdict: folding point + CI + p-value into a label
 
-**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `reality_check`, `Verdict`
+**Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `reality_check`, `Verdict`
 (`stats.py:93`)
 
 `reality_check` is the call the README calls "the whole point of the package." It collapses
@@ -191,7 +191,7 @@ This is the heart of the significance story and the reason Aronson & Masters mat
 
 ### 5a. Sign-permutation test (one strategy)
 
-**Code:** [`validation/permutation.py`](../src/crucible/validation/permutation.py) —
+**Code:** [`validation/permutation.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/permutation.py) —
 `sign_permutation_pvalue`
 
 ```
@@ -252,7 +252,7 @@ pass **every variant including the discards**, or the correction is toothless.
 
 ### Did the *selection* overfit? — PBO & deflated Sharpe
 
-**Code:** [`validation/pbo.py`](../src/crucible/validation/pbo.py) — `pbo_cscv`, `deflated_sharpe`
+**Code:** [`validation/pbo.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/pbo.py) — `pbo_cscv`, `deflated_sharpe`
 
 White's Reality Check asks whether the best variant's *edge* is noise. Two companion tools ask
 the complementary question: given that you searched N configs and kept the best-in-sample one,
@@ -285,7 +285,7 @@ and the *Sharpe* for it — the same multiple-testing disease, caught two more w
 
 ## 6. Ruling out drift: the random-entry / detrended benchmark
 
-**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `random_entry_null`,
+**Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `random_entry_null`,
 `detrended_timing_null`
 
 Beating zero is not enough on an instrument that drifts up. The right null is *"did my
@@ -316,7 +316,7 @@ is needed.
 
 ## 7. The ML track: is the signal real?
 
-**Code:** [`ml/`](../src/crucible/ml/) · [`edge/simulator.py`](../src/crucible/edge/simulator.py)
+**Code:** [`ml/`](https://github.com/mspinola/crucible/tree/main/src/crucible/ml/) · [`edge/simulator.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/simulator.py)
 
 The same honesty tests apply whether your entries come from a rule or a model — crucible only
 ever sees the returns. Two definitions sit underneath any ML book, and crucible covers both.
@@ -333,8 +333,8 @@ with `crucible.ml` below.
 
 ### Is the ML score real? — `crucible.ml`
 
-**Code:** [`ml/ic.py`](../src/crucible/ml/ic.py), [`ml/decay.py`](../src/crucible/ml/decay.py),
-[`ml/redundancy.py`](../src/crucible/ml/redundancy.py), [`ml/pit.py`](../src/crucible/ml/pit.py)
+**Code:** [`ml/ic.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/ic.py), [`ml/decay.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/decay.py),
+[`ml/redundancy.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/redundancy.py), [`ml/pit.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/pit.py)
 
 Once a model emits a **score**, the same honesty question §4 asks of a trade log applies to the
 score: does a higher score actually rank better outcomes, or is it noise, leakage, or a feature
@@ -375,7 +375,7 @@ predictions rather than an equity curve.
 
 ## 8. Confirming out-of-sample: holdout, purge & embargo
 
-**Code:** [`validation/holdout.py`](../src/crucible/validation/holdout.py) — `holdout`,
+**Code:** [`validation/holdout.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/holdout.py) — `holdout`,
 `split_train_test`
 
 For a **fixed** strategy, the honest test is temporal: measure the edge early, freeze it,
@@ -404,7 +404,7 @@ where an edge would have been chosen; only test counts.
 
 ## 9. Confirming it *keeps* working: walk-forward analysis & efficiency
 
-**Code:** [`validation/walk_forward.py`](../src/crucible/validation/walk_forward.py) —
+**Code:** [`validation/walk_forward.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/walk_forward.py) —
 `walk_forward`, `_wfe`
 
 One holdout is a single split; **walk-forward** rolls it through history: optimize params on
@@ -419,7 +419,7 @@ ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
 
 crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
-[`validation/diagnostics.py`](../src/crucible/validation/diagnostics.py)): a healthy *average*
+[`validation/diagnostics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/diagnostics.py)): a healthy *average*
 WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check — what fraction
 of folds are individually tradable (SQN > 0) and the coefficient of variation of fold SQN. High
 dispersion is itself a rejection, independent of the average.
@@ -442,7 +442,7 @@ are roughly one dollar bet. Two tools account for this: one **capital-free** and
 crucible, one **capital-aware** and out of crucible's scope. Both bear directly on whether a
 significance claim is honest.
 
-**Effective N** — [`breadth.py`](../src/crucible/breadth.py): `effective_n(returns)` returns a
+**Effective N** — [`breadth.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/breadth.py): `effective_n(returns)` returns a
 `Breadth` whose `n_eff = (Σλ)² / Σλ²` is the **participation ratio** of the eigenvalues of the
 return-correlation matrix (`participation_ratio`). N perfectly independent markets give
 `N_eff = N`; perfectly correlated give `N_eff = 1`. It is *"the honest denominator for
@@ -537,7 +537,7 @@ discipline made procedural. Full write-up in
 
 Everything above, run as one script on a **Donchian channel breakout** — go long when price
 closes above the prior 20-bar high; exit on a 2.5R target, a 1R stop, or a 30-bar cap. The
-full runnable version is in [`examples/donchian_gauntlet.py`](../examples/donchian_gauntlet.py);
+full runnable version is in [`examples/donchian_gauntlet.py`](https://github.com/mspinola/crucible/blob/main/examples/donchian_gauntlet.py);
 it uses reproducible synthetic prices, so you can run it with no network and get these exact
 numbers.
 
