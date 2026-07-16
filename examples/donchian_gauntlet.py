@@ -1,4 +1,4 @@
-"""Worked example for the tutorial (docs/statistical_significance_tutorial.md §12).
+"""Worked example for the tutorial (docs/index.html §12; https://mspinola.github.io/crucible/).
 
 A Donchian channel breakout run end to end through crucible: describe the edge,
 reality-check it, walk it forward, and put it through the gauntlet. Uses

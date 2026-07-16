@@ -22,7 +22,7 @@ pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on r
 
 > 📖 **[Read the tutorial →](https://mspinola.github.io/crucible/)** — *From Trade Log to
 > Verdict: the statistics of a significant edge* — every technique worked end to end on a
-> Donchian breakout. ([Markdown source](docs/statistical_significance_tutorial.md).)
+> Donchian breakout. (One self-contained page — source: [`docs/index.html`](docs/index.html).)
 
 ## What crucible answers
 
