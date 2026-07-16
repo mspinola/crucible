@@ -49,6 +49,16 @@ simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
+**Subtract costs before you test.** The `r` column should be **net of transaction costs** —
+commission *and* slippage, expressed in R. A fixed haircut (say −0.1R per trade for a liquid
+instrument, more for thin ones) is the floor; without it a **+0.15R expectancy might be
+literally just the spread**, and every p-value downstream is defending a phantom edge. The bias
+is worst exactly where it looks best: the same dollar of slippage is a *larger* fraction of a
+tight-stop (small-R) trade, so cost-per-R is highest on the highest-expectancy setups. crucible
+is capital-free but not cost-free — bake the haircut into `r` **upstream**, before the gauntlet
+ever sees the log. (Sizing-dependent frictions — financing, market impact at size — belong to
+the capital layer, §10.)
+
 The `TradeLog` is deliberately agnostic about *how* the trades were produced. A
 hand-coded moving-average rule, a set of discretionary fills exported from a broker or a
 RealTest run, and an ML take/skip filter all reduce to the same schema — a column of
@@ -86,6 +96,7 @@ Before any significance test, you summarize the sample. These are point estimate
 | **Expectancy** | `wr·avg_win − lr·avg_loss` (in R), `metrics.py:28` | mean profit per trade |
 | **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
 | **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
+| **Win rate** | fraction of `r > 0`, `:23` | how often you're right — read *with* payoff, never alone (35% is excellent at RR 3) |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:76`,`:85` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:91` | "let winners run, cut losers" |
@@ -96,6 +107,14 @@ The one to single out is **SQN** (System Quality Number, Van Tharp):
 same quantity a significance test formalizes. A high mean means nothing if the standard
 deviation is huge or `n` is tiny; SQN is the first hint of whether the sample can support
 a claim at all.
+
+> **What's deliberately absent: drawdown.** You won't find max drawdown, CAGR, or risk-of-ruin
+> in this table — and that's on purpose. **Drawdown is a function of position sizing and capital,
+> not raw edge:** two books with the *identical* `r` column can have wildly different drawdowns
+> depending only on how big and how *concurrently* you size them (correlated positions open at
+> once cluster their losses). So drawdown/ruin belong to the SURVIVE (capital) layer — the
+> block-bootstrap portfolio Monte Carlo of **§10** and beyond — not to this raw-edge layer.
+> crucible measures the edge; what it costs you to *hold* it is a separate question.
 
 > **Sources.**
 > - Expectancy, profit factor, payoff, drawdown and the rest of the classic evaluation
