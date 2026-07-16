@@ -92,6 +92,8 @@ def report_css() -> str:
                 color: #fff; font-weight: 600; margin: 8px 0 4px; }}
   .cr-verdict small {{ font-weight: 400; opacity: .9; }}
   .cr-pillars {{ color: var(--cr-muted); margin: 6px 0 18px; font-size: 14px; }}
+  .cr-verdict-row {{ display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 8px 0 18px; }}
+  .cr-verdict-row .cr-verdict, .cr-verdict-row .cr-pillars {{ margin: 0; }}
   .cr-pillars .ok {{ color: var(--cr-pass); font-weight: 600; }}
   .cr-pillars .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-pillars .na {{ color: var(--cr-faint); }}
@@ -350,8 +352,10 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
     label = "PASS" if passed else "FAIL"
     return (f"{head}{sub}"
+            f"<div class='cr-verdict-row'>"
             f"<div class='cr-verdict' style='background:{color}'>GAUNTLET {label}</div>"
-            f"<div class='cr-pillars'>{summary}</div>")
+            f"<div class='cr-pillars'>{summary}</div>"
+            f"</div>")
 
 
 def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
