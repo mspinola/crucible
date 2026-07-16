@@ -158,6 +158,33 @@ lower bound is negative does not clear the gate.
 > - Carver, *Systematic Trading*, **Appendix C "Portfolio Optimisation → More details on
 >   bootstrapping"** — bootstrap resampling applied to strategy/portfolio estimates.
 
+### When the observations aren't independent — the block bootstrap
+
+The i.i.d. bootstrap above (and the sign-permutation of §5) treats trades as **exchangeable**.
+That's fine for a single instrument, but it *breaks* for a **pooled multi-asset book**: one
+macro shock in Oct-2008 fires correlated longs across equities, metals, and FX at once, so those
+trades are not independent draws. Resampling them independently **overstates** the edge's
+significance — too-tight CIs, too-small p.
+
+The fix is to resample **contiguous blocks of calendar time** instead of individual trades, so
+the clustering survives in the null. Feed `block_bootstrap_pvalue` / `block_bootstrap_ci`
+(`edge/stats.py`) an ordered **period-return series** — e.g. monthly summed R on a gap-free grid
+— and it zero-centers to impose H₀ (mean = 0) and resamples blocks (circular, or the
+Politis–Romano **stationary bootstrap** for random block lengths):
+
+```python
+from crucible.edge import block_bootstrap_pvalue
+p = block_bootstrap_pvalue(monthly_R, block=6)   # ~1 ≈ i.i.d.; larger blocks absorb autocorrelation
+```
+
+`block≈1` reproduces the i.i.d. result; longer blocks *widen* the null exactly when the series is
+positively autocorrelated — the honest p for a clustered book. Useful diagnostic: if the p barely
+moves as the block grows, the clustering is hurting your *drawdown*, not the significance of your
+*mean* — two different statistics.
+
+> **Source.** Politis & Romano (1994), "The Stationary Bootstrap," *JASA* 89(428): 1303–1313 —
+> the block/stationary bootstrap for dependent data ([Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))).
+
 ---
 
 ## 4. The verdict: folding point + CI + p-value into a label
@@ -248,9 +275,40 @@ pass **every variant including the discards**, or the correction is toothless.
 >   and the permutation-test / selection-bias sections (the book is organized by topic
 >   around the TSSB tool).
 > - White, H. (2000), "A Reality Check for Data Snooping," *Econometrica* 68(5) — the
->   original max-statistic bootstrap `whites_reality_check` reimplements.
+>   original max-statistic bootstrap `whites_reality_check` reimplements. (No dedicated
+>   Wikipedia page; the problem it corrects lives at [Data dredging](https://en.wikipedia.org/wiki/Data_dredging).)
 > - Multiple-comparisons / overfitting the search itself: AFML **Ch. 11 "The Dangers of
 >   Backtesting"** and **Ch. 12 "Backtesting through Cross-Validation."**
+
+### 5d. Superior Predictive Ability — WRC's more powerful successor
+
+**Code:** `permutation.py` — `spa_test`
+
+White's Reality Check has a well-known weakness: it compares *raw* means and lets **every**
+variant — including obvious losers — into the max-under-the-null, so padding the search with
+junk actually *weakens* the test (the null max is inflated by noise the winner must beat).
+Hansen's **Superior Predictive Ability (SPA)** test fixes both:
+
+- **Studentize** — divide each variant's mean by its standard error before the max, so a
+  volatile / low-N variant can't dominate just by being noisy.
+- **Exclude the clearly-inferior** — variants whose studentized mean sits far below zero
+  (< −√(2·ln ln N)) are dropped from the null max (the consistent SPA_c recentering), so junk
+  no longer dilutes the test.
+
+The consequence is one-directional: **SPA p ≤ WRC p** — SPA is (weakly) more powerful. crucible
+ships `spa_test` **alongside** `whites_reality_check`, *not* as a replacement — because the extra
+power cuts against a distrust-first framework's grain. WRC is the *conservative* number (it errs
+toward not rejecting); SPA is the *powerful* one. Report both: stake a deploy on the conservative
+WRC verdict, and read SPA as "…and it's even stronger under the more powerful test." Reach for SPA
+especially when the variant pool is **heterogeneous** (wildly different sample sizes / variances
+across markets), where studentization matters most.
+
+> **Sources.**
+> - Hansen, P. R. (2005), "A Test for Superior Predictive Ability," *J. Business & Economic
+>   Statistics* 23(4): 365–380 — the SPA test `spa_test` reimplements. No dedicated Wikipedia
+>   page; see [Peter Reinhard Hansen](https://en.wikipedia.org/wiki/Peter_Reinhard_Hansen)
+>   (whose bio describes the test) and, for the data-snooping problem it corrects,
+>   [Data dredging](https://en.wikipedia.org/wiki/Data_dredging).
 
 ### Did the *selection* overfit? — PBO & deflated Sharpe
 
@@ -724,8 +782,9 @@ Information Coefficient (§7).
 | Look-ahead-free barrier simulator | `crucible/src/crucible/edge/simulator.py` |
 | Edge metrics (expectancy, PF, SQN, excursion…) | `crucible/src/crucible/edge/metrics.py` |
 | Bootstrap CI + metric-set CIs, p-value, reality_check verdict | `crucible/src/crucible/edge/stats.py` |
+| Block/stationary-bootstrap significance (serial dependence) | `crucible/src/crucible/edge/stats.py` |
 | Random-entry null + detrended timing null | `crucible/src/crucible/edge/stats.py` |
-| Sign-permutation, Šidák, White's Reality Check | `crucible/src/crucible/validation/permutation.py` |
+| Sign-permutation, Šidák, White's Reality Check + Hansen's SPA | `crucible/src/crucible/validation/permutation.py` |
 | PBO (CSCV) + deflated Sharpe | `crucible/src/crucible/validation/pbo.py` |
 | ML signal quality — IC, decay, redundancy, PIT | `crucible/src/crucible/ml/` |
 | Purged/embargoed holdout | `crucible/src/crucible/validation/holdout.py` |
@@ -746,9 +805,11 @@ bibliography, not a replacement for them.
 | Concept | In | Wikipedia |
 |---|---|---|
 | Bootstrapping (resampling) | §3 | [Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics)) |
+| Block / stationary bootstrap (dependent data) | §3 | [Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics)) |
 | Confidence interval | §3 | [Confidence interval](https://en.wikipedia.org/wiki/Confidence_interval) |
 | Permutation test | §5 | [Permutation test](https://en.wikipedia.org/wiki/Permutation_test) |
 | Data-mining bias | §5 | [Data dredging](https://en.wikipedia.org/wiki/Data_dredging) |
+| White's Reality Check / SPA test *(no dedicated pages)* | §5 | [Data dredging](https://en.wikipedia.org/wiki/Data_dredging) · [Peter Reinhard Hansen](https://en.wikipedia.org/wiki/Peter_Reinhard_Hansen) |
 | Multiple comparisons | §5 | [Multiple comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem) |
 | Šidák correction | §5 | [Šidák correction](https://en.wikipedia.org/wiki/%C5%A0id%C3%A1k_correction) |
 | Backtest overfitting / deflated Sharpe | §5 | [Deflated Sharpe ratio](https://en.wikipedia.org/wiki/Deflated_Sharpe_ratio) |

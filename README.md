@@ -141,8 +141,11 @@ print(reality_check(wf.stitched))  # the stitched-OOS verdict — the honest one
 ```
 
 Also here: `sidak_correction` and `whites_reality_check` (max-statistic across every
-variant you searched) for when a grid search flatters the best result — and, one
-step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
+variant you searched) for when a grid search flatters the best result — plus `spa_test`,
+Hansen's Superior Predictive Ability test, WRC's more powerful successor (studentized, and
+it drops clearly-inferior variants so junk can't weaken the test; `SPA p ≤ WRC p`) shipped
+*alongside* WRC, not replacing it (WRC is the conservative number, SPA the powerful one).
+One step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
 how much the *act of selecting* the best config overfit: the Probability of Backtest
 Overfitting (Bailey/López de Prado CSCV) over a trial matrix, and the Sharpe deflated
 for the number of trials and its own skew/kurtosis.
