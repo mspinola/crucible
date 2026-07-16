@@ -49,6 +49,13 @@ simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
+The unit that defines 1R is just the strategy's own stop, and crucible is agnostic to how
+it's set — a **volatility statistic** (ATR, the simulator's default), a **structural** level
+(a swing low or reversal-candle wick), or a **fixed** distance. All are valid risk units; the
+*volatility-scaled* framing holds specifically when that unit is a volatility measure like ATR
+— a structural stop is risk-normalized but only *implicitly* volatility-sensitive (a wider
+signal bar gives a wider stop).
+
 **Subtract costs before you test.** The `r` column should be **net of transaction costs** —
 commission *and* slippage, expressed in R. A fixed haircut (say −0.1R per trade for a liquid
 instrument, more for thin ones) is the floor; without it a **+0.15R expectancy might be
@@ -78,9 +85,11 @@ whole null distribution.
 
 > **Sources.** The R-multiple as the unit of trade evaluation: **Van Tharp, *Definitive Guide
 > to Position Sizing* (2008), Ch. 2 "Risk (R) and R-Multiples" (p. 11)**; popularized in *Trade
-> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-
-> scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
-> Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
+> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-scaled
+> return accounting: the ATR-based risk unit (`1R = sl × ATR`) is the trade-log echo of
+> Carver, *Systematic Trading*, **Ch. 9 "Volatility Targeting"** — the same volatility unit,
+> applied to *measuring* each trade rather than *sizing* it (position sizing itself is the
+> **SURVIVE** handoff, §10). The leakage-free barrier construction is
 > the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
 > Financial Machine Learning*, **§3.4 "The Triple-Barrier Method"**, cross-referenced in
 > §7) — but here it turns *any* entry rule into trades, ML or not.
@@ -602,9 +611,10 @@ hand the `TradeLog` to a capital-aware tool.
 >   Monte Carlo and money-management material**; risk of ruin and strategy failure: **AFML
 >   Ch. 15 "Understanding Strategy Risk," §15.4 "The Probability of Strategy Failure."**
 > - Position sizing — the **SURVIVE** layer crucible hands off — is the subject of **Van Tharp,
->   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models)
->   and **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
->   volatility %, capital/margin, portfolio-heat).
+>   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models),
+>   **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
+>   volatility %, capital/margin, portfolio-heat), and **Carver, *Systematic Trading*, Ch. 10
+>   "Position Sizing"** (turning the volatility target of §1's Ch. 9 into an actual position).
 
 ---
 
@@ -660,6 +670,25 @@ gauntlet_report(gauntlet, wf.stitched, path="gauntlet.html")   # one self-contai
 ![The computed gates as report blocks: REAL and STRONG pass, DURABLE fails and expands to show its per-check table (wfe_aggregate, fold dispersion).](img/gauntlet_gates.png){ width="620" }
 *Each gate block states its plain-English claim and its PASS/FAIL; the failing gate expands
 to the exact checks and thresholds. `tearsheet()` renders a single book the same way.*
+
+#### The verdict reads in three states, not two
+
+REAL / STRONG / DURABLE answer *"is the edge real?"* — the **core** question. GENERAL answers a
+separate one — *"does it generalize beyond the markets it was built on?"* — so the report frames
+the banner in three states rather than a flat pass/fail:
+
+- **`GAUNTLET PASS`** *(green)* — every gate that ran passed.
+- **`EDGE VALIDATED · scope-limited`** *(amber)* — the core (REAL/STRONG/DURABLE) holds and the
+  **only** miss is GENERAL. The edge is real and deployable **on the markets it was built on**;
+  only its cross-market reach is unproven. That's a documented **scope boundary**, not a rejected
+  edge — trade the set it's proven on rather than extrapolating to new markets on faith.
+- **`GAUNTLET FAIL`** *(red)* — a **core** gate missed, so the edge itself is in question.
+
+![An amber scope-limited verdict: REAL, STRONG and DURABLE pass, GENERAL shows an amber warning, and the banner reads EDGE VALIDATED · scope-limited.](img/gauntlet_scope.png){ width="660" }
+*Same report, amber instead of red: a GENERAL-only miss is a bounded-scope caveat, not a failed
+edge. This is a **presentation** distinction — `gauntlet.passed` stays strict (`True` only if
+**every** gate that ran, GENERAL included, passed), so a scope-limited book still returns
+`passed == False`. The gate math and thresholds are unchanged; only the framing is.*
 
 ---
 
@@ -749,7 +778,9 @@ run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
 
 ![The gauntlet report for this run: GAUNTLET FAIL, with REAL and STRONG passing and DURABLE failing; the metric row and the plain-English 'Not validated' verdict.](img/gauntlet_hero.png){ width="660" }
 *The same verdict as `gauntlet_report()` renders it (§11): pillar chips, the metric row, and a
-plain-English read — real and strong, but not durable, so **not validated**.*
+plain-English read — real and strong, but not durable, so **not validated**. This run fails on
+**DURABLE**, a core gate, so it's a genuine red FAIL; had REAL/STRONG/DURABLE held and only
+GENERAL missed, the same report would read amber — **EDGE VALIDATED · scope-limited** (§11).*
 
 **Reading it gate by gate:**
 
@@ -820,8 +851,9 @@ a verified page, that is stated explicitly.
 
 5. **Carver, Robert — *Systematic Trading*** (Harriman House, 2015). *Overfitting discipline
    and portfolio structure.* Ch. 3 "Fitting" → in-sample/out-of-sample, robust simple
-   parameters; Ch. 9 "Volatility Targeting," Ch. 10 "Position Sizing" → risk-normalized
-   returns; Ch. 11 "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
+   parameters; Ch. 9 "Volatility Targeting" → the volatility risk unit behind R-normalized
+   returns (§1), Ch. 10 "Position Sizing" → the sizing handoff (SURVIVE, §10); Ch. 11
+   "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
    rule-of-thumb correlations) and Appendix D "→ Calculation of diversification multiplier"
    → the number-of-independent-bets idea behind `N_eff`.
 

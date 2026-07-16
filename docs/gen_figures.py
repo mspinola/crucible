@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -151,6 +152,28 @@ def report_sheets() -> dict[str, str]:
     by = {x.name: x for x in g.gates}
     gates = "".join(gate_block(by[p]) for p in _PILLARS if p in by)
 
+    # Amber "scope-limited" illustration (#41): real strong metrics paired with a
+    # synthetic gauntlet whose only miss is GENERAL (core REAL/STRONG/DURABLE hold),
+    # so the report renders its third verdict state — EDGE VALIDATED · scope-limited.
+    @dataclass
+    class _FakeGate:
+        name: str
+        passed: bool
+
+    class _FakeGauntlet:
+        def __init__(self, gates):
+            self.gates = gates
+
+        @property
+        def passed(self):
+            return all(x.passed for x in self.gates)
+
+    scope_g = _FakeGauntlet([_FakeGate("REAL", True), _FakeGate("STRONG", True),
+                             _FakeGate("DURABLE", True), _FakeGate("GENERAL", False)])
+    scope = (verdict_banner(scope_g, title="A scope-limited edge",
+                            subtitle="core validated · cross-market generalization unproven")
+             + metrics_table(trades) + verdict_summary(scope_g))
+
     go, _ = _plotly()
     cr = cumulative_r(trades)
     grid = "rgba(128,128,128,0.18)"
@@ -167,6 +190,7 @@ def report_sheets() -> dict[str, str]:
 
     return {
         "gauntlet_hero": _sheet(hero, 840, css),
+        "gauntlet_scope": _sheet(scope, 840, css),
         "gauntlet_gates": _sheet(gates, 840, css),
         "gauntlet_cumr": _sheet(chart, 840, css),
     }
