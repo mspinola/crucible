@@ -13,7 +13,8 @@ from crucible.edge.metrics import (
 )
 from crucible.edge.stats import (
     bootstrap_ci, bootstrap_metric_cis, p_value_positive, reality_check,
-    random_entry_null, detrended_timing_null, CI, Verdict,
+    random_entry_null, detrended_timing_null,
+    block_bootstrap_pvalue, block_bootstrap_ci, CI, Verdict,
 )
 from crucible.edge.simulator import barrier_trades, random_entries
 
@@ -23,6 +24,7 @@ __all__ = [
     "expectancy", "profit_factor", "payoff_ratio", "win_rate", "sqn",
     "excursion_ratio", "e_ratio", "time_asymmetry", "exit_efficiency",
     "bootstrap_ci", "bootstrap_metric_cis", "p_value_positive", "reality_check",
-    "random_entry_null", "detrended_timing_null", "CI", "Verdict",
+    "random_entry_null", "detrended_timing_null",
+    "block_bootstrap_pvalue", "block_bootstrap_ci", "CI", "Verdict",
     "barrier_trades", "random_entries",
 ]
