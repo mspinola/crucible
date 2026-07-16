@@ -23,6 +23,21 @@ def test_sqn_zero_when_no_dispersion():
     assert sqn([1.0, 1.0, 1.0]) == 0.0
 
 
+def test_sqn_zero_when_dispersion_is_float_noise():
+    # Returns that differ only at float-noise level have no meaningful spread;
+    # SQN must not explode to a nonsensical value (the degenerate walk-forward
+    # fold that printed ~ -1e14). It reads as no signal, like exact-equal returns.
+    r = [-1.0, -1.0, -1.0 + 1e-15, -1.0 - 1e-15]
+    assert sqn(r) == 0.0
+
+
+def test_sqn_unchanged_on_a_normal_sample():
+    # A real spread is untouched by the guard: mean/std × √min(n,100).
+    r = np.array([2.0, 2.0, 2.0, -1.0] * 25)   # n=100
+    expected = r.mean() / r.std(ddof=1) * np.sqrt(100)
+    assert sqn(r) == float(expected)
+
+
 def test_edge_report_uses_available_columns():
     tl = TradeLog.from_arrays(
         r=[2.0, -1.0, 2.0, -1.0],
