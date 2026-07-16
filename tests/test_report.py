@@ -204,3 +204,25 @@ def test_gauntlet_report_has_logo_favicon_and_metric_order(ohlc):
 def test_report_css_is_style_body_only():
     css = report_css()
     assert "<style>" not in css and ".cr-gate" in css
+
+
+def test_strong_whisker_draws_ci_panels(ohlc):
+    from crucible.report.tearsheet import _strong_whisker
+    tl, g = _full_gauntlet(ohlc)
+    strong = next(gt for gt in g.gates if gt.name == "STRONG")
+    html = _strong_whisker(strong, tl)
+    assert html  # non-empty div
+    for lbl in ("Expectancy (R)", "Profit factor", "SQN-100"):
+        assert lbl in html
+    assert "floor" in html          # each panel marks its gate floor
+    # and it rides along inside the STRONG card on the full page
+    assert "Expectancy (R)" in gauntlet_report(g, tl, include_plotlyjs=False)
+
+
+def test_strong_whisker_guards(ohlc):
+    from crucible.report.tearsheet import _strong_whisker
+    from crucible.edge import TradeLog
+    tl, g = _full_gauntlet(ohlc)
+    strong = next(gt for gt in g.gates if gt.name == "STRONG")
+    assert _strong_whisker(None, tl) == ""                        # no gate
+    assert _strong_whisker(strong, TradeLog.from_arrays(r=[])) == ""  # no trades
