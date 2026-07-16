@@ -181,3 +181,48 @@ def random_entry_null(prices, side: str, n_entries: int, hold: int, *,
         tl = barrier_trades(prices, entries, side=side, tp=tp, sl=sl, timeout=hold)
         out[i] = expectancy(tl.r) if len(tl) else np.nan
     return out
+
+
+def detrended_timing_null(prices, holds, *, directions=None, n_samples: int = 2_000,
+                          detrend: bool = True, seed: int = 42) -> np.ndarray:
+    """Null per-trade-mean returns from random-*timing* trades matched to a
+    strategy's holding periods and directions, on drift-removed price returns.
+
+    Complements `random_entry_null` (which draws barrier-exit books on OHLC): this
+    one resamples the asset's own bar-to-bar returns for the same holds/directions,
+    detrended so the benchmark is asset-class-appropriate automatically — an equity
+    index's structural long drift is removed the same way a currency's near-zero
+    drift is, so no per-asset-class benchmark needs hand-picking. It isolates
+    *timing* skill from riding the underlying drift.
+
+    ``prices``: a price series (or 1-D array) covering the period. ``holds``:
+    per-trade holding periods in bars. ``directions``: per-trade +1/-1 (all long
+    when None). Returns an array of ``n_samples`` null per-trade-mean returns —
+    compare your strategy's mean per-trade return against its percentiles. Empty
+    array if there aren't enough price bars.
+    """
+    px = np.asarray(getattr(prices, "values", prices), dtype=float)
+    bar_returns = px[1:] / px[:-1] - 1.0
+    bar_returns = bar_returns[np.isfinite(bar_returns)]
+    if len(bar_returns) < 3:
+        return np.array([])
+    if detrend:
+        bar_returns = bar_returns - bar_returns.mean()
+
+    holds = np.nan_to_num(np.asarray(holds, dtype=float), nan=1.0)
+    holds = np.clip(holds, 1, None).astype(int)
+    directions = (np.ones(len(holds)) if directions is None
+                  else np.nan_to_num(np.asarray(directions, dtype=float), nan=1.0))
+
+    rng = np.random.default_rng(seed)
+    n_bars = len(bar_returns)
+    null = np.empty(n_samples)
+    for i in range(n_samples):
+        sim = np.empty(len(holds))
+        for j, (h, d) in enumerate(zip(holds, directions)):
+            h = min(int(h), n_bars)
+            start = rng.integers(0, n_bars - h + 1)
+            segment = bar_returns[start:start + h]
+            sim[j] = d * (np.prod(1 + segment) - 1)
+        null[i] = sim.mean()
+    return null
