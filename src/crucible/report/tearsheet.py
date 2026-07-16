@@ -252,7 +252,8 @@ def _fmt(x) -> str:
     return f"{xf:.3f}"
 
 
-def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = None) -> str:
+def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = None,
+               extra_html: str = "") -> str:
     """Render one audited :class:`Gate` as a collapsible card: a summary row (name,
     PASS/FAIL badge, one-line gloss) that expands to a row per check (name, value,
     threshold, hard/soft, result). Hard checks drive the gate's verdict; soft
@@ -261,7 +262,8 @@ def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = 
     It opens when the gate FAILED and collapses when it passed — so what needs
     attention shows its checks while clean pillars stay tucked away (state-based
     disclosure). Pass ``expanded`` to force it either way; ``title`` overrides the
-    default pillar heading."""
+    default pillar heading. ``extra_html`` is rendered inside the card just above
+    the checks table (e.g. a pillar-specific plot like the STRONG CI whiskers)."""
     name = getattr(gate, "name", "GATE")
     heading = title or name.title()
     blurb = _PILLAR_BLURB.get(name, "")
@@ -292,7 +294,7 @@ def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = 
     blurb_html = f"<span class='blurb'>{blurb}</span>" if blurb else ""
     return (f"<details class='cr-gate'{' open' if is_open else ''}>"
             f"<summary><span class='gate-h'>{heading}</span> {badge}{blurb_html}</summary>"
-            f"{table}</details>")
+            f"{extra_html}{table}</details>")
 
 
 def _logo_svg(*, size: int = 30, vessel: str = "currentColor", molten: str = "#e0812b",
@@ -466,6 +468,72 @@ _FOOT = ("<div class='cr-foot'>crucible — capital-free edge evaluation. Return
          "R-multiples; no capital, position sizing, or equity curve.</div>")
 
 
+def _strong_whisker(gate, trades: TradeLog, *, n_boot: int = 10_000,
+                    alpha: float = 0.05, seed: int = 0) -> str:
+    """The STRONG pillar rendered as CI whiskers — expectancy, profit factor and SQN,
+    each a point estimate + bootstrap CI against its floor (the dashed line). STRONG
+    passes a metric when its CI *lower* bound clears the floor, i.e. the whole whisker
+    sits right of the line — so a book whose point estimate clears but whose CI crosses
+    back (the "PF 1.37 on 60 trades" case) reads as a fail at a glance.
+
+    Floors and pass/fail are read straight from ``gate``'s checks so the picture always
+    matches the check table; the point/CI geometry is recomputed with the same bootstrap
+    the gate used (deterministic seed → identical numbers). Three stacked panels because
+    the metrics live on different scales. Returns an embeddable Plotly div
+    (``include_plotlyjs`` is never inlined here — the page already ships plotly.js), or
+    ``''`` when the gate or trade log can't supply the three CI checks."""
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    from crucible.validation.gauntlet import bootstrap_metric_cis
+
+    r = getattr(trades, "r", None)
+    if gate is None or r is None or len(r) == 0:
+        return ""
+    by_check = {c.name: c for c in getattr(gate, "checks", [])}
+    # (panel label, metric key in the CI dict, gate check name, hard?)
+    specs = [("Expectancy (R)", "expectancy", "expectancy_ci_lower", True),
+             ("Profit factor", "profit_factor", "profit_factor_ci_lower", True),
+             ("SQN-100", "sqn", "sqn_ci_lower", False)]
+    cis = bootstrap_metric_cis(trades, n_boot=n_boot, alpha=alpha, seed=seed)
+    specs = [s for s in specs if s[2] in by_check and s[1] in cis]
+    if not specs:
+        return ""
+
+    PASS, HARDFAIL, SOFT = "#1a7f37", "#b42318", "#9a6700"
+    fig = make_subplots(rows=len(specs), cols=1, vertical_spacing=0.22,
+                        subplot_titles=[f"{lbl}{'' if hard else '  ·  soft'}"
+                                        for lbl, _, _, hard in specs])
+    for i, (lbl, key, cname, hard) in enumerate(specs, start=1):
+        ci = cis[key]
+        chk = by_check[cname]
+        floor = chk.threshold
+        clears = bool(chk.passed)
+        color = PASS if clears else (HARDFAIL if hard else SOFT)
+        fig.add_trace(go.Scatter(
+            x=[ci.point], y=[0], mode="markers+text",
+            marker=dict(color=color, size=11, line=dict(width=1, color="rgba(0,0,0,0.35)")),
+            error_x=dict(type="data", symmetric=False, array=[ci.high - ci.point],
+                         arrayminus=[ci.point - ci.low], color=color, thickness=2, width=6),
+            text=[f"  {ci.point:.2f}"], textposition="middle right",
+            textfont=dict(color="#8b949e", size=11),
+            hovertemplate=(f"{lbl}<br>point {ci.point:.3f}<br>"
+                           f"90%% CI [{ci.low:.3f}, {ci.high:.3f}]<br>"
+                           f"floor {floor:g} → {'clears' if clears else 'below'}<extra></extra>")),
+            row=i, col=1)
+        if floor is not None:
+            fig.add_vline(x=floor, line_dash="dash", line_color="rgba(148,163,184,0.75)",
+                          annotation_text=f"floor {floor:g}", annotation_position="top left",
+                          annotation_font=dict(color="#8b949e", size=10), row=i, col=1)
+        fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False,
+                         range=[-1, 1], row=i, col=1)
+        fig.update_xaxes(gridcolor="rgba(128,128,128,0.18)", zeroline=False, row=i, col=1)
+    fig.update_layout(height=90 * len(specs) + 60, margin=dict(l=20, r=30, t=34, b=24),
+                      showlegend=False, paper_bgcolor="rgba(0,0,0,0)",
+                      plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
+    fig.update_annotations(font=dict(color="#c9d1d9", size=13))  # subplot titles
+    return fig.to_html(full_html=False, include_plotlyjs=False)
+
+
 def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
                     title: str = "crucible gauntlet", subtitle: Optional[str] = None,
                     appendix_html: str = "", header_html: str = "",
@@ -474,7 +542,8 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     """Compose a full gauntlet-organized page: verdict banner → optional
     ``header_html`` (a host note that sits right under the verdict, e.g. a
     net/gross badge) → edge panels + metrics → one section per pillar that ran
-    (REAL / STRONG / DURABLE / GENERAL) → an optional host-supplied
+    (REAL / STRONG / DURABLE / GENERAL; STRONG carries a CI-whisker plot of its
+    checks) → an optional host-supplied
     ``appendix_html`` (e.g. capital-aware panels the host owns). ``pillar_notes``
     relabels an un-run pillar in the banner (see `verdict_banner`). If ``path`` is
     given the HTML is written there and the path is returned; otherwise the HTML
@@ -484,7 +553,14 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed)
     metrics = metrics_table(trades)
     by_name = {g.name: g for g in gauntlet.gates}
-    pillars = "".join(gate_block(by_name[p]) for p in _PILLARS if p in by_name)
+
+    def _block(p):
+        # STRONG gets its CI checks drawn as whiskers above the table; recomputed with
+        # the report's bootstrap settings so the numbers match the gate's own CIs.
+        extra = _strong_whisker(by_name[p], trades, n_boot=n_boot, seed=seed) if p == "STRONG" else ""
+        return gate_block(by_name[p], extra_html=extra)
+
+    pillars = "".join(_block(p) for p in _PILLARS if p in by_name)
     appendix = appendix_html or ""
     inner = f"{banner}{metrics}{summary}{header_html or ''}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
