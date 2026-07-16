@@ -113,6 +113,8 @@ table { border-collapse: collapse; margin: 8pt 0; width: 100%; }
 th, td { border: 0.5pt solid #b0bec5; padding: 4pt 7pt; font-size: 9pt; text-align: left; }
 th { background: #e0f2f1; color: #004d40; }
 hr { border: none; border-top: 0.5pt solid #cfd8dc; margin: 12pt 0; }
+img { display: block; margin: 8pt 0; }
+.caption { font-size: 8.5pt; color: #78909c; font-style: italic; margin: 0 0 8pt 0; }
 """
 
 # The frame anchor is a plain block <div> (tables/floats aren't reliably honoured
@@ -125,6 +127,16 @@ FOOTER = (
 )
 
 
+def _link_callback(base_dir: Path):
+    """Resolve relative image URIs (e.g. ``img/foo.png``) to absolute paths so
+    xhtml2pdf can embed them; pass through data:/http(s) URIs untouched."""
+    def cb(uri: str, _rel: str) -> str:
+        if uri.startswith(("http://", "https://", "data:")):
+            return uri
+        return str((base_dir / uri).resolve())
+    return cb
+
+
 def render_pdf(src_path: Path, out_path: Path) -> None:
     from xhtml2pdf import pisa  # imported lazily so --help works without deps
 
@@ -133,7 +145,8 @@ def render_pdf(src_path: Path, out_path: Path) -> None:
     html = html.replace("<body>", "<body>\n" + FOOTER, 1)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("wb") as fh:
-        result = pisa.CreatePDF(html, dest=fh, encoding="utf-8")
+        result = pisa.CreatePDF(html, dest=fh, encoding="utf-8",
+                                link_callback=_link_callback(src_path.parent))
     if result.err:
         raise SystemExit(f"xhtml2pdf reported {result.err} error(s) generating {out_path}")
     print(f"wrote {out_path} ({out_path.stat().st_size // 1024} KB)")

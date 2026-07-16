@@ -73,6 +73,9 @@ the rule fires on, known at entry — and exits are scanned forward from the ent
 knowable only at the moment of the trade — a single peek into the future contaminates the
 whole null distribution.
 
+![The triple-barrier method: an entry becomes a labeled R-multiple when the price path first touches the profit barrier, the stop, or the time cap.](img/triple_barrier.png){ width="660" }
+*Each entry is scored by whichever barrier fires first — a profit target (`+tp·ATR`), a stop (`−sl·ATR`), or a time cap. The same construction labels trades for the ML track (§7).*
+
 > **Sources.** The R-multiple as the unit of trade evaluation: **Van Tharp, *Definitive Guide
 > to Position Sizing* (2008), Ch. 2 "Risk (R) and R-Multiples" (p. 11)**; popularized in *Trade
 > Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-
@@ -611,17 +614,7 @@ Every primitive above answers one question. The **gauntlet** runs them as an ord
 of audited hard gates and returns a single, capital-free pass/fail — crucible's own
 naming, no stage numbers borrowed from anywhere:
 
-```
-DECLARE   preamble  — a mechanical rule + a log of every variant you tried
-CLEAN     preamble  — leakage-controlled construction (use holdout / walk_forward)
-──────────────── the gauntlet crucible computes ────────────────
-REAL      — distinguishable from noise, corrected for the search
-STRONG    — economically meaningful at the CI lower bound
-DURABLE   — holds out-of-sample over time
-GENERAL   — travels to markets it wasn't built on (optional)
-─────────────────────────────────────────────────────────────────
-SURVIVE   handoff   — capital survivability (out of scope; hand the surviving log off)
-```
+![The gauntlet gate ladder: DECLARE and CLEAN preambles, the computed REAL/STRONG/DURABLE/GENERAL gates, the SURVIVE handoff, and the rule that any FAIL sends you back to DECLARE.](img/gate_ladder.png){ width="620" }
 
 ```python
 from crucible.validation import run_gauntlet
@@ -651,6 +644,22 @@ a strong later gate can't redeem an early failure. The non-negotiable rule: **a 
 you back to DECLARE, never to tweaking the failing number.** That is the anti-data-mining
 discipline made procedural. Full write-up in
 [`docs/edge_gate.md`](edge_gate.md).
+
+### The gauntlet as a report — `gauntlet_report()` / `tearsheet()`
+
+`crucible.report` renders the same verdict as a self-contained, theme-aware HTML page
+(the `[report]` extra adds plotly): a verdict banner and pillar chips, the metric row, the
+edge charts, and one expandable block per gate. It visualizes the **edge**, never an
+account — no equity curve, no capital.
+
+```python
+from crucible.report import gauntlet_report
+gauntlet_report(gauntlet, wf.stitched, path="gauntlet.html")   # one self-contained file
+```
+
+![The computed gates as report blocks: REAL and STRONG pass, DURABLE fails and expands to show its per-check table (wfe_aggregate, fold dispersion).](img/gauntlet_gates.png){ width="620" }
+*Each gate block states its plain-English claim and its PASS/FAIL; the failing gate expands
+to the exact checks and thresholds. `tearsheet()` renders a single book the same way.*
 
 ---
 
@@ -722,6 +731,11 @@ WFE of 1.34 looks respectable until you notice it's *above 1.00* — the out-of-
 in-sample, which §9 flagged as too-good-to-be-true. A few outlier years (fold WFEs of 3.5, 3.7,
 5.3) inflated the average. Step 4 makes the call.
 
+![Cumulative R of the stitched out-of-sample log: an early climb, a long flat and choppy middle, then a late rip up to about 78R.](img/gauntlet_cumr.png){ width="660" }
+*The stitched out-of-sample slices as one cumulative-R curve — an early climb, a long flat/choppy
+middle (the losing years), then a late rip a few outlier years drive. Convincing as a curve; the
+gauntlet still rejects it.*
+
 ### Step 4 — the verdict (§11)
 
 ```
@@ -732,6 +746,10 @@ run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
    ─────────────────────────────────────────────────────────────────────
    GAUNTLET: FAIL   (2 of 3 gates passed — failing: DURABLE)
 ```
+
+![The gauntlet report for this run: GAUNTLET FAIL, with REAL and STRONG passing and DURABLE failing; the metric row and the plain-English 'Not validated' verdict.](img/gauntlet_hero.png){ width="660" }
+*The same verdict as `gauntlet_report()` renders it (§11): pillar chips, the metric row, and a
+plain-English read — real and strong, but not durable, so **not validated**.*
 
 **Reading it gate by gate:**
 
