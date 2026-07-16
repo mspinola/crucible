@@ -49,6 +49,16 @@ simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
+**Subtract costs before you test.** The `r` column should be **net of transaction costs** —
+commission *and* slippage, expressed in R. A fixed haircut (say −0.1R per trade for a liquid
+instrument, more for thin ones) is the floor; without it a **+0.15R expectancy might be
+literally just the spread**, and every p-value downstream is defending a phantom edge. The bias
+is worst exactly where it looks best: the same dollar of slippage is a *larger* fraction of a
+tight-stop (small-R) trade, so cost-per-R is highest on the highest-expectancy setups. crucible
+is capital-free but not cost-free — bake the haircut into `r` **upstream**, before the gauntlet
+ever sees the log. (Sizing-dependent frictions — financing, market impact at size — belong to
+the capital layer, §10.)
+
 The `TradeLog` is deliberately agnostic about *how* the trades were produced. A
 hand-coded moving-average rule, a set of discretionary fills exported from a broker or a
 RealTest run, and an ML take/skip filter all reduce to the same schema — a column of
@@ -86,6 +96,7 @@ Before any significance test, you summarize the sample. These are point estimate
 | **Expectancy** | `wr·avg_win − lr·avg_loss` (in R), `metrics.py:28` | mean profit per trade |
 | **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
 | **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
+| **Win rate** | fraction of `r > 0`, `:23` | how often you're right — read *with* payoff, never alone (35% is excellent at RR 3) |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:76`,`:85` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:91` | "let winners run, cut losers" |
@@ -96,6 +107,14 @@ The one to single out is **SQN** (System Quality Number, Van Tharp):
 same quantity a significance test formalizes. A high mean means nothing if the standard
 deviation is huge or `n` is tiny; SQN is the first hint of whether the sample can support
 a claim at all.
+
+> **What's deliberately absent: drawdown.** You won't find max drawdown, CAGR, or risk-of-ruin
+> in this table — and that's on purpose. **Drawdown is a function of position sizing and capital,
+> not raw edge:** two books with the *identical* `r` column can have wildly different drawdowns
+> depending only on how big and how *concurrently* you size them (correlated positions open at
+> once cluster their losses). So drawdown/ruin belong to the SURVIVE (capital) layer — the
+> block-bootstrap portfolio Monte Carlo of **§10** and beyond — not to this raw-edge layer.
+> crucible measures the edge; what it costs you to *hold* it is a separate question.
 
 > **Sources.**
 > - Expectancy, profit factor, payoff, drawdown and the rest of the classic evaluation
@@ -309,6 +328,48 @@ across markets), where studentization matters most.
 >   page; see [Peter Reinhard Hansen](https://en.wikipedia.org/wiki/Peter_Reinhard_Hansen)
 >   (whose bio describes the test) and, for the data-snooping problem it corrects,
 >   [Data dredging](https://en.wikipedia.org/wiki/Data_dredging).
+
+### 5e. Cross-market Reality Check — the GENERAL gate
+
+**Code:** `gauntlet.py` — `gate_general` (which calls `whites_reality_check` / `spa_test`)
+
+The tests above correct for **one** search: the parameter/config variants you tried. But a book
+that applies **one universal rule across many markets** is running a *second*, implicit search —
+testing 27 markets is 27 shots at a winner. The **GENERAL** gate asks whether the edge *travels*,
+and prices that second search exactly as §5c/§5d price the first.
+
+It's the same max-statistic idea, one axis over: treat **each market's per-trade returns as a
+variant** and run the Reality Check (or SPA) across them. The pass bar is that the **best market**
+beats the distribution of the best under no skill *across every market tested*, so one lucky
+market can't carry the book:
+
+```python
+variant_returns = {market: its trade returns}     # one entry per market
+p = whites_reality_check(variant_returns)          # best market vs best-under-null over N markets
+#   gauntlet.py: gate_general  (spa_test is the studentized, more-powerful alternative)
+```
+
+Two things make it honest — and easy to misread:
+
+- **Pass every market, including the failures** — which were development vs. held-out is your
+  record to keep, not crucible's (same rule as §5c). Omitting the losers biases it toward a false
+  pass.
+- **It scores the single BEST market, not the pool.** For a *pooled, thin-per-market* book (the
+  edge lives in the aggregate, ~30 trades/market) that's a **stringent, arguably mismatched** bar:
+  you can have a genuinely broad, real pooled edge and *still* have no single market clear an
+  N-way correction. Read a GENERAL failure as **"no single market is an individually-validated
+  standout,"** not "the edge is fake" — the pooled edge is REAL/STRONG's job (§5/§3), and breadth
+  is better read two other ways: the book's **effective N** (§10) and a plain **sign test** over
+  the units (how many are individually positive).
+
+**Choose the unit deliberately.** Per *symbol* is thin (few trades each → almost nothing passes);
+per *asset class* pools within each class into a powered unit and is usually the honest lens. And
+because markets are wildly **heteroskedastic** (hundreds of trades in one, a handful in another),
+this is exactly where SPA's studentization (§5d) earns its keep — on a real 28-asset book, moving
+the GENERAL unit symbol → class and the test WRC → SPA walked the p from **0.20 → 0.07 → 0.002**.
+
+> **Sources.** White (2000) / Hansen (2005) as in §5c–5d; the "does the edge travel across markets"
+> (cross-sectional generalization) framing is the held-out-asset step of AFML **Ch. 11–12**.
 
 ### Did the *selection* overfit? — PBO & deflated Sharpe
 
@@ -582,7 +643,7 @@ print(gauntlet.passed)  # True only if every gate that ran passed
 | **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
 | **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
 | **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
-| **GENERAL** | travels across markets | cross-market Reality Check — §5; breadth / N_eff — §10 |
+| **GENERAL** | travels across markets | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
 | **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
 
 Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
