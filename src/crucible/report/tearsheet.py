@@ -84,6 +84,9 @@ def report_css() -> str:
   .cr-wrap {{ max-width: 1080px; margin: 0 auto; padding: 24px; background: var(--cr-bg);
              font: 15px/1.5 -apple-system, Segoe UI, Roboto, sans-serif; color: var(--cr-fg); }}
   .cr-wrap h1 {{ margin: 0 0 2px; font-size: 22px; }}
+  .cr-title {{ display: flex; align-items: center; gap: 11px; margin: 0 0 2px; }}
+  .cr-title h1 {{ margin: 0; }}
+  .cr-title svg {{ flex: none; }}
   .cr-sub {{ color: var(--cr-muted); margin-bottom: 16px; }}
   .cr-verdict {{ display: inline-block; padding: 8px 14px; border-radius: 8px;
                 color: #fff; font-weight: 600; margin: 8px 0 4px; }}
@@ -290,6 +293,37 @@ def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = 
             f"{table}</details>")
 
 
+def _logo_svg(*, size: int = 30, vessel: str = "currentColor", molten: str = "#e0812b",
+              up: str = "var(--cr-pass)", down: str = "var(--cr-fail)") -> str:
+    """The crucible mark: a tilted foundry ladle pouring molten that casts a rising
+    candlestick chart. The vessel adapts to the page (``currentColor``); the molten
+    pour is a fixed glow; the candles use the gauntlet's pass/fail colors."""
+    return (
+        f"<svg width='{size}' height='{size}' viewBox='0 0 48 46' fill='none' "
+        f"role='img' aria-label='crucible' xmlns='http://www.w3.org/2000/svg'>"
+        f"<path d='M18.5 12.8 Q22.8 21.5 26.6 29.6 L29.4 28.4 Q25.6 20.4 21.7 11.6 Z' fill='{molten}'/>"
+        f"<ellipse cx='27.5' cy='40.6' rx='4.6' ry='1.3' fill='{molten}'/>"
+        f"<path d='M8 9.5 L5.8 19 Q10.8 26.4 17 23.2 L20.4 13.6' stroke='{vessel}' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>"
+        f"<path d='M8 9.5 L20.4 13.6' stroke='{vessel}' stroke-width='1.5' stroke-linecap='round'/>"
+        f"<path d='M7.2 14 Q11.6 20.4 15.6 17.8' stroke='{vessel}' stroke-width='1.3' stroke-linecap='round'/>"
+        f"<line x1='27.5' y1='33' x2='27.5' y2='41' stroke='{down}' stroke-width='1.6' stroke-linecap='round'/>"
+        f"<rect x='25.8' y='35' width='3.4' height='4' rx='1' fill='{down}'/>"
+        f"<line x1='32.5' y1='29' x2='32.5' y2='40' stroke='{up}' stroke-width='1.6' stroke-linecap='round'/>"
+        f"<rect x='30.8' y='31' width='3.4' height='5' rx='1' fill='{up}'/>"
+        f"<line x1='37.5' y1='25' x2='37.5' y2='39' stroke='{up}' stroke-width='1.6' stroke-linecap='round'/>"
+        f"<rect x='35.8' y='27' width='3.4' height='5' rx='1' fill='{up}'/>"
+        f"</svg>"
+    )
+
+
+def _favicon_href() -> str:
+    """The mark as an SVG data-URI for `<link rel=icon>` — fixed colors (favicons get
+    no page context, so no currentColor / CSS vars)."""
+    from urllib.parse import quote
+    svg = _logo_svg(size=32, vessel="#7a808a", molten="#e0812b", up="#1a7f37", down="#b42318")
+    return "data:image/svg+xml," + quote(svg)
+
+
 def verdict_banner(gauntlet, *, title: Optional[str] = None,
                    subtitle: Optional[str] = None, pillar_notes: Optional[dict] = None) -> str:
     """Overall gauntlet verdict: a PASS/FAIL banner plus a one-line pillar summary
@@ -312,7 +346,7 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
         else:
             chips.append(f"<span class='na'>{p} {pillar_notes.get(p, '—')}</span>")
     summary = " &nbsp;·&nbsp; ".join(chips)
-    head = f"<h1>{title}</h1>" if title else ""
+    head = (f"<div class='cr-title'>{_logo_svg(size=34)}<h1>{title}</h1></div>") if title else ""
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
     label = "PASS" if passed else "FAIL"
     return (f"{head}{sub}"
@@ -419,6 +453,7 @@ def _page(title: str, inner: str) -> str:
     return (f"<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
             f"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
             f"<title>{title}</title>"
+            f"<link rel=\"icon\" href=\"{_favicon_href()}\">"
             f"<style>body{{margin:0;background:var(--cr-bg);}}{report_css()}</style></head>"
             f"<body><div class=\"cr-wrap\">{inner}</div></body></html>")
 
@@ -447,7 +482,7 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     by_name = {g.name: g for g in gauntlet.gates}
     pillars = "".join(gate_block(by_name[p]) for p in _PILLARS if p in by_name)
     appendix = appendix_html or ""
-    inner = f"{banner}{summary}{header_html or ''}{metrics}{panels}{pillars}{appendix}{_FOOT}"
+    inner = f"{banner}{metrics}{summary}{header_html or ''}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
     if path is None:
         return doc
