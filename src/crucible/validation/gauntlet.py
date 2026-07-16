@@ -27,7 +27,7 @@ import pandas as pd
 
 from crucible.edge import (
     TradeLog, edge_report, expectancy, sqn,
-    bootstrap_metric_cis, random_entry_null,
+    bootstrap_metric_cis, random_entry_null, detrended_timing_null,
 )
 from crucible.validation.permutation import (
     sign_permutation_pvalue, sidak_correction, whites_reality_check,
@@ -52,6 +52,7 @@ def _infer_hold(trades: TradeLog, default: int = 20) -> int:
 def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
               side: str = "long", hold: Optional[int] = None,
               tp: float = 2.0, sl: float = 1.0,
+              null: str = "random_entry", directions=None,
               variant_returns: Optional[Dict[str, object]] = None,
               n_variants: Optional[int] = None,
               thr: Thresholds = Thresholds()) -> Gate:
@@ -61,9 +62,19 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
     you searched, discards included), it uses White's Reality Check across them;
     else a sign-permutation p-value, Šidák-corrected when you declare
     `n_variants`. When `prices` are given it also requires the expectancy to beat
-    the 95th percentile of random-entry books on the *same* prices (crucible's
-    R-consistent "beat coin-flip timing" null); without prices that check is
-    recorded as a soft skip.
+    the 95th percentile of a random-timing null on the *same* prices; without
+    prices that check is a soft skip.
+
+    Two nulls (``null=``):
+
+      "random_entry"  (default) — random-entry books held under the same TP/SL
+                      barriers on the OHLC. Single-`side`; inherits the asset's drift.
+      "detrended"     — random-*timing* on drift-removed price returns, matched to
+                      each trade's holding period and direction. The right null for
+                      a mixed long/short book on a drift-bearing asset — pass
+                      per-trade ``directions`` (+1/-1); it falls back to `side` for
+                      all trades when omitted. It's a return-space test, so use it
+                      when the log's `r` is in return units.
     """
     g = Gate("REAL")
 
@@ -86,20 +97,33 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                          "search correction if you searched more than one")
 
     if prices is not None and trades.n:
-        h = hold if hold is not None else _infer_hold(trades)
-        null = random_entry_null(prices, side=side, n_entries=trades.n, hold=h,
-                                 tp=tp, sl=sl, n_sims=thr.n_random_sims, seed=thr.seed)
-        finite = null[np.isfinite(null)]
+        if null == "detrended":
+            close = (prices["Close"] if hasattr(prices, "columns") and "Close" in prices.columns
+                     else prices.iloc[:, 0] if hasattr(prices, "columns") else prices)
+            holds = trades.col("bars_held")
+            if holds is None:
+                holds = np.full(trades.n, hold if hold is not None else _infer_hold(trades))
+            dirs = (np.asarray(directions, dtype=float) if directions is not None
+                    else np.full(trades.n, 1.0 if side == "long" else -1.0))
+            null_dist = detrended_timing_null(close, holds, directions=dirs,
+                                              n_samples=thr.n_random_sims, seed=thr.seed)
+            method = "detrended random-timing books (matched holds/directions)"
+        else:
+            h = hold if hold is not None else _infer_hold(trades)
+            null_dist = random_entry_null(prices, side=side, n_entries=trades.n, hold=h,
+                                          tp=tp, sl=sl, n_sims=thr.n_random_sims, seed=thr.seed)
+            method = "random-entry books on the same prices"
+        finite = null_dist[np.isfinite(null_dist)]
         if len(finite):
             obs = expectancy(trades.r)
             bar = float(np.percentile(finite, 95))
             beaten = float((finite < obs).mean()) * 100
             g.add("beats_random_timing", obs > bar, value=obs, threshold=bar,
-                  detail=f"expectancy beats {beaten:.0f}% of random-entry books on the "
-                         f"same prices (needs to beat the 95th percentile)")
+                  detail=f"expectancy beats {beaten:.0f}% of {method} "
+                         f"(needs to beat the 95th percentile)")
         else:
             g.add("beats_random_timing", False, hard=False,
-                  detail="skipped — random-entry null produced no trades")
+                  detail="skipped — the null produced no trades")
     else:
         g.add("beats_random_timing", False, hard=False,
               detail="skipped — no price series provided")
@@ -202,14 +226,18 @@ def run_gauntlet(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                  wf=None, trade_logs: Optional[Dict[str, TradeLog]] = None,
                  side: str = "long", hold: Optional[int] = None,
                  tp: float = 2.0, sl: float = 1.0,
+                 null: str = "random_entry", directions=None,
                  variant_returns: Optional[Dict[str, object]] = None,
                  n_variants: Optional[int] = None,
                  thr: Thresholds = Thresholds()) -> Gauntlet:
     """Run the gauntlet on a trade log. REAL and STRONG always run; DURABLE runs
     when a `WalkForwardResult` is supplied, GENERAL when a {market: TradeLog} map
-    is. The gauntlet passes only if every gate it ran passes."""
+    is. The gauntlet passes only if every gate it ran passes. See `gate_real` for
+    the `null` / `directions` options (use `null="detrended"` for a mixed
+    long/short book on a drift-bearing asset)."""
     gauntlet = Gauntlet()
     gauntlet.add(gate_real(trades, prices=prices, side=side, hold=hold, tp=tp, sl=sl,
+                           null=null, directions=directions,
                            variant_returns=variant_returns, n_variants=n_variants, thr=thr))
     gauntlet.add(gate_strong(trades, thr=thr))
     if wf is not None:
