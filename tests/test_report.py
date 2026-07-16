@@ -182,6 +182,17 @@ def test_gauntlet_report_embeds_header_html(ohlc):
     assert doc.index("net-gross-badge") < doc.index("Real")
 
 
+def test_gauntlet_report_has_logo_favicon_and_metric_order(ohlc):
+    tl, g = _full_gauntlet(ohlc)
+    doc = gauntlet_report(g, tl, include_plotlyjs=False)
+    # the crucible mark is in the header lockup, and the favicon carries it too
+    assert "cr-title" in doc and "aria-label='crucible'" in doc
+    assert 'rel="icon"' in doc and "data:image/svg+xml," in doc
+    # metric-reorder: numbers sit right under the verdict, before the prose summary
+    # (match the body elements, not the .cr-* rule order in the <style> head)
+    assert doc.index("class='cr-metrics'") < doc.index("class='cr-summary'")
+
+
 def test_report_css_is_style_body_only():
     css = report_css()
     assert "<style>" not in css and ".cr-gate" in css
