@@ -1,8 +1,8 @@
 # From Trade Log to Verdict: The Statistics of a Significant Edge
 
-**A tutorial on the statistical techniques in `crucible` (and, to a lesser extent,
-`pardo_quant_framework`), and how each one contributes to declaring a trade log
-statistically significant — with references to the source literature.**
+**A standalone tutorial on the statistical techniques in `crucible` — how each one
+contributes to declaring a trade log statistically significant, worked end to end on an
+example system, with references to the source literature.**
 
 ---
 
@@ -16,17 +16,17 @@ question this tutorial is about is different:
 > one, could a curve this good have come from **no edge at all**?
 
 Answering that turns a point estimate into a **verdict**. Two distinct failure modes
-have to be ruled out (the framing is Aronson's, carried into
-`pardo_quant_framework/docs/edge_validation_framework.md`):
+have to be ruled out (the framing is Aronson's):
 
 1. **Luck mistaken for skill** — a small sample, or a large search, threw up a good
    number by chance. *(Statistical validity.)*
 2. **A real pattern that doesn't travel** — genuine in-sample, gone out-of-sample or on
    another market. *(Robustness / generalization.)*
 
-`crucible` is the tool that answers these at the **trade-log level**, before any
-capital, position sizing, or equity curve enters the picture. `pardo_quant_framework`
-wraps the same primitives in a staged, gated pipeline for a real COT-based book.
+`crucible` answers these at the **trade-log level**, before any capital, position sizing, or
+equity curve enters the picture — everything here is capital-free. The concepts come first
+(§1–§11); then **§12 works the whole pipeline end to end on a Donchian breakout**, so you can
+see exactly how to read every number and verdict.
 
 Everything below is organized as a pipeline: **describe the edge → quantify sampling
 noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account
@@ -61,8 +61,9 @@ the rule fires on, known at entry — and exits are scanned forward from the ent
 knowable only at the moment of the trade — a single peek into the future contaminates the
 whole null distribution.
 
-> **Sources.** The R-multiple as the unit of trade evaluation: Van Tharp, *Trade Your
-> Way to Financial Freedom* (origin of R and SQN, below). Risk-normalized, volatility-
+> **Sources.** The R-multiple as the unit of trade evaluation: **Van Tharp, *Definitive Guide
+> to Position Sizing* (2008), Ch. 2 "Risk (R) and R-Multiples" (p. 11)**; popularized in *Trade
+> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-
 > scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
 > Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
 > the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
@@ -99,15 +100,14 @@ a claim at all.
 >   battery: **Pardo, *The Evaluation and Optimization of Trading Strategies*, 2nd ed.
 >   (2008), the "Evaluation of Trading Strategies" chapter** — this is the canonical list
 >   `edge_report` reproduces.
-> - **SQN**: Van Tharp, *Trade Your Way to Financial Freedom*, 2nd ed. (2007), ch. on
->   "The System Quality Number." Both codebases use Van Tharp's `√min(n,100)` cap:
->   crucible's `sqn()` (`metrics.py:60`) is the single source of truth, and the
->   framework's `PardoSQNEvaluator.calculate_sqn` delegates to it. (An earlier Pardo
->   variant used `√100` always to normalize low-frequency books across asset classes,
->   but that credited small samples with confidence they hadn't earned — inflating a
->   30-trade SQN by √(100/30) ≈ 1.8× — and was replaced. Its walk-forward ratio
->   WFE_SQN stays computed on the sample-size-independent per-trade quality (mean/std),
->   so a fold's robustness score isn't distorted by IS/OOS window-length asymmetry.)
+> - **SQN**: Van Tharp, *Definitive Guide to Position Sizing* (2008), Ch. 3 "Evaluating the
+>   Quality of Your Trading System" (p. 23) — and, precisely on the small-sample problem the
+>   `√min(n,100)` cap addresses, "One Problem with System Quality Number and How to Overcome It"
+>   (p. 32) and "Statistical Assumptions in Using This Material" (p. 33); popularized in *Trade
+>   Your Way to Financial Freedom* (2007). crucible's `sqn()` (`metrics.py:60`) uses Van
+>   Tharp's `√min(n,100)` cap. (A `√100`-always variant would inflate a 30-trade SQN by
+>   √(100/30) ≈ 1.8×, crediting it with confidence it hasn't earned — the actual trade count
+>   is the honest scale.)
 > - Excursion (MFE/MAE) analysis: Sweeney, *Campaign Trading*; Curtis Faith, *Way of the
 >   Turtle* (the E-ratio) — cited in the `metrics.py` module docstring.
 > - The *risk-adjusted* framing (why std matters as much as mean): Carver, *Advanced
@@ -120,8 +120,7 @@ a claim at all.
 ## 3. Quantifying sampling noise: the bootstrap confidence interval
 
 **Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `bootstrap_ci`,
-`p_value_positive`; framework mirror in
-[`pardo .../validation/bootstrap.py`](../../pardo_quant_framework/src/validation/bootstrap.py).
+`p_value_positive`, and `bootstrap_metric_cis` (the whole metric set in one resample pass).
 
 A point estimate of expectancy on 60–200 trades badly understates how much it could
 have wobbled. The **bootstrap** turns the single number into a distribution:
@@ -142,9 +141,10 @@ Why it is the honest read: it makes no normality assumption (trade returns are s
 fat-tailed), and it works for *any* metric — expectancy, profit factor, SQN — not just the
 mean. On small samples the band is wide, and that width **is the message**.
 
-The framework gates on this: Stage 4 requires the **CI lower bound**, not the point
-estimate, to clear each threshold (`stage_evaluator.py:142-151`). This directly fixes the
-"PF 1.37 on 60 trades treated as a clean pass" failure the framework was built to prevent.
+crucible's gauntlet gates on this: its **STRONG** gate requires the **CI lower bound**, not
+the point estimate, to clear each threshold (`gate_strong`, §11). This directly fixes the
+"PF 1.37 on 60 trades treated as a clean pass" failure: a positive point estimate whose CI
+lower bound is negative does not clear the gate.
 
 > **Sources.**
 > - **Aronson, *Evidence-Based Technical Analysis* (EBTA, 2006), Ch. 4 "Statistical
@@ -180,8 +180,8 @@ a p-value to be argued over.
 > **Sources.** The philosophy — a rule earns belief only when the evidence clears a
 > pre-set statistical bar, not when it merely looks good — is the thesis of **EBTA Ch. 3
 > "The Scientific Method and Technical Analysis" (p. 103)** and **Ch. 5 (p. 217)**. The
-> "hard gate, no discretionary override" posture is spelled out in
-> `edge_validation_framework.md` → *Two-Tier Gating Philosophy*.
+> "hard gate, no discretionary override" posture is the gauntlet's own (§11): a failing hard
+> check can't be waived by a reviewer who likes the strategy.
 
 ---
 
@@ -215,8 +215,8 @@ Method**, the public-domain alternative to White's patented Reality Check.
 If you quietly tried 50 parameter sets and reported the best, its raw p-value is a lie of
 selection. Šidák asks: *what's the chance the best of N independent searches looks this
 good by luck?* It is the conservative fallback when you only know the **count** of variants.
-The framework applies it in Stage 3 using the search-space log
-(`stage_evaluator.py:78`).
+crucible's **REAL** gate applies it in the gauntlet — pass your `n_variants` (the total number
+of configs you searched, discards included).
 
 ### 5c. White's Reality Check (you have every variant's returns)
 
@@ -250,23 +250,54 @@ pass **every variant including the discards**, or the correction is toothless.
 > - Multiple-comparisons / overfitting the search itself: AFML **Ch. 11 "The Dangers of
 >   Backtesting"** and **Ch. 12 "Backtesting through Cross-Validation."**
 
+### Did the *selection* overfit? — PBO & deflated Sharpe
+
+**Code:** [`validation/pbo.py`](../src/crucible/validation/pbo.py) — `pbo_cscv`, `deflated_sharpe`
+
+White's Reality Check asks whether the best variant's *edge* is noise. Two companion tools ask
+the complementary question: given that you searched N configs and kept the best-in-sample one,
+**how much did the act of choosing overfit?**
+
+- **PBO — Probability of Backtest Overfitting** (`pbo_cscv`) via Combinatorially-Symmetric
+  Cross-Validation. Feed a `T×N` performance matrix (periods × the configs you searched). Over
+  every symmetric IS/OOS split of the period blocks it picks the best-in-sample config and reads
+  its **rank out-of-sample**; PBO is the fraction of splits where the in-sample winner lands
+  **below the OOS median**. Read it in bands — `ROBUST` (≤0.10) / `GUARDED` / `OVERFIT` — not to
+  the decimal, and (like White's) pass *every* config you tried or it reads optimistic.
+
+- **Deflated Sharpe Ratio** (`deflated_sharpe`). The winner's Sharpe must clear a bar that
+  **rises with the number of trials**: `SR0` is the expected maximum Sharpe of N noise trials,
+  and the DSR is the probability the winner's *true* Sharpe beats it — corrected for the return
+  series' own **skew and kurtosis** (fat left tails widen the error bar). Read `≥ 95%` like a
+  passed significance test.
+
+Where the permutation test corrects the *p-value* for the search, these correct the *IS ranking*
+and the *Sharpe* for it — the same multiple-testing disease, caught two more ways. Capital-free
+(stdlib `NormalDist`, no scipy).
+
+> **Sources.** **PBO / CSCV**: Bailey, Borwein, López de Prado & Zhu (2017), "The Probability of
+> Backtest Overfitting," *Journal of Computational Finance*; **AFML Ch. 11–12**. **Deflated /
+> Probabilistic Sharpe**: Bailey & López de Prado (2014), "The Deflated Sharpe Ratio," *Journal of
+> Portfolio Management*, and (2012) the Probabilistic Sharpe Ratio; **AFML Ch. 14 "Backtest
+> Statistics."**
+
 ---
 
 ## 6. Ruling out drift: the random-entry / detrended benchmark
 
-**Code:** `edge/stats.py:115` — `random_entry_null` (crucible);
-[`pardo .../validation/benchmark.py`](../../pardo_quant_framework/src/validation/benchmark.py)
-— `detrended_benchmark_test` (framework)
+**Code:** [`edge/stats.py`](../src/crucible/edge/stats.py) — `random_entry_null`,
+`detrended_timing_null`
 
 Beating zero is not enough on an instrument that drifts up. The right null is *"did my
-signal beat coin-flip timing on this same instrument?"*
+signal beat coin-flip timing on this same instrument?"* crucible offers two, both capital-free:
 
-- **crucible** `random_entry_null`: run `n_sims` trade logs with **random entries**, same
-  barriers, same prices; compare your real expectancy against that distribution.
-- **framework** `detrended_benchmark_test`: build randomly-timed trades **matched to your
-  actual directions and holding periods**, on a **drift-removed** return series, and require
-  your per-trade expectancy to beat the 95th percentile of that no-skill distribution
-  (`benchmark.py:63-73`).
+- **`random_entry_null`**: run `n_sims` trade logs with **random entries**, same barriers,
+  same prices; compare your real expectancy against that distribution. This is the one the
+  gauntlet's REAL gate uses.
+- **`detrended_timing_null`**: draw randomly-timed trades **matched to your actual directions
+  and holding periods**, on a **drift-removed** version of the asset's own bar returns, and
+  compare your per-trade mean against its percentiles — the same question, without going
+  through the barriers.
 
 Detrending is what isolates *timing skill* from *riding the market*. It also makes the
 benchmark automatically asset-class-appropriate: an equity index's structural long drift is
@@ -283,33 +314,62 @@ is needed.
 
 ---
 
-## 7. Defining the trade honestly: triple-barrier labeling (framework)
+## 7. The ML track: is the signal real?
 
-**Code:** [`pardo .../ml/labels.py`](../../pardo_quant_framework/src/ml/labels.py) —
-`compute_triple_barrier_labels`; barrier version in
-[`crucible .../simulator.py`](../src/crucible/edge/simulator.py)
+**Code:** [`ml/`](../src/crucible/ml/) · [`edge/simulator.py`](../src/crucible/edge/simulator.py)
 
-Before you can test a trade log you must define what a "trade outcome" *is*, mechanically
-and without hindsight. The **triple-barrier method** labels each entry by whichever of three
-events fires first: a profit barrier (`+tp·ATR`), a stop barrier (`−sl·ATR`), or a vertical
-time barrier (`horizon`). Volatility-scaled (ATR) barriers keep the labels comparable across
-regimes. Because the label *looks forward* until a barrier is touched, it creates the
-leakage risk that §8's purge/embargo exists to neutralize.
+The same honesty tests apply whether your entries come from a rule or a model — crucible only
+ever sees the returns. Two definitions sit underneath any ML book, and crucible covers both.
 
-> **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (and §3.2–3.3 on
-> fixed-time-horizon and dynamic thresholds) — the exact construction `labels.py` implements.
-> Pairs with **§3.5 "Learning Side and Size."**
+**Labeling the outcome.** `barrier_trades` (§1) is a **triple-barrier labeler**: each entry is
+scored by whichever fires first — a profit barrier (`+tp·ATR`), a stop (`−sl·ATR`), or a time
+cap. Because the label looks forward until a barrier is touched, it creates the leakage the
+§8 purge/embargo controls. If a *model* then chooses which labeled trades to take
+(**meta-labeling** — a take/skip filter on a primary signal), you judge that filter's score
+with `crucible.ml` below.
 
-### Meta-labeling (framework)
+> **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (with §3.5 "Learning
+> Side and Size" and §3.6 "Meta-Labeling") — the labeling and take/skip framing.
 
-**Code:** [`pardo .../ml/meta_eval.py`](../../pardo_quant_framework/src/ml/meta_eval.py)
+### Is the ML score real? — `crucible.ml`
 
-The ML layer does not predict direction; it predicts **whether to take or skip** a trade the
-rules book already generated (meta-label = "did this trade win?"). This is López de Prado's
-**meta-labeling**: keep a transparent primary model for *side*, add an ML filter for
-*size/precision*, and judge it only if take/skip beats take-all out-of-sample.
+**Code:** [`ml/ic.py`](../src/crucible/ml/ic.py), [`ml/decay.py`](../src/crucible/ml/decay.py),
+[`ml/redundancy.py`](../src/crucible/ml/redundancy.py), [`ml/pit.py`](../src/crucible/ml/pit.py)
 
-> **Sources.** **AFML §3.6 "Meta-Labeling"** and **§3.7 "How to Use Meta-Labeling."**
+Once a model emits a **score**, the same honesty question §4 asks of a trade log applies to the
+score: does a higher score actually rank better outcomes, or is it noise, leakage, or a feature
+wearing a new name? `crucible.ml` answers it capital-free (numpy/pandas only), on the model's
+predictions rather than an equity curve.
+
+- **Information Coefficient** (`information_coefficient`) — the Spearman **rank** correlation
+  between a score and its realized label. Rank-based, so it's invariant to the label encoding
+  (+1/−1 or 0/1) and to any monotonic transform of the score: it measures only whether higher
+  scores line up with better outcomes. `alpha_gate(ic, min_ic=…)` raises below the bar — a
+  PASS/FAIL you wire into a training loop to kill an edge-less or leaking model before it reaches
+  a backtester. Computed **out-of-fold** (`fold_ic`), and — echoing §5 — its **sign-stability
+  across folds** matters more than its magnitude: a weak-but-consistently-positive IC is a better
+  sign than a strong one that flips.
+
+- **Quantile decay** (`quantile_decay`) — bucket the score into equal-count quantiles and read
+  the realized win rate per bucket. A genuine, well-ordered edge makes win rate climb
+  **monotonically** Q1→Q5 (`.monotonic`, `.spread`); a flat or ragged profile is the tell of a
+  score that ranks nothing. `decay_tearsheet` renders it as self-contained HTML.
+
+- **Feature redundancy** (`redundancy_droplist`) — clusters features by |Spearman| / Cramér's V
+  and keeps the highest-|IC| member of each cluster. This is the feature-space analogue of §10's
+  N_eff: three features that are one feature in disguise are one bet, not three, and counting them
+  as independent inflates any significance claim downstream.
+
+- **Point-in-time slices** (`asof_window` / `window_before`) — a leakage-safe window so a live
+  feature is built identically to its training twin: the feature-space cousin of §8's
+  purge/embargo. §8 stops the *label* from peeking ahead; this stops the *features* from doing so.
+
+> **Sources.** The Information Coefficient and the link between per-bet skill and portfolio
+> performance: **Grinold & Kahn, *Active Portfolio Management*** (the IC and the Fundamental Law of
+> Active Management) — outside the six-book set, but the canonical IC reference. Out-of-fold
+> feature importance, judging features on unseen data: **AFML Ch. 8 "Feature Importance."** No-look-
+> ahead feature construction: **AFML Ch. 7 §7.4** — the purge/embargo principle applied to features.
+> Quantile-decay monotonicity is the standard factor-research check (the alphalens lineage).
 
 ---
 
@@ -334,8 +394,7 @@ where an edge would have been chosen; only test counts.
 
 > **Sources.**
 > - **AFML Ch. 7 "Cross-Validation in Finance," §7.4 "A Solution: Purged K-Fold CV"** — the
->   origin of purge + embargo for overlapping financial labels. Directly cited in the
->   framework doc's Stage 1.
+>   origin of purge + embargo for overlapping financial labels.
 > - **Pardo (2008), the "Walk-Forward Analysis" chapter** — the in-sample/out-of-sample
 >   discipline this generalizes.
 > - Carver, *Systematic Trading*, **Ch. 3 "Fitting"** — why in-sample results prove nothing
@@ -359,10 +418,11 @@ Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
 ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
 
-The framework hardens this against a specific trap (`stage_evaluator.py` Stage 5): a healthy
-*average* WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check —
-what fraction of folds are individually tradable (SQN > 0) and the coefficient of variation
-of fold SQN. High dispersion is itself a rejection, independent of the average.
+crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
+[`validation/diagnostics.py`](../src/crucible/validation/diagnostics.py)): a healthy *average*
+WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check — what fraction
+of folds are individually tradable (SQN > 0) and the coefficient of variation of fold SQN. High
+dispersion is itself a rejection, independent of the average.
 
 > **Sources.**
 > - **Pardo (2008)** — the walk-forward method and the **Walk-Forward Efficiency** metric
@@ -375,11 +435,11 @@ of fold SQN. High dispersion is itself a rejection, independent of the average.
 
 ---
 
-## 10. Correcting for correlation: effective sample size (crucible) & portfolio survivability (framework)
+## 10. Correcting for correlation: effective sample size & portfolio survivability
 
 A book of 665 trades across 20 markets is not 665 independent bets — eight currency futures
 are roughly one dollar bet. Two tools account for this: one **capital-free** and native to
-crucible, one **capital-aware** and left to the framework. Both bear directly on whether a
+crucible, one **capital-aware** and out of crucible's scope. Both bear directly on whether a
 significance claim is honest.
 
 **Effective N** — [`breadth.py`](../src/crucible/breadth.py): `effective_n(returns)` returns a
@@ -396,15 +456,13 @@ rates / grains / …). Capital-free: correlation structure only, no equity curve
 3.8                                # ...so it's really ~4 independent bets
 ```
 
-**Portfolio Monte Carlo** —
-[`pardo .../validation/portfolio_mc.py`](../../pardo_quant_framework/src/validation/portfolio_mc.py):
-the capital-aware sibling, left in the framework because it needs a capital model crucible
-deliberately doesn't have. A **circular block bootstrap** of the monthly portfolio-return
-series (`block_bootstrap`, `portfolio_mc.py:49`): contiguous blocks preserve within-period
-clustering and autocorrelation that a naive per-trade shuffle destroys; the output is a
-distribution of max drawdown, terminal equity, and risk-of-ruin per risk fraction. So
-`crucible.breadth` measures the independence *structure*; `portfolio_mc` measures the drawdown
-*consequence* of it — the SURVIVE handoff of §11.
+**Portfolio Monte Carlo** is the capital-aware sibling — deliberately **out of crucible's
+scope**, because it needs a capital model crucible doesn't have. The idea: a **circular block
+bootstrap** of the monthly portfolio-return series (contiguous blocks preserve the clustering
+and autocorrelation a naive per-trade shuffle destroys) yields a distribution of max drawdown,
+terminal equity, and risk-of-ruin per risk fraction. `crucible.breadth` measures the
+independence *structure*; the drawdown *consequence* of it is the **SURVIVE** handoff (§11) —
+hand the `TradeLog` to a capital-aware tool.
 
 > **Sources.**
 > - Concurrency / overlap and effective sample size: **AFML Ch. 4 "Sample Weights," §4.3
@@ -419,6 +477,10 @@ distribution of max drawdown, terminal equity, and risk-of-ruin per risk fractio
 > - Monte Carlo drawdown / risk-of-ruin on reshuffled trade sequences: **Pardo (2008),
 >   Monte Carlo and money-management material**; risk of ruin and strategy failure: **AFML
 >   Ch. 15 "Understanding Strategy Risk," §15.4 "The Probability of Strategy Failure."**
+> - Position sizing — the **SURVIVE** layer crucible hands off — is the subject of **Van Tharp,
+>   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models)
+>   and **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
+>   volatility %, capital/margin, portfolio-heat).
 
 ---
 
@@ -469,14 +531,107 @@ you back to DECLARE, never to tweaking the failing number.** That is the anti-da
 discipline made procedural. Full write-up in
 [`docs/edge_gate.md`](edge_gate.md).
 
-**Where `pardo_quant_framework` extends it.** crucible stops at "the edge is real, strong,
-durable, and general." pqf wraps the same gauntlet in a heavier, capital-aware pipeline
-([`edge_validation_framework.md`](../../pardo_quant_framework/docs/edge_validation_framework.md)):
-it layers on the **ML-only diagnostics** (IC sign-stability, feature-importance stability),
-a **detrended benchmark** (a fractional-return cousin of the random-entry null), the
-**cross-asset universe orchestration** behind GENERAL, and — past crucible's boundary — the
-**SURVIVE** stage itself: portfolio Monte Carlo, MAR, and correlation on a real capital
-model (§10). Same gates, more machinery around them.
+---
+
+## 12. Worked example: a Donchian breakout, read end to end
+
+Everything above, run as one script on a **Donchian channel breakout** — go long when price
+closes above the prior 20-bar high; exit on a 2.5R target, a 1R stop, or a 30-bar cap. The
+full runnable version is in [`examples/donchian_gauntlet.py`](../examples/donchian_gauntlet.py);
+it uses reproducible synthetic prices, so you can run it with no network and get these exact
+numbers.
+
+```python
+from crucible.edge import barrier_trades, edge_report, reality_check
+from crucible.validation import walk_forward, run_gauntlet
+
+def donchian(df, lookback=20):
+    return df["Close"] > df["High"].rolling(lookback).max().shift(1)
+
+entries = donchian(px, lookback=20)                                  # your signal
+trades  = barrier_trades(px, entries, side="long", tp=2.5, sl=1.0, timeout=30)
+```
+
+### Step 1 — describe the edge (§2)
+
+```
+edge_report(trades)
+   Trades        : 162          Payoff ratio  : 2.50
+   Win rate      : 43.2 %       SQN-100       : 2.95
+   Expectancy    : +0.512 R     Excursion     : 1.77   [PASS]
+   Profit factor : 1.90         Time asymmetry: 2.19   [PASS]
+```
+
+**How to read it.** A textbook trend-following shape: a *low* win rate (43%) paired with a
+payoff of 2.5 — winners run about 2.5× the size of losers — nets a positive expectancy and PF
+1.90. Excursion and time-asymmetry both above 1 say the signal has directional edge *before*
+the exit rule even acts. But these are point estimates on 162 trades: they **describe**, they
+don't yet **defend**. SQN 2.95 hints the sample can support a claim — keep going.
+
+### Step 2 — is it real, or small-sample luck? (§3–§4)
+
+```
+reality_check(trades)
+   VERDICT (expectancy): +0.512 R   95% CI [+0.253, +0.772]
+                         p(edge>0) = 1.000   ->  HELD
+```
+
+**How to read it.** The bootstrap CI lower bound (**+0.253**) clears zero — across 10,000
+resamples the edge stays positive. Verdict **HELD**: on the whole history this is not
+small-sample noise. A backtester would stop right here, with a rising equity curve. crucible
+doesn't — HELD on the pooled log is necessary, not sufficient.
+
+### Step 3 — does it survive out of sample, over time? (§9)
+
+```
+walk_forward(px, donchian, {"lookback": [20, 40]}, is_days=3yr, oos_days=1yr)
+   OOS year   IS E     OOS E    WFE          OOS year   IS E     OOS E    WFE
+   2011      +0.925   +2.150   3.52          2016      +1.000   −1.000  −0.14
+   2012      +1.258   +1.227   1.40          …
+   2013      +1.220   +1.000   0.71          2022      +0.690   +0.969   3.66
+   2014      +1.214   −1.000  −0.31          2023      +0.716   +0.925   3.77
+   2015      +1.087   −0.125  −0.06          folds=14  mean WFE=1.34  stitched=105
+```
+
+**How to read it.** Optimize the lookback in-sample, apply the winner to the next *unseen*
+year, step forward, stitch the out-of-sample slices into one log. The in-sample expectancy is
+steadily positive — but the **OOS** column lurches: +2.15, +1.23, +1.00, then −1.00, −0.13,
+−1.00 … a few great years and a run of losing ones. The mean WFE of 1.34 looks respectable, but
+it's an average *of chaos*. Step 4 is built to catch exactly that.
+
+### Step 4 — the verdict (§11)
+
+```
+run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
+   REAL     ✓   corrected p = 0.0008   ·   beats 100% of random-entry timing
+   STRONG   ✓   expectancy CI-low +0.40 · PF CI-low 1.67 · SQN CI-low 2.32
+   DURABLE  ✗   WFE 1.34 outside [0.30, 1.00]  ·  dispersion CV 3.74, only 50% of folds tradable
+   ─────────────────────────────────────────────────────────────────────
+   GAUNTLET: FAIL   (2 of 3 gates passed — failing: DURABLE)
+```
+
+**Reading it gate by gate:**
+
+- **REAL ✓** — the sign-permutation p is 0.0008 (well under 0.05, Šidák-adjusted for the 2
+  lookbacks searched), and the expectancy beats **100%** of random-entry books on the same
+  prices. Not noise, and not just riding the drift: real *timing* edge.
+- **STRONG ✓** — every hard metric clears its bar at the **pessimistic CI lower bound**, not the
+  point estimate: expectancy-low +0.40 (> 0), PF-low 1.67 (> 1.25), SQN-low 2.32 (> 1.6).
+  Economically real even under sampling noise.
+- **DURABLE ✗** — and here it dies. The aggregate WFE 1.34 sits *above* the "too-good-to-be-true"
+  ceiling of 1.00 (inflated by a handful of huge fold ratios), and only **half** the folds are
+  individually tradable, with a dispersion CV of 3.74 against a bar of 2.0. Fold to fold, chaotic.
+
+**The lesson.** Pooled — and even out-of-sample in aggregate — this breakout is real and strong:
+`reality_check` said **HELD**, and two of three gates are green. A backtester's equity curve would
+have sold it to you. But **DURABLE**, the gate crucible won't let you skip, exposes it — the edge
+doesn't hold up *through time*. Overall **FAIL**: back to DECLARE, don't size it up. That is the
+whole reason to run the gauntlet instead of trusting a curve.
+
+> A **PASS** reads the same way with three green gates and `GAUNTLET: PASS` — an edge that's
+> real, strong, *and* durable, leaving only **SURVIVE** (capital), which you take to a
+> position-sizing tool (§10's sources). Most naive signals look like this Donchian: convincing on
+> the surface, caught by DURABLE or REAL.
 
 ---
 
@@ -533,12 +688,25 @@ a verified page, that is stated explicitly.
    / diversification-multiplier material across a large futures universe — the practical
    counterpart to `crucible.breadth` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
 
-**Supporting reference (not in the provided set):**
-Van Tharp, Van K. — *Trade Your Way to Financial Freedom*, 2nd ed. (McGraw-Hill, 2007) →
-the R-multiple and the **System Quality Number (SQN)**, implemented in `metrics.py:60`.
+7. **Van Tharp, Van K. — *Definitive Guide to Position Sizing*** (IITM, 2008) and ***Trade Your
+   Way to Financial Freedom***, 2nd ed. (McGraw-Hill, 2007). *The R/SQN origin and the
+   position-sizing layer.* Definitive Guide **Ch. 2 "Risk (R) and R-Multiples" (p. 11)** → §1's
+   R-multiple; **Ch. 3 "Evaluating the Quality of Your Trading System" (p. 23)**, with "One
+   Problem with SQN and How to Overcome It" (p. 32) and "Statistical Assumptions" (p. 33) → the
+   SQN and its small-sample caveat (§2); its position-sizing parts are the SURVIVE layer crucible
+   hands off. ("R," "SQN," "Position Sizing" are Tharp / IITM service marks.)
 
+8. **Basso, Tom — *Successful Traders Size Their Positions — Why and How?*** (enjoytheride.world,
+   2019). *Position sizing only — the SURVIVE layer.* Risk %, volatility %, capital/margin, and
+   portfolio-heat sizing — the capital methodology crucible stops short of and hands off (§10).
+
+**Supporting references (papers, not in the six-book set):**
 White, Halbert (2000), "A Reality Check for Data Snooping," *Econometrica* 68(5): 1097–1126 →
-the original Reality Check that `whites_reality_check` reimplements via sign permutation.
+the Reality Check `whites_reality_check` reimplements. &nbsp;·&nbsp; Bailey & López de Prado (2014),
+"The Deflated Sharpe Ratio," *J. Portfolio Management*, and Bailey, Borwein, López de Prado & Zhu
+(2017), "The Probability of Backtest Overfitting," *J. Computational Finance* → §5's
+`deflated_sharpe` / `pbo_cscv`. &nbsp;·&nbsp; Grinold & Kahn, *Active Portfolio Management* → the
+Information Coefficient (§7).
 
 ---
 
@@ -549,15 +717,40 @@ the original Reality Check that `whites_reality_check` reimplements via sign per
 | Trade-log schema, R-multiples | `crucible/src/crucible/edge/trade_log.py` |
 | Look-ahead-free barrier simulator | `crucible/src/crucible/edge/simulator.py` |
 | Edge metrics (expectancy, PF, SQN, excursion…) | `crucible/src/crucible/edge/metrics.py` |
-| Bootstrap CI, p-value, reality_check verdict, random-entry null | `crucible/src/crucible/edge/stats.py` |
+| Bootstrap CI + metric-set CIs, p-value, reality_check verdict | `crucible/src/crucible/edge/stats.py` |
+| Random-entry null + detrended timing null | `crucible/src/crucible/edge/stats.py` |
 | Sign-permutation, Šidák, White's Reality Check | `crucible/src/crucible/validation/permutation.py` |
+| PBO (CSCV) + deflated Sharpe | `crucible/src/crucible/validation/pbo.py` |
+| ML signal quality — IC, decay, redundancy, PIT | `crucible/src/crucible/ml/` |
 | Purged/embargoed holdout | `crucible/src/crucible/validation/holdout.py` |
 | Walk-forward + WFE | `crucible/src/crucible/validation/walk_forward.py` |
-| Bootstrap metric CIs (framework) | `pardo_quant_framework/src/validation/bootstrap.py` |
-| Staged gates (Stage 3/4/5) | `pardo_quant_framework/src/validation/stage_evaluator.py` |
-| Detrended random-timing benchmark | `pardo_quant_framework/src/validation/benchmark.py` |
+| Fold dispersion / WFE diagnostics | `crucible/src/crucible/validation/diagnostics.py` |
+| Audited gate + Gauntlet | `crucible/src/crucible/validation/gate.py` |
+| The gauntlet (REAL/STRONG/DURABLE/GENERAL) + Thresholds | `crucible/src/crucible/validation/gauntlet.py` |
 | Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
-| Portfolio Monte Carlo (block bootstrap) | `pardo_quant_framework/src/validation/portfolio_mc.py` |
-| Triple-barrier labels | `pardo_quant_framework/src/ml/labels.py` |
-| Meta-labeling harness | `pardo_quant_framework/src/ml/meta_eval.py` |
-| The gated framework, in prose | `pardo_quant_framework/docs/edge_validation_framework.md` |
+| Worked example (Donchian breakout) | `crucible/examples/` |
+
+---
+
+## Appendix — the underlying statistics, on Wikipedia
+
+Convenience look-ups for the techniques above — *secondary* to the primary sources in the
+bibliography, not a replacement for them.
+
+| Concept | In | Wikipedia |
+|---|---|---|
+| Bootstrapping (resampling) | §3 | [Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics)) |
+| Confidence interval | §3 | [Confidence interval](https://en.wikipedia.org/wiki/Confidence_interval) |
+| Permutation test | §5 | [Permutation test](https://en.wikipedia.org/wiki/Permutation_test) |
+| Data-mining bias | §5 | [Data dredging](https://en.wikipedia.org/wiki/Data_dredging) |
+| Multiple comparisons | §5 | [Multiple comparisons problem](https://en.wikipedia.org/wiki/Multiple_comparisons_problem) |
+| Šidák correction | §5 | [Šidák correction](https://en.wikipedia.org/wiki/%C5%A0id%C3%A1k_correction) |
+| Backtest overfitting / deflated Sharpe | §5 | [Deflated Sharpe ratio](https://en.wikipedia.org/wiki/Deflated_Sharpe_ratio) |
+| Sharpe ratio | §5 | [Sharpe ratio](https://en.wikipedia.org/wiki/Sharpe_ratio) |
+| Cross-validation | §5, §9 | [Cross-validation (statistics)](https://en.wikipedia.org/wiki/Cross-validation_(statistics)) |
+| Walk-forward optimization | §9 | [Walk forward optimization](https://en.wikipedia.org/wiki/Walk_forward_optimization) |
+| Information coefficient | §7 | [Information coefficient](https://en.wikipedia.org/wiki/Information_coefficient) |
+| Spearman rank correlation | §7 | [Spearman's rank correlation coefficient](https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient) |
+| Skewness &amp; kurtosis | §5 | [Skewness](https://en.wikipedia.org/wiki/Skewness) · [Kurtosis](https://en.wikipedia.org/wiki/Kurtosis) |
+| Principal component analysis | §10 | [Principal component analysis](https://en.wikipedia.org/wiki/Principal_component_analysis) |
+| Monte Carlo method | §10 | [Monte Carlo method](https://en.wikipedia.org/wiki/Monte_Carlo_method) |
