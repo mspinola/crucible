@@ -78,9 +78,11 @@ whole null distribution.
 
 > **Sources.** The R-multiple as the unit of trade evaluation: **Van Tharp, *Definitive Guide
 > to Position Sizing* (2008), Ch. 2 "Risk (R) and R-Multiples" (p. 11)**; popularized in *Trade
-> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-
-> scaled position/return accounting: Carver, *Systematic Trading*, **Ch. 9 "Volatility
-> Targeting"** and **Ch. 10 "Position Sizing"**. The leakage-free barrier construction is
+> Your Way to Financial Freedom* (2nd ed. 2007). Risk-normalized, volatility-scaled
+> return accounting: the ATR-based risk unit (`1R = sl × ATR`) is the trade-log echo of
+> Carver, *Systematic Trading*, **Ch. 9 "Volatility Targeting"** — the same volatility unit,
+> applied to *measuring* each trade rather than *sizing* it (position sizing itself is the
+> **SURVIVE** handoff, §10). The leakage-free barrier construction is
 > the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
 > Financial Machine Learning*, **§3.4 "The Triple-Barrier Method"**, cross-referenced in
 > §7) — but here it turns *any* entry rule into trades, ML or not.
@@ -602,9 +604,10 @@ hand the `TradeLog` to a capital-aware tool.
 >   Monte Carlo and money-management material**; risk of ruin and strategy failure: **AFML
 >   Ch. 15 "Understanding Strategy Risk," §15.4 "The Probability of Strategy Failure."**
 > - Position sizing — the **SURVIVE** layer crucible hands off — is the subject of **Van Tharp,
->   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models)
->   and **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
->   volatility %, capital/margin, portfolio-heat).
+>   *Definitive Guide to Position Sizing* (2008)** (risk / volatility / percent-of-equity models),
+>   **Tom Basso, *Successful Traders Size Their Positions — Why and How?* (2019)** (risk %,
+>   volatility %, capital/margin, portfolio-heat), and **Carver, *Systematic Trading*, Ch. 10
+>   "Position Sizing"** (turning the volatility target of §1's Ch. 9 into an actual position).
 
 ---
 
@@ -820,8 +823,9 @@ a verified page, that is stated explicitly.
 
 5. **Carver, Robert — *Systematic Trading*** (Harriman House, 2015). *Overfitting discipline
    and portfolio structure.* Ch. 3 "Fitting" → in-sample/out-of-sample, robust simple
-   parameters; Ch. 9 "Volatility Targeting," Ch. 10 "Position Sizing" → risk-normalized
-   returns; Ch. 11 "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
+   parameters; Ch. 9 "Volatility Targeting" → the volatility risk unit behind R-normalized
+   returns (§1), Ch. 10 "Position Sizing" → the sizing handoff (SURVIVE, §10); Ch. 11
+   "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
    rule-of-thumb correlations) and Appendix D "→ Calculation of diversification multiplier"
    → the number-of-independent-bets idea behind `N_eff`.
 
