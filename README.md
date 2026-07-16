@@ -96,6 +96,12 @@ would have shown you as a rising equity curve is, at this sample size,
 - **The honesty layer** — `bootstrap_ci`, `p_value_positive`, `reality_check`
   (HELD / FRAGILE / FAIL), and `random_entry_null` (did your signal beat
   coin-flip timing on the same prices?).
+- **Significance under serial dependence** — `block_bootstrap_pvalue` /
+  `block_bootstrap_ci`: the i.i.d. trade bootstrap treats trades as exchangeable,
+  which breaks the time-clustering of a pooled multi-asset book (correlated trades
+  exit the same months). Feed an ordered *period-return* series (e.g. monthly R)
+  and it resamples contiguous blocks (circular or stationary), so autocorrelation
+  survives in the null — the honest p-value for a clustered book.
 - **Book-level breadth** — `breadth.effective_n`: how many *independent* bets a
   correlated set of return streams really holds (N_eff, the participation ratio of
   the correlation eigenvalues) — the honest denominator for significance. Still
@@ -135,8 +141,11 @@ print(reality_check(wf.stitched))  # the stitched-OOS verdict — the honest one
 ```
 
 Also here: `sidak_correction` and `whites_reality_check` (max-statistic across every
-variant you searched) for when a grid search flatters the best result — and, one
-step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
+variant you searched) for when a grid search flatters the best result — plus `spa_test`,
+Hansen's Superior Predictive Ability test, WRC's more powerful successor (studentized, and
+it drops clearly-inferior variants so junk can't weaken the test; `SPA p ≤ WRC p`) shipped
+*alongside* WRC, not replacing it (WRC is the conservative number, SPA the powerful one).
+One step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
 how much the *act of selecting* the best config overfit: the Probability of Backtest
 Overfitting (Bailey/López de Prado CSCV) over a trial matrix, and the Sharpe deflated
 for the number of trials and its own skew/kurtosis.

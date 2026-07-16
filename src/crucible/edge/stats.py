@@ -226,3 +226,78 @@ def detrended_timing_null(prices, holds, *, directions=None, n_samples: int = 2_
             sim[j] = d * (np.prod(1 + segment) - 1)
         null[i] = sim.mean()
     return null
+
+
+# --------------------------------------------------------------------------- #
+#  Block bootstrap — significance under SERIAL DEPENDENCE
+#
+#  The i.i.d. trade bootstrap and sign-permutation treat observations as
+#  exchangeable, which breaks the time-clustering of a pooled multi-asset book
+#  (correlated trades exit the same months). These operate on an ORDERED series
+#  of PERIOD returns (e.g. monthly summed R on a gap-free calendar grid) and
+#  resample contiguous blocks, so autocorrelation / cross-asset clustering is
+#  preserved in the null.
+# --------------------------------------------------------------------------- #
+
+def _block_bootstrap_means(r: np.ndarray, block: int, n_boot: int, rng,
+                           stationary: bool) -> np.ndarray:
+    """Resample-mean distribution under a block bootstrap. `stationary=True` is the
+    Politis–Romano stationary bootstrap (geometric block lengths, mean `block`);
+    otherwise a circular fixed-length block bootstrap. Both vectorized over draws."""
+    n = len(r)
+    block = max(int(block), 1)
+    if stationary:
+        p = 1.0 / block
+        idx = np.empty((n_boot, n), dtype=np.int64)
+        restart = rng.random((n_boot, n)) < p
+        jump = rng.integers(0, n, size=(n_boot, n))
+        idx[:, 0] = jump[:, 0]
+        for k in range(1, n):                       # sequential in time, vectorized over draws
+            idx[:, k] = np.where(restart[:, k], jump[:, k], (idx[:, k - 1] + 1) % n)
+    else:
+        nb = int(np.ceil(n / block))
+        starts = rng.integers(0, n, size=(n_boot, nb))
+        offs = np.arange(block)
+        idx = ((starts[:, :, None] + offs[None, None, :]) % n).reshape(n_boot, nb * block)[:, :n]
+    return r[idx].mean(axis=1)
+
+
+def block_bootstrap_pvalue(returns, *, block: int = 6, n_boot: int = 10_000,
+                           stationary: bool = False, seed: int = 0) -> float:
+    """One-sided p-value that the mean of an ORDERED period-return series is > 0,
+    preserving serial dependence via a block bootstrap.
+
+    Feed an ordered series of PERIOD returns (e.g. monthly summed R over a gap-free
+    calendar grid) — NOT a shuffled trade log. It zero-centers to impose H0
+    (mean = 0), resamples contiguous blocks (circular, or `stationary=True` for the
+    Politis–Romano stationary bootstrap), and returns P(bootstrap mean >= observed).
+    Small p = the edge survives a correlation-preserving null. `block` is in periods:
+    ~1 ≈ i.i.d.; larger blocks absorb more autocorrelation (widening the null when
+    the series is positively autocorrelated — the clustering a trade-level test
+    misses)."""
+    r = np.asarray(returns, dtype=float)
+    r = r[~np.isnan(r)]
+    if len(r) < 2:
+        return 1.0
+    observed = float(r.mean())
+    rng = np.random.default_rng(seed)
+    boot = _block_bootstrap_means(r - observed, block, n_boot, rng, stationary)
+    return float((np.sum(boot >= observed) + 1) / (n_boot + 1))
+
+
+def block_bootstrap_ci(returns, *, block: int = 6, n_boot: int = 10_000,
+                       stationary: bool = False, alpha: float = 0.05,
+                       seed: int = 0) -> CI:
+    """Percentile CI for the MEAN of an ordered period-return series under a block
+    bootstrap. Wider than the i.i.d. :func:`bootstrap_ci` when the series is
+    positively autocorrelated — the honest CI for a pooled, time-clustered book.
+    Same block options as :func:`block_bootstrap_pvalue`."""
+    r = np.asarray(returns, dtype=float)
+    r = r[~np.isnan(r)]
+    if len(r) < 2:
+        return CI(float("nan"), float("nan"), float("nan"), alpha)
+    rng = np.random.default_rng(seed)
+    boot = _block_bootstrap_means(r, block, n_boot, rng, stationary)   # not centered → CI of the mean
+    return CI(point=float(r.mean()),
+              low=float(np.percentile(boot, alpha / 2 * 100)),
+              high=float(np.percentile(boot, (1 - alpha / 2) * 100)), alpha=alpha)

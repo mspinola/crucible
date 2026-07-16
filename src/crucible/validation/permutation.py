@@ -91,3 +91,61 @@ def whites_reality_check(variant_returns: Dict[str, Returns],
     p = float((np.sum(null_best >= observed_best) + 1) / (n_permutations + 1))
     return {"best_variant": best_variant, "observed_best_mean": float(observed_best),
             "corrected_pvalue": p, "n_variants": len(cleaned)}
+
+
+def spa_test(variant_returns: Dict[str, Returns],
+             n_permutations: int = 5000,
+             seed: Optional[int] = 0) -> dict:
+    """Hansen's Superior Predictive Ability test — White's Reality Check's more
+    powerful successor (Hansen 2005). Same max-statistic-under-the-null idea, with
+    the two upgrades that matter when the variants are heterogeneous:
+
+      * STUDENTIZED — each variant's mean is divided by its standard error before
+        the max, so a noisy / low-N variant can't dominate the statistic just by
+        being volatile (`whites_reality_check` compares raw means).
+      * INFERIOR VARIANTS EXCLUDED (the consistent SPA_c recentering) — variants
+        whose studentized mean is clearly below zero (< -sqrt(2·ln ln N)) are dropped
+        from the null max, so padding the pool with junk no longer weakens the test —
+        WRC's known flaw. The well-known consequence: **SPA p <= WRC p** (more power).
+
+    This is `spa_test` ADDED alongside `whites_reality_check`, not a replacement:
+    WRC is the more conservative number, SPA the more powerful one — report both and
+    adopt the extra power deliberately. Same sign-permutation resampling/conventions.
+    Returns best_variant, observed_max_t (studentized), corrected_pvalue, n_variants
+    (kept), n_excluded (dropped as inferior)."""
+    cleaned = {k: _as_returns(v) for k, v in variant_returns.items()}
+    cleaned = {k: v for k, v in cleaned.items() if len(v) >= 2}
+    _none = {"best_variant": None, "observed_max_t": float("nan"),
+             "corrected_pvalue": 1.0, "n_variants": 0, "n_excluded": 0}
+    if not cleaned:
+        return _none
+
+    # studentize each variant (t = mean / SE) and drop the clearly-inferior ones.
+    kept = {}
+    for k, v in cleaned.items():
+        n = len(v)
+        se = float(v.std(ddof=1)) / np.sqrt(n)
+        if se <= 0:
+            continue
+        t = float(v.mean()) / se
+        if t >= -np.sqrt(2.0 * np.log(np.log(max(n, 3)))):   # SPA_c exclusion band
+            kept[k] = (v, se, t)
+    if not kept:
+        return {**_none, "n_excluded": len(cleaned)}
+
+    best_variant = max(kept, key=lambda k: kept[k][2])
+    observed_max_t = kept[best_variant][2]
+
+    rng = np.random.default_rng(seed)
+    null_max = np.empty(n_permutations)
+    for i in range(n_permutations):
+        m = -np.inf
+        for v, se, _ in kept.values():
+            signs = rng.choice([-1.0, 1.0], size=len(v))
+            m = max(m, float((signs * np.abs(v)).mean()) / se)
+        null_max[i] = m
+
+    p = float((np.sum(null_max >= observed_max_t) + 1) / (n_permutations + 1))
+    return {"best_variant": best_variant, "observed_max_t": float(observed_max_t),
+            "corrected_pvalue": p, "n_variants": len(kept),
+            "n_excluded": len(cleaned) - len(kept)}
