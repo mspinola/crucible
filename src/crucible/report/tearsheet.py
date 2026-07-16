@@ -105,10 +105,17 @@ def report_css() -> str:
                   color: var(--cr-fg); line-height: 1.15; }}
   .cr-metric .k {{ font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
                   color: var(--cr-muted); }}
-  .cr-gate {{ border: 1px solid var(--cr-border); border-radius: 10px; padding: 14px 16px;
-             margin: 14px 0; background: var(--cr-card); }}
-  .cr-gate h3 {{ margin: 0 0 2px; font-size: 16px; display: flex; align-items: baseline; gap: 10px; }}
-  .cr-gate .blurb {{ color: var(--cr-muted); font-size: 13px; margin: 0 0 10px; }}
+  .cr-gate {{ border: 1px solid var(--cr-border); border-radius: 10px;
+             margin: 12px 0; background: var(--cr-card); }}
+  .cr-gate > summary {{ list-style: none; cursor: pointer; padding: 12px 16px;
+             display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; }}
+  .cr-gate > summary::-webkit-details-marker {{ display: none; }}
+  .cr-gate > summary::before {{ content: '\\25B8'; color: var(--cr-muted); font-size: 12px;
+             align-self: center; }}
+  .cr-gate[open] > summary::before {{ content: '\\25BE'; }}
+  .cr-gate .gate-h {{ font-size: 16px; font-weight: 600; }}
+  .cr-gate .blurb {{ color: var(--cr-muted); font-size: 13px; }}
+  .cr-gate table.cr-checks {{ margin: 0 16px 14px; width: calc(100% - 32px); }}
   .cr-tag {{ font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 2px 8px;
             border-radius: 999px; text-transform: uppercase; }}
   .cr-tag.pass {{ background: var(--cr-pass-bg); color: var(--cr-pass); }}
@@ -240,15 +247,21 @@ def _fmt(x) -> str:
     return f"{xf:.3f}"
 
 
-def gate_block(gate, *, title: Optional[str] = None) -> str:
-    """Render one audited :class:`Gate` as a titled card: a PASS/FAIL badge plus a
-    row per check (name, value, threshold, hard/soft, result). Hard checks drive
-    the gate's verdict; soft checks inform and render muted (amber when failing,
-    never red). ``title`` overrides the default pillar heading."""
+def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = None) -> str:
+    """Render one audited :class:`Gate` as a collapsible card: a summary row (name,
+    PASS/FAIL badge, one-line gloss) that expands to a row per check (name, value,
+    threshold, hard/soft, result). Hard checks drive the gate's verdict; soft
+    checks inform and render muted (amber when failing, never red).
+
+    It opens when the gate FAILED and collapses when it passed — so what needs
+    attention shows its checks while clean pillars stay tucked away (state-based
+    disclosure). Pass ``expanded`` to force it either way; ``title`` overrides the
+    default pillar heading."""
     name = getattr(gate, "name", "GATE")
     heading = title or name.title()
     blurb = _PILLAR_BLURB.get(name, "")
     passed = bool(gate.passed)
+    is_open = (not passed) if expanded is None else bool(expanded)
     badge = (f"<span class='cr-tag {'pass' if passed else 'fail'}'>"
              f"{'pass' if passed else 'fail'}</span>")
 
@@ -271,8 +284,10 @@ def gate_block(gate, *, title: Optional[str] = None) -> str:
     head = ("<tr><th>Check</th><th>Value</th><th>Threshold</th>"
             "<th style='text-align:right'>Result</th></tr>")
     table = f"<table class='cr-checks'>{head}{''.join(body_rows)}</table>"
-    blurb_html = f"<p class='blurb'>{blurb}</p>" if blurb else ""
-    return (f"<section class='cr-gate'><h3>{heading} {badge}</h3>{blurb_html}{table}</section>")
+    blurb_html = f"<span class='blurb'>{blurb}</span>" if blurb else ""
+    return (f"<details class='cr-gate'{' open' if is_open else ''}>"
+            f"<summary><span class='gate-h'>{heading}</span> {badge}{blurb_html}</summary>"
+            f"{table}</details>")
 
 
 def verdict_banner(gauntlet, *, title: Optional[str] = None,

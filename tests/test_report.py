@@ -110,6 +110,21 @@ def test_gate_block_shows_verdict_and_checks(ohlc):
         assert c.name in html
 
 
+def test_gate_block_collapse_follows_verdict(ohlc):
+    _, g = _full_gauntlet(ohlc)
+    for gate in g.gates:
+        html = gate_block(gate)
+        assert html.startswith("<details")
+        opened = "cr-gate' open>" in html
+        assert opened == (not gate.passed)      # failed → expanded, passed → collapsed
+        # even collapsed, the summary carries name + badge (nothing important hidden)
+        assert "gate-h" in html and "cr-tag" in html
+    # explicit override wins in both directions
+    any_gate = g.gates[0]
+    assert "cr-gate' open>" in gate_block(any_gate, expanded=True)
+    assert "cr-gate' open>" not in gate_block(any_gate, expanded=False)
+
+
 def test_verdict_banner_lists_all_four_pillars(ohlc):
     _, g = _full_gauntlet(ohlc)
     banner = verdict_banner(g, title="book", subtitle="synthetic")
