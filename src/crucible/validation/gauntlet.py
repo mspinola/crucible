@@ -164,30 +164,54 @@ def gate_strong(trades: TradeLog, *, thr: Thresholds = Thresholds()) -> Gate:
     return g
 
 
-def gate_durable(wf, *, thr: Thresholds = Thresholds()) -> Gate:
+def gate_durable(wf, *, wfe: str = "return", thr: Thresholds = Thresholds()) -> Gate:
     """DURABLE — does the edge hold out-of-sample over time?
 
-    Reads a `WalkForwardResult`: the aggregate return-based WFE must sit in its
-    accept band (both extremes reject), and the folds must not be chaotic — a
-    majority individually tradable (SQN>0) with bounded dispersion.
+    Reads a `WalkForwardResult`. Two walk-forward-efficiency measures (`wfe=`):
+
+      "return" (default) — the aggregate annualized OOS/IS *return* WFE must sit in
+                its accept band (both extremes reject: too-low = fragile, too-high =
+                too-good-to-be-true).
+      "sqn"    — the mean OOS/IS *score* ratio across folds must clear
+                `min_wfe_sqn`. Use it for an R-multiple (rules) book, where
+                return-based WFE mis-scales; run the walk-forward with an SQN score
+                so the fold scores are SQNs. A ratio far above 1 is soft-flagged
+                (usually a near-zero in-sample baseline, not genuine robustness).
+
+    In both cases the folds must not be chaotic — a majority individually tradable
+    (SQN>0) with bounded dispersion.
     """
     g = Gate("DURABLE")
 
-    wfe = walk_forward_efficiency(
-        [f.wfe for f in wf.folds],
-        reject_low=thr.wfe_reject_low, reject_high=thr.wfe_reject_high,
-        target_low=thr.wfe_target_low, target_high=thr.wfe_target_high)
-    if wfe is not None:
-        g.add("wfe_aggregate", wfe["passes"], value=wfe["aggregate_wfe"],
-              threshold=(wfe["reject_low"], wfe["reject_high"]),
-              detail=f"mean annualized OOS/IS return over {wfe['n_folds']} folds; "
-                     f"reject <{wfe['reject_low']:.0%} or >{wfe['reject_high']:.0%}")
-        g.add("wfe_in_target_band", wfe["in_target_band"], hard=False,
-              value=wfe["aggregate_wfe"],
-              threshold=(wfe["target_low"], wfe["target_high"]),
-              detail=f"healthy band {wfe['target_low']:.0%}–{wfe['target_high']:.0%}")
+    if wfe == "sqn":
+        ratios = [f.oos_score / f.is_score for f in wf.folds if f.is_score]
+        if ratios:
+            agg = float(np.mean(ratios))
+            g.add("wfe_sqn_aggregate", agg > thr.min_wfe_sqn, value=agg,
+                  threshold=thr.min_wfe_sqn,
+                  detail=f"mean OOS/IS SQN ratio over {len(ratios)} folds")
+            g.add("wfe_sqn_not_anomalous", agg <= thr.wfe_sqn_anomaly, hard=False,
+                  value=agg, threshold=thr.wfe_sqn_anomaly,
+                  detail="a ratio far above 1 usually means a near-zero in-sample "
+                         "baseline inflated it, not genuine robustness")
+        else:
+            g.add("wfe_sqn_aggregate", False, detail="no in-sample SQN to form the ratio")
     else:
-        g.add("wfe_aggregate", False, detail="no folds to evaluate")
+        wfe_res = walk_forward_efficiency(
+            [f.wfe for f in wf.folds],
+            reject_low=thr.wfe_reject_low, reject_high=thr.wfe_reject_high,
+            target_low=thr.wfe_target_low, target_high=thr.wfe_target_high)
+        if wfe_res is not None:
+            g.add("wfe_aggregate", wfe_res["passes"], value=wfe_res["aggregate_wfe"],
+                  threshold=(wfe_res["reject_low"], wfe_res["reject_high"]),
+                  detail=f"mean annualized OOS/IS return over {wfe_res['n_folds']} folds; "
+                         f"reject <{wfe_res['reject_low']:.0%} or >{wfe_res['reject_high']:.0%}")
+            g.add("wfe_in_target_band", wfe_res["in_target_band"], hard=False,
+                  value=wfe_res["aggregate_wfe"],
+                  threshold=(wfe_res["target_low"], wfe_res["target_high"]),
+                  detail=f"healthy band {wfe_res['target_low']:.0%}–{wfe_res['target_high']:.0%}")
+        else:
+            g.add("wfe_aggregate", False, detail="no folds to evaluate")
 
     disp = fold_dispersion([sqn(f.oos_trades.r) for f in wf.folds],
                            min_tradable_pct=thr.min_folds_tradable_pct,
@@ -226,7 +250,7 @@ def run_gauntlet(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                  wf=None, trade_logs: Optional[Dict[str, TradeLog]] = None,
                  side: str = "long", hold: Optional[int] = None,
                  tp: float = 2.0, sl: float = 1.0,
-                 null: str = "random_entry", directions=None,
+                 null: str = "random_entry", directions=None, wfe: str = "return",
                  variant_returns: Optional[Dict[str, object]] = None,
                  n_variants: Optional[int] = None,
                  thr: Thresholds = Thresholds()) -> Gauntlet:
@@ -241,7 +265,7 @@ def run_gauntlet(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                            variant_returns=variant_returns, n_variants=n_variants, thr=thr))
     gauntlet.add(gate_strong(trades, thr=thr))
     if wf is not None:
-        gauntlet.add(gate_durable(wf, thr=thr))
+        gauntlet.add(gate_durable(wf, wfe=wfe, thr=thr))
     if trade_logs is not None:
         gauntlet.add(gate_general(trade_logs, thr=thr))
     return gauntlet
