@@ -64,7 +64,11 @@ def sqn(r, cap: int = 100) -> float:
     if n < 2:
         return 0.0
     sd = r.std(ddof=1)
-    if sd == 0:
+    # Guard dispersion at the level of floating-point noise, not just exact zero:
+    # a set of effectively-identical returns has no meaningful spread, and mean/sd
+    # would otherwise explode to a nonsensical SQN (e.g. ~1e14 on a degenerate
+    # walk-forward fold of near-equal R-multiples). Treat it as no signal.
+    if sd <= 1e-12 * (np.abs(r).mean() + 1e-12):
         return 0.0
     return float(r.mean() / sd * np.sqrt(min(n, cap)))
 
