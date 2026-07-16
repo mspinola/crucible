@@ -310,6 +310,48 @@ across markets), where studentization matters most.
 >   (whose bio describes the test) and, for the data-snooping problem it corrects,
 >   [Data dredging](https://en.wikipedia.org/wiki/Data_dredging).
 
+### 5e. Cross-market Reality Check — the GENERAL gate
+
+**Code:** `gauntlet.py` — `gate_general` (which calls `whites_reality_check` / `spa_test`)
+
+The tests above correct for **one** search: the parameter/config variants you tried. But a book
+that applies **one universal rule across many markets** is running a *second*, implicit search —
+testing 27 markets is 27 shots at a winner. The **GENERAL** gate asks whether the edge *travels*,
+and prices that second search exactly as §5c/§5d price the first.
+
+It's the same max-statistic idea, one axis over: treat **each market's per-trade returns as a
+variant** and run the Reality Check (or SPA) across them. The pass bar is that the **best market**
+beats the distribution of the best under no skill *across every market tested*, so one lucky
+market can't carry the book:
+
+```python
+variant_returns = {market: its trade returns}     # one entry per market
+p = whites_reality_check(variant_returns)          # best market vs best-under-null over N markets
+#   gauntlet.py: gate_general  (spa_test is the studentized, more-powerful alternative)
+```
+
+Two things make it honest — and easy to misread:
+
+- **Pass every market, including the failures** — which were development vs. held-out is your
+  record to keep, not crucible's (same rule as §5c). Omitting the losers biases it toward a false
+  pass.
+- **It scores the single BEST market, not the pool.** For a *pooled, thin-per-market* book (the
+  edge lives in the aggregate, ~30 trades/market) that's a **stringent, arguably mismatched** bar:
+  you can have a genuinely broad, real pooled edge and *still* have no single market clear an
+  N-way correction. Read a GENERAL failure as **"no single market is an individually-validated
+  standout,"** not "the edge is fake" — the pooled edge is REAL/STRONG's job (§5/§3), and breadth
+  is better read two other ways: the book's **effective N** (§10) and a plain **sign test** over
+  the units (how many are individually positive).
+
+**Choose the unit deliberately.** Per *symbol* is thin (few trades each → almost nothing passes);
+per *asset class* pools within each class into a powered unit and is usually the honest lens. And
+because markets are wildly **heteroskedastic** (hundreds of trades in one, a handful in another),
+this is exactly where SPA's studentization (§5d) earns its keep — on a real 28-asset book, moving
+the GENERAL unit symbol → class and the test WRC → SPA walked the p from **0.20 → 0.07 → 0.002**.
+
+> **Sources.** White (2000) / Hansen (2005) as in §5c–5d; the "does the edge travel across markets"
+> (cross-sectional generalization) framing is the held-out-asset step of AFML **Ch. 11–12**.
+
 ### Did the *selection* overfit? — PBO & deflated Sharpe
 
 **Code:** [`validation/pbo.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/pbo.py) — `pbo_cscv`, `deflated_sharpe`
@@ -582,7 +624,7 @@ print(gauntlet.passed)  # True only if every gate that ran passed
 | **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
 | **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
 | **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
-| **GENERAL** | travels across markets | cross-market Reality Check — §5; breadth / N_eff — §10 |
+| **GENERAL** | travels across markets | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
 | **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
 
 Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
