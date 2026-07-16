@@ -1,6 +1,6 @@
 name: Pages
 
-# Publish docs/ (the rendered tutorial at docs/index.html) to GitHub Pages.
+# Build the MkDocs Material docs site from docs/ and publish to GitHub Pages.
 # One-time: repo Settings → Pages → Source = "GitHub Actions".
 
 on:
@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -16,7 +18,6 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment; don't cancel an in-progress run.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -29,9 +30,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-docs.txt
+      - run: mkdocs build --strict
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
