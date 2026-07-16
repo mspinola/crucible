@@ -62,6 +62,42 @@ def test_metrics_table_renders_core_rows(ohlc):
     assert html.count("cr-metric'") >= 6      # one flex cell per metric
 
 
+class _FakeGate:
+    def __init__(self, name, passed):
+        self.name, self.passed = name, passed
+
+
+class _FakeGauntlet:
+    """Minimal stand-in (verdict rendering only reads .gates[].name/.passed and
+    .passed) so the scope-limited state can be exercised deterministically."""
+    def __init__(self, **passed):
+        self.gates = [_FakeGate(n, passed[n]) for n in ("REAL", "STRONG", "DURABLE", "GENERAL")]
+        self.passed = all(g.passed for g in self.gates)
+
+
+def test_scope_limited_verdict_when_only_general_fails():
+    from crucible.report.tearsheet import _verdict_state
+    g = _FakeGauntlet(REAL=True, STRONG=True, DURABLE=True, GENERAL=False)
+    assert _verdict_state(g) == "scope"
+
+    banner = verdict_banner(g, title="book")
+    assert "EDGE VALIDATED" in banner and "scope-limited" in banner
+    assert "GAUNTLET FAIL" not in banner            # not red-failed
+    assert "GENERAL ⚠" in banner and "class='warn'" in banner   # amber caveat, not red ✗
+
+    s = verdict_summary(g)
+    assert "Validated on its universe" in s and "unproven" in s
+    assert "Not validated" not in s
+
+
+def test_core_failure_still_reads_fail():
+    from crucible.report.tearsheet import _verdict_state
+    g = _FakeGauntlet(REAL=False, STRONG=True, DURABLE=True, GENERAL=True)
+    assert _verdict_state(g) == "fail"
+    assert "GAUNTLET FAIL" in verdict_banner(g, title="book")
+    assert "Not validated" in verdict_summary(g)
+
+
 def test_verdict_summary_pass_and_fail(ohlc):
     tl, g = _full_gauntlet(ohlc)
     s = verdict_summary(g)
