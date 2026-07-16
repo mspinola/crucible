@@ -87,9 +87,9 @@ Before any significance test, you summarize the sample. These are point estimate
 | **Profit factor** | gross win / gross loss, `:41` | reward-to-risk of the whole book |
 | **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
-| **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:72`,`:81` | is there directional edge *before* the exit rule? |
-| **Time asymmetry** | avg bars in wins / avg bars in losses, `:87` | "let winners run, cut losers" |
-| **Exit efficiency** | captured / available MFE, `:98` | how much of the move the exit banked |
+| **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:76`,`:85` | is there directional edge *before* the exit rule? |
+| **Time asymmetry** | avg bars in wins / avg bars in losses, `:91` | "let winners run, cut losers" |
+| **Exit efficiency** | captured / available MFE, `:102` | how much of the move the exit banked |
 
 The one to single out is **SQN** (System Quality Number, Van Tharp):
 `mean(R) / std(R) × √n`. It is a Sharpe-like *t*-statistic on the per-trade returns — the
@@ -128,10 +128,10 @@ A point estimate of expectancy on 60–200 trades badly understates how much it 
 have wobbled. The **bootstrap** turns the single number into a distribution:
 
 ```
-for i in 1..10000:           # stats.py:54  _resample
+for i in 1..10000:           # stats.py:65  _resample
     draw = sample r WITH REPLACEMENT, size n
     record metric(draw)
-CI = [2.5th percentile, 97.5th percentile]     # stats.py:76
+CI = [2.5th percentile, 97.5th percentile]     # stats.py:87
 ```
 
 Resampling the trade log with replacement simulates "other histories you could plausibly
@@ -163,7 +163,7 @@ lower bound is negative does not clear the gate.
 ## 4. The verdict: folding point + CI + p-value into a label
 
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `reality_check`, `Verdict`
-(`stats.py:93`)
+(`stats.py:44`)
 
 `reality_check` is the call the README calls "the whole point of the package." It collapses
 the three numbers into a decision:
