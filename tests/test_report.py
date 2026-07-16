@@ -67,8 +67,9 @@ def test_verdict_summary_pass_and_fail(ohlc):
     s = verdict_summary(g)
     assert "cr-summary" in s
     assert ("Validated" in s) or ("Not validated" in s)
-    # names the pillars that ran, in plain English (not just the chip glyphs)
-    assert "pillars" in s
+    # the redundant "(N/N pillars — X fails)" count is deduped — the banner + chips
+    # carry it; the summary keeps only the plain-English reading
+    assert "pillars" not in s
     # a REAL-only + STRONG-only gauntlet still summarizes without the unrun pillars
     from crucible.validation import run_gauntlet
     g2 = run_gauntlet(barrier_trades(ohlc, ma_cross(ohlc), side="long"))
