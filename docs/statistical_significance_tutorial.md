@@ -596,8 +596,10 @@ walk_forward(px, donchian, {"lookback": [20, 40]}, is_days=3yr, oos_days=1yr)
 **How to read it.** Optimize the lookback in-sample, apply the winner to the next *unseen*
 year, step forward, stitch the out-of-sample slices into one log. The in-sample expectancy is
 steadily positive — but the **OOS** column lurches: +2.15, +1.23, +1.00, then −1.00, −0.13,
-−1.00 … a few great years and a run of losing ones. The mean WFE of 1.34 looks respectable, but
-it's an average *of chaos*. Step 4 is built to catch exactly that.
+−1.00 … a few great years and a run of losing ones, and only half the years profitable. The mean
+WFE of 1.34 looks respectable until you notice it's *above 1.00* — the out-of-sample outran the
+in-sample, which §9 flagged as too-good-to-be-true. A few outlier years (fold WFEs of 3.5, 3.7,
+5.3) inflated the average. Step 4 makes the call.
 
 ### Step 4 — the verdict (§11)
 
@@ -605,7 +607,7 @@ it's an average *of chaos*. Step 4 is built to catch exactly that.
 run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
    REAL     ✓   corrected p = 0.0008   ·   beats 100% of random-entry timing
    STRONG   ✓   expectancy CI-low +0.40 · PF CI-low 1.67 · SQN CI-low 2.32
-   DURABLE  ✗   WFE 1.34 outside [0.30, 1.00]  ·  dispersion CV 3.74, only 50% of folds tradable
+   DURABLE  ✗   wfe_aggregate 1.34 above the [0.30, 1.00] ceiling  ·  fold_dispersion CV 1.51 → PASS
    ─────────────────────────────────────────────────────────────────────
    GAUNTLET: FAIL   (2 of 3 gates passed — failing: DURABLE)
 ```
@@ -618,9 +620,11 @@ run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
 - **STRONG ✓** — every hard metric clears its bar at the **pessimistic CI lower bound**, not the
   point estimate: expectancy-low +0.40 (> 0), PF-low 1.67 (> 1.25), SQN-low 2.32 (> 1.6).
   Economically real even under sampling noise.
-- **DURABLE ✗** — and here it dies. The aggregate WFE 1.34 sits *above* the "too-good-to-be-true"
-  ceiling of 1.00 (inflated by a handful of huge fold ratios), and only **half** the folds are
-  individually tradable, with a dispersion CV of 3.74 against a bar of 2.0. Fold to fold, chaotic.
+- **DURABLE ✗** — and here it dies. The aggregate WFE is 1.34 — *above* the 1.00
+  "too-good-to-be-true" ceiling: the out-of-sample outran the in-sample, inflated by a few outlier
+  years (fold WFEs of 3.5–5.3), the opposite of the graceful 50–80% degradation a robust edge
+  shows. Fold dispersion itself passes, but barely — only **half** the folds are individually
+  tradable (CV 1.51 vs. a bar of 2.0).
 
 **The lesson.** Pooled — and even out-of-sample in aggregate — this breakout is real and strong:
 `reality_check` said **HELD**, and two of three gates are green. A backtester's equity curve would
