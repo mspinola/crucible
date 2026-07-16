@@ -201,17 +201,17 @@ def verdict_summary(gauntlet) -> str:
         return ""
     passed = [g.name for g in gates if g.passed]
     failed = [g.name for g in gates if not g.passed]
-    n = len(gates)
 
     if gauntlet.passed:
-        lead = (f"<span class='lead ok'>Validated ({n}/{n} pillars).</span> "
+        lead = (f"<span class='lead ok'>Validated.</span> "
                 f"This book {_join(_PILLAR_PASS.get(nm, nm) for nm in passed)} — "
                 f"a real, deployable edge on this evidence.")
         return f"<p class='cr-summary'>{lead}</p>"
 
-    names = " · ".join(f"<span class='no'>{nm}</span>" for nm in failed)
-    verb = "fails" if len(failed) == 1 else "fail"
-    lead = f"<span class='lead no'>Not validated ({len(passed)}/{n} pillars — {names} {verb}).</span> "
+    # The banner + pillar chips already carry the PASS/FAIL count and which pillar
+    # broke, so the summary drops that enumeration and keeps only the plain-English
+    # reading — what passing/failing actually means for the book.
+    lead = "<span class='lead no'>Not validated.</span> "
     if passed:
         body = (f"It {_join(_PILLAR_PASS.get(nm, nm) for nm in passed)}, but "
                 f"{_join(_PILLAR_FAIL.get(nm, nm) for nm in failed)}.")
