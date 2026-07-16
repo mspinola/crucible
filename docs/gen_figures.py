@@ -195,14 +195,19 @@ def render_png(html: str, out: Path, pad: int = 22) -> None:
     print(f"wrote {out.relative_to(REPO)}  ({im.width}x{im.height})")
 
 
-def render_logo(out: Path, size: int = 96, pad: int = 6) -> None:
-    """Render the crucible mark to a transparent, alpha-cropped PNG for the
-    tutorial title area and the PDF cover. Uses the favicon colorway (a fixed
-    slate vessel that reads on both light and dark) since a committed PNG gets no
-    page context to drive ``currentColor``."""
+# Two committed colorways (a PNG gets no page context to drive currentColor):
+#   full — slate vessel that reads on light and dark (title area, PDF cover, favicon)
+#   mono — all-white for the teal site header bar
+LOGO_FULL = dict(vessel="#7a808a", molten="#e0812b", up="#1a7f37", down="#b42318")
+LOGO_MONO = dict(vessel="#ffffff", molten="#ffffff", up="#ffffff", down="#ffffff")
+
+
+def render_logo(out: Path, colors: dict = LOGO_FULL, size: int = 96, pad: int = 6) -> None:
+    """Render the crucible mark to a transparent, alpha-cropped PNG in the given
+    colorway (see LOGO_FULL / LOGO_MONO)."""
     from PIL import Image
     from crucible.report.tearsheet import _logo_svg
-    svg = _logo_svg(size=size, vessel="#7a808a", molten="#e0812b", up="#1a7f37", down="#b42318")
+    svg = _logo_svg(size=size, **colors)
     html = f'<!doctype html><html><head><meta charset="utf-8">' \
            f'<style>html,body{{margin:0;background:transparent}}</style></head>' \
            f'<body>{svg}</body></html>'
@@ -233,7 +238,8 @@ def main() -> None:
     sheets["gate_ladder"] = GATE_LADDER_HTML
     for name, html in sheets.items():
         render_png(html, IMG / f"{name}.png")
-    render_logo(IMG / "crucible_logo.png")
+    render_logo(IMG / "crucible_logo.png", LOGO_FULL)
+    render_logo(IMG / "crucible_logo_white.png", LOGO_MONO)  # site header (teal bar)
 
 
 if __name__ == "__main__":
