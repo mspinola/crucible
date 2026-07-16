@@ -49,6 +49,13 @@ simulator sizes as `sl × ATR`). R-normalization is what lets
 returns from different instruments and volatility regimes pool into one sample that the
 statistics can treat as draws from a single distribution.
 
+The unit that defines 1R is just the strategy's own stop, and crucible is agnostic to how
+it's set — a **volatility statistic** (ATR, the simulator's default), a **structural** level
+(a swing low or reversal-candle wick), or a **fixed** distance. All are valid risk units; the
+*volatility-scaled* framing holds specifically when that unit is a volatility measure like ATR
+— a structural stop is risk-normalized but only *implicitly* volatility-sensitive (a wider
+signal bar gives a wider stop).
+
 **Subtract costs before you test.** The `r` column should be **net of transaction costs** —
 commission *and* slippage, expressed in R. A fixed haircut (say −0.1R per trade for a liquid
 instrument, more for thin ones) is the floor; without it a **+0.15R expectancy might be
