@@ -412,7 +412,7 @@ def _logo_svg(*, size: int = 30, vessel: str = "currentColor", molten: str = "#e
         f"<svg width='{size}' height='{size}' viewBox='0 0 48 46' fill='none' "
         f"role='img' aria-label='crucible' xmlns='http://www.w3.org/2000/svg'>"
         f"<path d='M18.5 12.8 Q22.8 21.5 26.6 29.6 L29.4 28.4 Q25.6 20.4 21.7 11.6 Z' fill='{molten}'/>"
-        f"<ellipse cx='27.5' cy='40.6' rx='4.6' ry='1.3' fill='{molten}'/>"
+        f"<ellipse cx='32.5' cy='41.2' rx='9.5' ry='1.9' fill='{molten}'/>"
         f"<path d='M8 9.5 L5.8 19 Q10.8 26.4 17 23.2 L20.4 13.6' stroke='{vessel}' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/>"
         f"<path d='M8 9.5 L20.4 13.6' stroke='{vessel}' stroke-width='1.5' stroke-linecap='round'/>"
         f"<path d='M7.2 14 Q11.6 20.4 15.6 17.8' stroke='{vessel}' stroke-width='1.3' stroke-linecap='round'/>"
