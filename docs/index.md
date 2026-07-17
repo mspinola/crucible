@@ -110,6 +110,8 @@ Before any significance test, you summarize the sample. These are point estimate
 | **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
 | **Win rate** | fraction of `r > 0`, `:23` | how often you're right — read *with* payoff, never alone (35% is excellent at RR 3) |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
+| **MFE** — max favorable excursion | *per trade:* furthest it ran *for* you while open, in R; a trade-log column the simulator records (`simulator.py`) | the unrealized profit that was on the table |
+| **MAE** — max adverse excursion | *per trade:* furthest it ran *against* you while open, in R (≤ 0); simulator column | the worst heat taken to hold it |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:76`,`:85` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:91` | "let winners run, cut losers" |
 | **Exit efficiency** | captured / available MFE, `:102` | how much of the move the exit banked |
