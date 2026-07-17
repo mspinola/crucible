@@ -265,7 +265,7 @@ significance — too-tight CIs, too-small p.
 The fix is to resample **contiguous blocks of calendar time** instead of individual trades, so
 the clustering survives in the null. Feed `block_bootstrap_pvalue` / `block_bootstrap_ci`
 (`edge/stats.py`) an ordered **period-return series** — e.g. monthly summed R on a gap-free grid
-— and it zero-centers to impose H₀ (mean = 0) and resamples blocks (circular, or the
+— and it zero-centers to impose the null (mean = 0) and resamples blocks (circular, or the
 Politis–Romano **stationary bootstrap** for random block lengths):
 
 ```python
