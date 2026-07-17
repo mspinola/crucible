@@ -283,6 +283,12 @@ outcomes a skill-less system would produce on these same magnitudes; the p-value
 often chance matches or beats you. This is **Timothy Masters' Monte Carlo Permutation
 Method**, the public-domain alternative to White's patented Reality Check.
 
+In the gauntlet this *is* the **REAL** gate's `corrected_pvalue` hard check: the sign-permutation
+p, Šidák-corrected (§5b) for your variant count, must clear α = 0.05. On the report it's the
+`corrected_pvalue` row in the REAL block, with the raw sign-permutation p in its detail line.
+(Hand `gate_real` every variant's returns instead and it swaps to White's Reality Check — §5c —
+as `reality_check_pvalue`.)
+
 ### 5b. Šidák correction (you tried N variants)
 
 **Code:** `permutation.py:47` — `sidak_correction`; `corrected = 1 − (1 − p)^N`
