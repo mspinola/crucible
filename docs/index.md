@@ -213,6 +213,12 @@ positively autocorrelated — the honest p for a clustered book. Useful diagnost
 moves as the block grows, the clustering is hurting your *drawdown*, not the significance of your
 *mean* — two different statistics.
 
+The report draws this comparison directly: pass a period series to the tearsheet
+(`edge_panels(trades, period_returns=monthly_r(trades))`, or the same argument on
+`gauntlet_report`) and it appends a block-bootstrap panel that shows the wider,
+correlation-preserving CI against the optimistic i.i.d. one on the period-mean axis — the
+picture of "the i.i.d. band is too tight" rather than just the assertion.
+
 > **Source.** Politis & Romano (1994), "The Stationary Bootstrap," *JASA* 89(428): 1303–1313 —
 > the block/stationary bootstrap for dependent data ([Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))).
 
