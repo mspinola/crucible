@@ -193,8 +193,11 @@ lower bound is negative does not clear the gate.
 
 ### When the observations aren't independent — the block bootstrap
 
-The i.i.d. bootstrap above (and the sign-permutation of §5) treats trades as **exchangeable**.
-That's fine for a single instrument, but it *breaks* for a **pooled multi-asset book**: one
+The i.i.d. bootstrap above (and the sign-permutation of §5) treats trades as **exchangeable** —
+*i.i.d.* means **independent** (one trade's outcome carries no information about the others) and
+**identically distributed** (all drawn from one fixed distribution), so their order doesn't
+matter and you can resample them one at a time. That's fine for a single instrument, but it
+*breaks* for a **pooled multi-asset book**: one
 macro shock in Oct-2008 fires correlated longs across equities, metals, and FX at once, so those
 trades are not independent draws. Resampling them independently **overstates** the edge's
 significance — too-tight CIs, too-small p.
