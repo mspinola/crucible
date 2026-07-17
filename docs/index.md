@@ -663,6 +663,11 @@ cap. Because the label looks forward until a barrier is touched, it creates the 
 (**meta-labeling** — a take/skip filter on a primary signal), you judge that filter's score
 with `crucible.ml` below — **worked end to end in §13**.
 
+![A vertical flow: a primary signal produces many candidate trades, the triple-barrier method labels each a win or loss, a model scores each trade take-or-skip, crucible.ml judges whether that score is real, and the high-score trades become the filtered book that goes through the gauntlet.](img/meta_label.png){ width="560" }
+*Meta-labeling splits the decision: the primary signal decides which trades exist, the model
+decides which to take. `crucible.ml` judges the model's score before it ever reaches a
+backtester — the pipeline §13 runs end to end.*
+
 > **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (with §3.5 "Learning
 > Side and Size" and §3.6 "Meta-Labeling") — the labeling and take/skip framing.
 
@@ -724,6 +729,11 @@ real (`holdout.py:36-48`):
   side.
 - **Embargo:** drop the first `embargo_weeks` of the test period, killing residual
   autocorrelation across the seam.
+
+![A time axis split into a train period and a test period. Train trades enter and exit before the split; one trade that straddles the split is purged; an embargo band drops the first slice of the test period; test trades begin only after it.](img/purge_embargo.png){ width="680" }
+*Purge removes any trade whose forward window crosses the split (it would carry future
+information into the fitted side); embargo drops the first slice of test so autocorrelation
+can't leak across the seam. What remains on the right has genuinely never been seen.*
 
 The `HoldoutResult` runs a full `reality_check` on each side and declares **the untouched
 TEST period the verdict** (`holdout.py:56`, `:69`). Train is expected to look good — that's
