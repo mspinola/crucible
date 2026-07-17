@@ -100,10 +100,7 @@ def report_css() -> str:
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
   .cr-summary {{ margin: 6px 0 16px; max-width: 70ch; color: var(--cr-fg); font-size: 14.5px; }}
-  .cr-summary-row {{ display: flex; justify-content: space-between; align-items: flex-start;
-                    gap: 28px; flex-wrap: wrap; }}
-  .cr-summary-row .cr-summary {{ flex: 1 1 58%; }}
-  .cr-hostnote {{ flex: 0 1 auto; margin: 6px 0 16px; }}
+  .cr-hostnote {{ margin-left: auto; align-self: center; }}   /* rides the right end of the verdict row */
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-summary .ok {{ color: var(--cr-pass); font-weight: 600; }}
@@ -428,7 +425,8 @@ def _favicon_href() -> str:
 
 
 def verdict_banner(gauntlet, *, title: Optional[str] = None,
-                   subtitle: Optional[str] = None, pillar_notes: Optional[dict] = None) -> str:
+                   subtitle: Optional[str] = None, pillar_notes: Optional[dict] = None,
+                   note_html: str = "") -> str:
     """Overall gauntlet verdict: a PASS/FAIL banner plus a one-line pillar summary
     (REAL / STRONG / DURABLE / GENERAL, each ✓ passed, ✗ failed, or — not run).
 
@@ -464,10 +462,13 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
     pill = (f"<div class='cr-verdict' style='background:{color}'>{label}"
             f"{' <small>scope-limited</small>' if state == 'scope' else ''}</div>")
+    # an optional host note (e.g. the net-of-costs badge) rides the right end of the row
+    note = f"<div class='cr-hostnote'>{note_html}</div>" if note_html else ""
     return (f"{head}{sub}"
             f"<div class='cr-verdict-row'>"
             f"{pill}"
             f"<div class='cr-pillars'>{summary}</div>"
+            f"{note}"
             f"</div>")
 
 
@@ -837,7 +838,9 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     the optimistic i.i.d. one (``block`` / ``stationary`` tune it; see `edge_panels`).
     If ``path`` is given the HTML is written there and the path is returned; otherwise
     the HTML string is returned."""
-    banner = verdict_banner(gauntlet, title=title, subtitle=subtitle, pillar_notes=pillar_notes)
+    # the host note (e.g. net-of-costs badge) rides the right end of the verdict row
+    banner = verdict_banner(gauntlet, title=title, subtitle=subtitle,
+                            pillar_notes=pillar_notes, note_html=header_html)
     summary = verdict_summary(gauntlet)
     # bullets is the FIRST figure → it carries plotly.js so everything below finds it
     bullets = pillar_bullets(gauntlet, include_plotlyjs=include_plotlyjs)
@@ -856,9 +859,7 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     appendix = appendix_html or ""
     # Summary text (left) and the host note (e.g. the net-of-costs badge) sit on one row
     # so the note fills the space beside the ≤70ch prose instead of stranding it below.
-    note = f"<div class='cr-hostnote'>{header_html}</div>" if header_html else ""
-    summary_row = f"<div class='cr-summary-row'>{summary}{note}</div>"
-    inner = f"{banner}{metrics}{summary_row}{bullets}{panels}{pillars}{appendix}{_FOOT}"
+    inner = f"{banner}{metrics}{summary}{bullets}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
     if path is None:
         return doc
