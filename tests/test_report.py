@@ -104,6 +104,26 @@ def test_pillar_bullets_render_and_direction_inference(ohlc):
     from crucible.report.tearsheet import _BULLET_LABEL  # noqa: F401  (label map present)
 
 
+def test_check_bullet_svg_colors_by_result_and_skips_non_numeric():
+    from crucible.report.tearsheet import _check_bullet_svg
+    from types import SimpleNamespace as NS
+    # passing hard → green; failing hard → red; failing soft → amber
+    assert "var(--cr-pass)" in _check_bullet_svg(NS(name="wfe", value=1.47, threshold=0.5, hard=True, passed=True))
+    assert "var(--cr-fail)" in _check_bullet_svg(NS(name="p", value=0.10, threshold=0.05, hard=True, passed=False))
+    assert "var(--cr-warn)" in _check_bullet_svg(NS(name="sqn", value=0.1, threshold=1.6, hard=False, passed=False))
+    # a value bar and a threshold tick are drawn
+    svg = _check_bullet_svg(NS(name="e", value=0.44, threshold=0.0, hard=True, passed=True))
+    assert "<rect" in svg and "<line" in svg and "<svg" in svg
+    # non-numeric / missing → empty (no crash)
+    assert _check_bullet_svg(NS(name="t", value=("a", "b"), threshold=None, hard=True, passed=True)) == ""
+
+
+def test_gate_block_embeds_per_check_bullets(ohlc):
+    _, g = _full_gauntlet(ohlc)
+    html = gate_block(g.gates[0])          # any real gate
+    assert "cr-cbul" in html               # the inline bullet svg is in the checks table
+
+
 def test_pillar_bullets_empty_without_checks():
     from crucible.report import pillar_bullets
     from types import SimpleNamespace
