@@ -100,7 +100,7 @@ def report_css() -> str:
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
   .cr-summary {{ margin: 6px 0 16px; max-width: 90ch; color: var(--cr-fg); font-size: 14.5px; }}
-  .cr-hostnote {{ margin-top: auto; align-self: flex-start; padding-top: 16px; }}   /* bottom of the left column */
+  .cr-hostnote {{ align-self: flex-start; padding-top: 16px; }}   /* rides under the prose */
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-summary .ok {{ color: var(--cr-pass); font-weight: 600; }}
@@ -115,7 +115,8 @@ def report_css() -> str:
                   color: var(--cr-muted); }}
   /* Two-column verdict top: interpretation prose (left) + a stats card (right). */
   .cr-top {{ display: flex; gap: 30px; align-items: stretch; flex-wrap: wrap; margin: 6px 0 2px; }}
-  .cr-top-left {{ flex: 1 1 52%; min-width: 300px; display: flex; flex-direction: column; }}
+  .cr-top-left {{ flex: 1 1 52%; min-width: 300px; display: flex; flex-direction: column;
+                 justify-content: center; }}   /* center prose+note as a group vs the taller card */
   .cr-top-right {{ flex: 1 1 30%; min-width: 236px; }}
   .cr-top-left .cr-summary {{ margin: 0; max-width: none; }}
   .cr-statcard {{ border: 1px solid var(--cr-border); border-radius: 10px;
@@ -878,7 +879,8 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
            f"<div class='cr-top-left'>{summary}{note}</div>"
            f"<div class='cr-top-right'><div class='cr-statcard'>{metrics}</div></div>"
            f"</div>")
-    inner = f"{banner}{top}<hr class='cr-div'>{bullets}{panels}{pillars}{appendix}{_FOOT}"
+    inner = (f"{banner}<hr class='cr-div'>{top}<hr class='cr-div'>"
+             f"{bullets}{panels}{pillars}{appendix}{_FOOT}")
     doc = _page(title, inner)
     if path is None:
         return doc

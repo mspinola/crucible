@@ -338,7 +338,7 @@ def test_gauntlet_report_has_logo_favicon_and_metric_order(ohlc):
     # rules in the <style> head.
     assert "class='cr-top-left'" in doc and "class='cr-statcard'" in doc
     assert doc.index("class='cr-summary'") < doc.index("class='cr-statcard'")  # prose left, card right
-    assert doc.index("class='cr-statcard'") < doc.index("class='cr-div'")      # card, then divider
+    assert doc.count("class='cr-div'") >= 2   # a rule frames the two-column row (above + below)
 
 
 def test_report_css_is_style_body_only():
