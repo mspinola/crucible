@@ -6,3 +6,17 @@
   vertical-align: -0.12em;
   margin-right: 0.3rem;
 }
+
+/* The gauntlet gate names (REAL, STRONG, DURABLE, …) as one consistent token:
+   spaced small caps in a teal deeper than the link color, so the controlled
+   vocabulary reads as terms of art without looking clickable. Wrapped
+   automatically by docs/gate_tokens.py (the on_page_content hook). */
+.md-typeset .gate {
+  font-size: 0.86em;
+  letter-spacing: 0.13em;
+  font-weight: 500;
+  color: #00695c;
+}
+[data-md-color-scheme="slate"] .md-typeset .gate {
+  color: #5dcaa5;
+}

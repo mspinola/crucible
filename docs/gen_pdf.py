@@ -23,6 +23,8 @@ from pathlib import Path
 
 import markdown
 
+from gate_tokens import wrap_gate_tokens
+
 HERE = Path(__file__).resolve().parent
 DEFAULT_SRC = HERE / "index.md"
 SITE_URL = "https://mspinola.github.io/crucible/"
@@ -70,6 +72,7 @@ def build_html(src: str) -> str:
         ],
         extension_configs={"codehilite": {"noclasses": True, "guess_lang": False}},
     )
+    body = wrap_gate_tokens(body)
     generated = date.today().isoformat()
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>{CSS}</style></head>
@@ -119,6 +122,7 @@ th { background: #e0f2f1; color: #004d40; }
 hr { border: none; border-top: 0.5pt solid #cfd8dc; margin: 12pt 0; }
 img { display: block; margin: 8pt 0; }
 .caption { font-size: 8.5pt; color: #78909c; font-style: italic; margin: 0 0 8pt 0; }
+.gate { color: #00695c; font-size: 9.6pt; letter-spacing: 1.2pt; font-weight: normal; }
 """
 
 # The frame anchor is a plain block <div> (tables/floats aren't reliably honoured

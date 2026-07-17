@@ -48,5 +48,9 @@ markdown_extensions:
 plugins:
   - search
 
+# Styles the gauntlet gate names (REAL, STRONG, …) as one consistent token.
+hooks:
+  - docs/gate_tokens.py
+
 extra_css:
   - stylesheets/extra.css
