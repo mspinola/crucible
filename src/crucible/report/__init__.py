@@ -18,11 +18,13 @@ from crucible.report.tearsheet import (
     gauntlet_report,
     verdict_banner,
     verdict_summary,
+    pillar_bullets,
     gate_block,
     edge_panels,
     metrics_table,
     report_css,
     cumulative_r,
+    monthly_r,
 )
 
 __all__ = [
@@ -30,9 +32,11 @@ __all__ = [
     "gauntlet_report",
     "verdict_banner",
     "verdict_summary",
+    "pillar_bullets",
     "gate_block",
     "edge_panels",
     "metrics_table",
     "report_css",
     "cumulative_r",
+    "monthly_r",
 ]
