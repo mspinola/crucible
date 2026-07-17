@@ -429,6 +429,12 @@ Where the permutation test corrects the *p-value* for the search, these correct 
 and the *Sharpe* for it — the same multiple-testing disease, caught two more ways. Capital-free
 (stdlib `NormalDist`, no scipy).
 
+Unlike the trade-log tests, these two aren't drawn on the report or wired into the gauntlet —
+they need the **whole search** as input (`pbo_cscv` a `T×N` periods×configs matrix;
+`deflated_sharpe` the winner's Sharpe plus the trial count), which a single `TradeLog` doesn't
+carry. Call them yourself with that matrix — same story as the block bootstrap (§3): a standalone
+check that runs on a different object than the one the report shows.
+
 > **Sources.** **PBO / CSCV**: Bailey, Borwein, López de Prado & Zhu (2017), "The Probability of
 > Backtest Overfitting," *Journal of Computational Finance*; **AFML Ch. 11–12**. **Deflated /
 > Probabilistic Sharpe**: Bailey & López de Prado (2014), "The Deflated Sharpe Ratio," *Journal of
