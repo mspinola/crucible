@@ -265,7 +265,7 @@ significance — too-tight CIs, too-small p.
 The fix is to resample **contiguous blocks of calendar time** instead of individual trades, so
 the clustering survives in the null. Feed `block_bootstrap_pvalue` / `block_bootstrap_ci`
 (`edge/stats.py`) an ordered **period-return series** — e.g. monthly summed R on a gap-free grid
-— and it zero-centers to impose H₀ (mean = 0) and resamples blocks (circular, or the
+— and it zero-centers to impose the null (mean = 0) and resamples blocks (circular, or the
 Politis–Romano **stationary bootstrap** for random block lengths):
 
 ```python
@@ -319,6 +319,55 @@ a p-value to be argued over.
 ## 5. Ruling out data-mining luck: permutation tests
 
 This is the heart of the significance story and the reason Aronson & Masters matter.
+
+### First, a lens: what does the test hold fixed?
+
+§0 took your backtester's Monte Carlo apart with two questions — *what does it randomize, and
+what does it hold fixed?* That lens isn't special to Monte Carlo. It is how **every** test in
+this tutorial works, and it's the fastest way to know what one can and cannot tell you. Each
+test builds a world and drops your results into it. What it **holds fixed** is what it grants
+you for free; what it **randomizes** is the thing whose contribution it is actually measuring.
+Sorted that way, the whole toolkit is three families.
+
+**1 — Resample your own trades.** These grant your results and ask how much of the number is
+noise.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `bootstrap_ci` — §3 | your trades, treated as the population | which trades you drew | how much of the number is the sample |
+| `block_bootstrap_ci` — §3 | contiguous blocks of calendar time | which blocks you drew | the same, with autocorrelation left intact |
+| *your backtester's Monte Carlo* | **the outcomes themselves** | their order | how rough the ride could get |
+
+**2 — Build a world where you had no skill.** These grant nothing. This is where *"is the edge
+real?"* actually gets answered.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `sign_permutation_pvalue` — §5a | each trade's magnitude | its **sign** | is there directional skill at all |
+| `random_entry_null` — §6 | the prices, the barriers, the trade count, the holding period | ***when* you entered** | timing skill, or just exposure |
+| `detrended_timing_null` — §6 | your directions and holding periods | timing, on **drift-removed** returns | timing skill once the market's own drift is gone |
+| `block_bootstrap_pvalue` — §3 | the block structure | which blocks — **zero-centered to impose a no-edge null** | the same, for a serially dependent book |
+
+**3 — Correct for how hard you looked.** These grant that you found something, and ask whether
+the finding survives the size of the search that found it.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `whites_reality_check` — §5c | the whole variant pool | signs across **every** variant, keeping the max | did the size of my search manufacture this winner |
+| Hansen's SPA — §5d | the same pool, studentized, clear losers dropped | the same | the same question, without one wild variant setting the bar |
+| cross-market RC — §5e | the markets, used as the variant pool | the same — best market vs best-under-null | does it travel, or is one market carrying the book |
+| PBO — §5, below | the config pool | which period blocks are IS vs OOS (it enumerates every symmetric split rather than sampling) | did the act of *choosing* the winner overfit |
+
+(§5b's Šidák correction is the odd one out — it randomizes nothing at all. It's the arithmetic
+shortcut for family three when the only thing you know is the **count**.)
+
+Now read the first table against the other two. Your backtester's Monte Carlo sits in family
+one, and it is the only test here that holds the **outcomes** fixed — which is exactly why it
+can measure the ride but never the edge. It grants the thing in question. Families two and
+three are what crucible adds, and no amount of family-one resampling is a substitute for them:
+they are different questions, not stronger versions of the same one.
+
+The rest of §5 is family three.
 
 ### 5a. Sign-permutation test (one strategy)
 
@@ -512,6 +561,17 @@ check that runs on a different object than the one the report shows.
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `random_entry_null`,
 `detrended_timing_null`
 
+Your system made money in a market that went up. This section is about separating those two
+facts, because your equity curve cannot.
+
+That is an uncomfortable sentence, so be precise about the claim: nobody is saying the money
+wasn't made. The question is *who made it*. Take your rule away, keep everything else — the same
+instrument, the same barriers, the same number of trades, the same holding period — and just
+enter at **random**. In a market that trended up, that random system also makes money. So the
+bar your signal has to clear was never zero. It's whatever coin-flip timing would have handed
+you on this instrument over this period, and on a trending market that bar can be a long way
+above zero.
+
 Beating zero is not enough on an instrument that drifts up. The right null is *"did my
 signal beat coin-flip timing on this same instrument?"* crucible offers two, both capital-free:
 
@@ -527,6 +587,15 @@ Detrending is what isolates *timing skill* from *riding the market*. It also mak
 benchmark automatically asset-class-appropriate: an equity index's structural long drift is
 removed the same way a currency's near-zero drift is, so no hand-picked per-class benchmark
 is needed.
+
+That last property is worth pausing on, because it quietly removes an argument you would
+otherwise have to have. The usual way to answer "did you just ride the market?" is to *pick a
+benchmark* — SPY, buy-and-hold, some index — and then defend the choice, which is unfalsifiable
+in exactly the way a good test shouldn't be (pick a weak benchmark and your edge appears). Here
+nothing gets picked. **The asset becomes its own benchmark**: its drift is estimated from its own
+bars and subtracted, so what remains is the timing. The same line of code does the right thing
+for an equity index and for a currency, and there is no benchmark selection to litigate — which
+also means there's no benchmark selection to quietly optimize.
 
 > **Sources.**
 > - **EBTA Appendix "Proof That Detrending Is Equivalent to Benchmarking Based on Position
@@ -664,6 +733,22 @@ Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
 `walk_forward.py:136-138`) and reports **Walk-Forward Efficiency (WFE)** — Pardo's named
 ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
+
+**If you already run walk-forward, this section is about reading it.** Two instincts carried over
+from the equity-curve world will quietly invert the result.
+
+The first is that **higher WFE is better**. It isn't — the metric has a *ceiling*, not just a
+floor. WFE is out-of-sample over in-sample, so a WFE above 1.00 says your strategy did **better**
+on data it had never seen than on the data it was fitted to. That is not a triumph; it's a
+statement that something is wrong, and `wfe_reject_high = 1.00` (`thresholds.py:29`) rejects it
+outright. Usually it's a bug, a leak, or a couple of freak folds — but whatever it is, it isn't
+skill, because fitting is supposed to *help* on the data you fit to. §12 fails on exactly this.
+
+The second is that **the aggregate is the answer**. It's a mean, and means get carried. A healthy
+aggregate WFE can be a strategy that was mediocre in most of its folds and extraordinary in two —
+and those two are the least likely to repeat, because outliers are the thing that doesn't. Read
+the fold column, not the summary row. (§12 is this exact shape: an aggregate of 1.34 with
+individual folds at 3.5 and 3.7.)
 
 crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
 [`validation/diagnostics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/diagnostics.py)): a healthy *average*
