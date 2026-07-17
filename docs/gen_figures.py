@@ -137,7 +137,7 @@ def report_sheets() -> dict[str, str]:
     from crucible.validation import walk_forward, run_gauntlet, Thresholds
     from crucible.report import (verdict_banner, metrics_table, verdict_summary,
                                  gate_block, cumulative_r, report_css)
-    from crucible.report.tearsheet import _PILLARS, _plotly
+    from crucible.report.tearsheet import _PILLARS, _plotly, _COSTS_NOT_ATTESTED
 
     px = dg.synthetic_prices()
     tp, sl, to = 2.5, 1.0, 30
@@ -147,10 +147,13 @@ def report_sheets() -> dict[str, str]:
                      n_variants=2, thr=Thresholds(n_boot=5000, n_perm=5000, n_random_sims=500))
     trades = wf.stitched
     css = report_css()
+    # the §12 synthetic book carries no costs, so the report's default cost note is
+    # the honest read here — mirror what gauntlet_report() stamps under the verdict
+    note = f"<div class='cr-hostnote'>{_COSTS_NOT_ATTESTED}</div>"
 
     hero = (verdict_banner(g, title="Donchian breakout — the gauntlet",
                            subtitle="stitched OOS log · 20/40 lookback search")
-            + metrics_table(trades) + verdict_summary(g))
+            + metrics_table(trades) + verdict_summary(g) + note)
     by = {x.name: x for x in g.gates}
     gates = "".join(gate_block(by[p]) for p in _PILLARS if p in by)
 
@@ -174,7 +177,7 @@ def report_sheets() -> dict[str, str]:
                              _FakeGate("DURABLE", True), _FakeGate("GENERAL", False)])
     scope = (verdict_banner(scope_g, title="A scope-limited edge",
                             subtitle="core validated · cross-market generalization unproven")
-             + metrics_table(trades) + verdict_summary(scope_g))
+             + metrics_table(trades) + verdict_summary(scope_g) + note)
 
     go, _ = _plotly()
     cr = cumulative_r(trades)

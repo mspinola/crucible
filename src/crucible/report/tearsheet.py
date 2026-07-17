@@ -829,15 +829,25 @@ def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
                        include_plotlyjs=(True if include_plotlyjs else "cdn"))
 
 
+# Shown under the verdict when the host supplies no cost attestation. crucible sees only
+# the `r` column, so it never assumes the returns are net — it asks.
+_COSTS_NOT_ATTESTED = (
+    "<span style='display:inline-block;padding:4px 11px;border-radius:999px;"
+    "font-size:12px;font-weight:600;background:rgba(210,153,34,0.14);color:var(--cr-warn)'>"
+    "costs not attested · is <i>r</i> net of commission + slippage?</span>"
+)
+
+
 def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
                     title: str = "crucible gauntlet", subtitle: Optional[str] = None,
                     appendix_html: str = "", header_html: str = "",
                     n_boot: int = 10_000, seed: int = 0,
                     include_plotlyjs: bool = True, pillar_notes: Optional[dict] = None,
                     period_returns=None, block: int = 6, stationary: bool = False) -> str:
-    """Compose a full gauntlet-organized page: verdict banner → optional
-    ``header_html`` (a host note that sits right under the verdict, e.g. a
-    net/gross badge) → edge panels + metrics → one section per pillar that ran
+    """Compose a full gauntlet-organized page: verdict banner → a cost note that
+    sits right under the verdict (``header_html`` if the host supplies one, e.g. a
+    net/gross badge; otherwise a default ``costs not attested`` nudge, since crucible
+    can't tell a net log from a gross one) → edge panels + metrics → one section per pillar that ran
     (REAL / STRONG / DURABLE / GENERAL; STRONG carries a CI-whisker plot of its
     checks) → an optional host-supplied
     ``appendix_html`` (e.g. capital-aware panels the host owns). ``pillar_notes``
@@ -873,8 +883,11 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     # Two-column top: interpretation prose (left) + the stats as a card (right); then a
     # rule before the pillar-margin bullets.
     # the host note (net-of-costs badge) sits at the bottom of the left column so the
-    # prose + note balance the taller stats card on the right
-    note = f"<div class='cr-hostnote'>{header_html}</div>" if header_html else ""
+    # prose + note balance the taller stats card on the right. With no host note, crucible
+    # cannot tell a net log from a gross one — both are just an `r` column — so rather than
+    # imply the returns are net it stamps "costs not attested". A host that has netted (and
+    # says so via header_html) suppresses this; a bare log gets nudged to declare costs.
+    note = f"<div class='cr-hostnote'>{header_html or _COSTS_NOT_ATTESTED}</div>"
     top = (f"<div class='cr-top'>"
            f"<div class='cr-top-left'>{summary}{note}</div>"
            f"<div class='cr-top-right'><div class='cr-statcard'>{metrics}</div></div>"

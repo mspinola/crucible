@@ -114,9 +114,37 @@ instrument, more for thin ones) is the floor; without it a **+0.15R expectancy m
 literally just the spread**, and every p-value downstream is defending a phantom edge. The bias
 is worst exactly where it looks best: the same dollar of slippage is a *larger* fraction of a
 tight-stop (small-R) trade, so cost-per-R is highest on the highest-expectancy setups. crucible
-is capital-free but not cost-free — bake the haircut into `r` **upstream**, before the gauntlet
-ever sees the log. (Sizing-dependent frictions — financing, market impact at size — belong to
-the capital layer, §10.)
+is capital-free but not cost-free — net the haircut into `r` before the gauntlet ever sees the
+log. (Sizing-dependent frictions — financing, market impact at size — belong to the capital
+layer, §10.)
+
+The netting is a few lines on what a backtester already hands you per fill — the gross R, and
+the entry and stop that defined 1R. A round turn costs a fixed *dollar* amount, so in R it is
+that dollar cost over the dollars you had at risk:
+
+```python
+cost_usd = commission + 2 * slippage_ticks * tick_value   # round-turn $, e.g. $5 + 2·1·$10 = $25
+risk_usd = abs(entry - stop) * point_value                # the dollars 1R actually risked
+r_net    = r_gross - cost_usd / risk_usd                  # cost in R = $cost / $risk
+```
+
+Dividing by `risk_usd` is the whole point — it is what makes the flat-haircut shortcut above a
+floor, not the truth. Take gold (`$100`/point, `$10`/tick, so the *same* `$25` round turn on
+every trade):
+
+- a **wide** 15-point stop risks `$1,500` → cost `0.017R` → a `+0.15R` edge nets `+0.133R` **(−11%)**
+- a **tight** 3-point stop risks `$300` → cost `0.083R` → the same `+0.15R` edge nets `+0.067R` **(−56%)**
+
+Same instrument, same `$25` — and the tighter-stop book, the one that looked *better* gross,
+loses more than half its edge. A flat `−0.1R` can't see that; charging per dollar-of-risk can,
+which is what a full futures cost layer does per trade (pricing each fill from its own risk and
+the contract's tick/point value, with an extra tick for thin markets), stamping the result on
+the verdict — *"net of 0.06R/trade."*
+
+Because crucible only ever sees the `r` you hand it, it **can't tell a net log from a gross
+one** — so it never assumes. A gauntlet report whose log carries no cost attestation is stamped
+**costs not attested**; a producer that has already netted says so, and crucible repeats the
+claim. Netting stays yours to do — the verdict just refuses to hide whether you did.
 
 The `TradeLog` is deliberately agnostic about *how* the trades were produced. A
 hand-coded moving-average rule, a set of discretionary fills exported from a broker or a

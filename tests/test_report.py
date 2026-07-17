@@ -236,6 +236,18 @@ def test_gauntlet_report_embeds_block_panel(ohlc):
     assert "Block bootstrap" not in gauntlet_report(g, tl, include_plotlyjs=False)
 
 
+def test_gauntlet_report_stamps_costs_not_attested(ohlc):
+    tl, g = _full_gauntlet(ohlc)
+    # No host note: crucible can't tell net from gross, so it nudges rather than imply net.
+    bare = gauntlet_report(g, tl, include_plotlyjs=False)
+    assert "costs not attested" in bare
+    # A host that attests (e.g. a net/gross badge) suppresses the default entirely.
+    attested = gauntlet_report(g, tl, include_plotlyjs=False,
+                               header_html="<b>NET of transaction costs</b>")
+    assert "NET of transaction costs" in attested
+    assert "costs not attested" not in attested
+
+
 def test_gate_block_shows_verdict_and_checks(ohlc):
     _, g = _full_gauntlet(ohlc)
     by = {gate.name: gate for gate in g.gates}
