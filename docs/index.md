@@ -132,8 +132,8 @@ Dividing by `risk_usd` is the whole point — it is what makes the flat-haircut 
 floor, not the truth. Take gold (`$100`/point, `$10`/tick, so the *same* `$25` round turn on
 every trade):
 
-- a **wide** 15-point stop risks `$1,500` → cost `0.017R` → a `+0.15R` edge nets `+0.133R` **(−11%)**
-- a **tight** 3-point stop risks `$300` → cost `0.083R` → the same `+0.15R` edge nets `+0.067R` **(−56%)**
+- a **wide** 15-point stop risks `$1,500` → cost `$25 / $1,500 = 0.017R` → a `+0.15R` edge nets `+0.133R` **(−11%)**
+- a **tight** 3-point stop risks `$300` → cost `$25 / $300 = 0.083R` → the same `+0.15R` edge nets `+0.067R` **(−56%)**
 
 Same instrument, same `$25` — and the tighter-stop book, the one that looked *better* gross,
 loses more than half its edge. A flat `−0.1R` can't see that; charging per dollar-of-risk can,
@@ -405,7 +405,8 @@ can measure the ride but never the edge. It grants the thing in question. Famili
 three are what crucible adds, and no amount of family-one resampling is a substitute for them:
 they are different questions, not stronger versions of the same one.
 
-The rest of §5 is family three.
+§5a is the family-two test — the blunt question, *is there any edge at all?* Everything after
+it (§5b onward) is family three, correcting for how hard you looked.
 
 ### 5a. Sign-permutation test (one strategy)
 
