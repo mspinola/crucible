@@ -100,6 +100,10 @@ def report_css() -> str:
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
   .cr-summary {{ margin: 6px 0 16px; max-width: 70ch; color: var(--cr-fg); font-size: 14.5px; }}
+  .cr-summary-row {{ display: flex; justify-content: space-between; align-items: flex-start;
+                    gap: 28px; flex-wrap: wrap; }}
+  .cr-summary-row .cr-summary {{ flex: 1 1 58%; }}
+  .cr-hostnote {{ flex: 0 1 auto; margin: 6px 0 16px; }}
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-summary .ok {{ color: var(--cr-pass); font-weight: 600; }}
@@ -727,7 +731,11 @@ def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
     PASS, WARN, FAIL = "#1a7f37", "#9a6700", "#b42318"
     titles = [f"{name}  ·  {_BULLET_LABEL.get(c.name, c.name.replace('_', ' '))}"
               for name, c in rows]
-    fig = make_subplots(rows=len(rows), cols=1, vertical_spacing=0.26, subplot_titles=titles)
+    # generous inter-panel spacing (near plotly's 1/(rows-1) ceiling) + taller rows below,
+    # so each pillar's title/bar reads as its own band rather than a cramped stack
+    fig = make_subplots(rows=len(rows), cols=1,
+                        vertical_spacing=min(0.30, 0.9 / max(len(rows) - 1, 1)),
+                        subplot_titles=titles)
     for i, (name, c) in enumerate(rows, start=1):
         v, t, passed = float(c.value), float(c.threshold), bool(c.passed)
         color = PASS if passed else (WARN if name == "GENERAL" else FAIL)
@@ -751,7 +759,7 @@ def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
                          range=[-0.8, 0.8], row=i, col=1)
         fig.update_xaxes(gridcolor="rgba(128,128,128,0.18)", zeroline=False,
                          range=[lo - pad, hi + pad], row=i, col=1)
-    fig.update_layout(height=68 * len(rows) + 50, margin=dict(l=20, r=44, t=30, b=18),
+    fig.update_layout(height=104 * len(rows) + 54, margin=dict(l=20, r=44, t=30, b=18),
                       showlegend=False, bargap=0.4, paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
     fig.update_annotations(font=dict(color="#c9d1d9", size=13))   # subplot titles
@@ -799,7 +807,11 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
 
     pillars = "".join(_block(p) for p in _PILLARS if p in by_name)
     appendix = appendix_html or ""
-    inner = f"{banner}{metrics}{summary}{bullets}{header_html or ''}{panels}{pillars}{appendix}{_FOOT}"
+    # Summary text (left) and the host note (e.g. the net-of-costs badge) sit on one row
+    # so the note fills the space beside the ≤70ch prose instead of stranding it below.
+    note = f"<div class='cr-hostnote'>{header_html}</div>" if header_html else ""
+    summary_row = f"<div class='cr-summary-row'>{summary}{note}</div>"
+    inner = f"{banner}{metrics}{summary_row}{bullets}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
     if path is None:
         return doc
