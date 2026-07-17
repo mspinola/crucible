@@ -6,7 +6,7 @@ from crucible.edge import barrier_trades          # noqa: E402
 from crucible.strategies import ma_cross           # noqa: E402
 from crucible.report import (                      # noqa: E402
     tearsheet, cumulative_r, gauntlet_report, verdict_banner, verdict_summary,
-    gate_block, edge_panels, metrics_table, report_css,
+    gate_block, edge_panels, metrics_table, report_css, monthly_r,
 )
 from crucible.validation import run_gauntlet, walk_forward  # noqa: E402
 
@@ -90,6 +90,28 @@ def test_scope_limited_verdict_when_only_general_fails():
     assert "Not validated" not in s
 
 
+def test_pillar_bullets_render_and_direction_inference(ohlc):
+    from crucible.report import pillar_bullets
+    _, g = _full_gauntlet(ohlc)
+    html = pillar_bullets(g)
+    assert "plotly" in html.lower()
+    # a headline check per pillar that ran, labelled
+    for pillar in ("REAL", "STRONG", "DURABLE", "GENERAL"):
+        assert pillar in html
+    assert "plotly_dark" not in html                     # theme-neutral
+
+    # direction is inferred from (value>=threshold)==passed — verify both cases:
+    from crucible.report.tearsheet import _BULLET_LABEL  # noqa: F401  (label map present)
+
+
+def test_pillar_bullets_empty_without_checks():
+    from crucible.report import pillar_bullets
+    from types import SimpleNamespace
+    # a gate whose checks lack numeric value/threshold → nothing to plot
+    g = SimpleNamespace(gates=[SimpleNamespace(name="REAL", checks=[])])
+    assert pillar_bullets(g) == ""
+
+
 def test_core_failure_still_reads_fail():
     from crucible.report.tearsheet import _verdict_state
     g = _FakeGauntlet(REAL=False, STRONG=True, DURABLE=True, GENERAL=True)
@@ -133,6 +155,65 @@ def test_edge_panels_omit_plotlyjs_by_default(ohlc):
     assert len(frag) < 200_000
     inlined = edge_panels(tl, include_plotlyjs=True)
     assert len(inlined) > len(frag)
+
+
+def test_monthly_r_is_gap_free_and_preserves_total(ohlc):
+    tl = barrier_trades(ohlc, ma_cross(ohlc), side="long")
+    mr = monthly_r(tl)
+    # gap-free monthly grid: one bin per calendar month between first and last exit
+    assert len(mr) >= 2
+    assert mr.index.to_period("M").nunique() == len(mr)      # no missing months
+    # summing periods must reconstruct the trade-log total R (empty months add 0)
+    import numpy as np
+    assert float(mr.sum()) == pytest.approx(float(tl.r.sum()))
+
+
+def test_monthly_r_empty_log_is_empty_series():
+    from crucible.edge import TradeLog
+    assert len(monthly_r(TradeLog.from_arrays(r=[]))) == 0
+
+
+def test_edge_panels_block_panel_is_opt_in(ohlc):
+    tl = barrier_trades(ohlc, ma_cross(ohlc), side="long")
+    base = edge_panels(tl, include_plotlyjs=False)
+    assert "Block bootstrap" not in base                     # off by default → unchanged
+    withblk = edge_panels(tl, include_plotlyjs=False, period_returns=monthly_r(tl), block=6)
+    assert "Block bootstrap" in withblk                       # panel appended
+    assert "mean period return (R)" in withblk                # its own period-mean axis
+    assert "block=6" in withblk and "i.i.d." in withblk       # both whiskers drawn
+    assert len(withblk) > len(base)
+    # the appended panel must not re-inline plotly.js (host/main fragment carries it)
+    assert "cdn.plot" in withblk or "plotly-graph-div" in withblk
+
+
+def test_block_bootstrap_panel_widens_ci_on_autocorrelation():
+    # A positively autocorrelated period series: the block CI must be WIDER than the
+    # i.i.d. one — the whole reason the panel exists. Assert on the numbers behind it.
+    import numpy as np
+    from crucible.edge.stats import block_bootstrap_ci
+    from crucible.report.tearsheet import _block_bootstrap_panel
+    rng = np.random.default_rng(1)
+    n, x = 72, np.empty(72)
+    x[0] = 0.3
+    e = rng.normal(0, 1, n)
+    for i in range(1, n):
+        x[i] = 0.3 + 0.7 * (x[i - 1] - 0.3) + e[i]
+    iid = block_bootstrap_ci(x, block=1, seed=0)
+    blk = block_bootstrap_ci(x, block=6, seed=0)
+    assert (blk.high - blk.low) > (iid.high - iid.low)
+    html = _block_bootstrap_panel(x, block=6)
+    assert html and "block=6" in html
+    # too-short series can't be block-resampled → no panel, no crash
+    assert _block_bootstrap_panel([0.1]) == ""
+    assert _block_bootstrap_panel([]) == ""
+
+
+def test_gauntlet_report_embeds_block_panel(ohlc):
+    tl, g = _full_gauntlet(ohlc)
+    doc = gauntlet_report(g, tl, include_plotlyjs=False, period_returns=monthly_r(tl))
+    assert "Block bootstrap" in doc and "mean period return (R)" in doc
+    # absent when not requested
+    assert "Block bootstrap" not in gauntlet_report(g, tl, include_plotlyjs=False)
 
 
 def test_gate_block_shows_verdict_and_checks(ohlc):

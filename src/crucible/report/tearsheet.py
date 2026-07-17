@@ -158,6 +158,26 @@ def cumulative_r(trades: TradeLog) -> pd.Series:
     return pd.Series(np.cumsum(g["r"].to_numpy(dtype=float)), index=x)
 
 
+def monthly_r(trades: TradeLog, *, freq: str = "ME") -> pd.Series:
+    """Summed R per calendar period (monthly by default) on a GAP-FREE grid, ordered
+    by exit date (entry date as a fallback) — the ordered period-return series the
+    block bootstrap consumes (`edge_panels(..., period_returns=monthly_r(tl))`).
+
+    Empty periods contribute 0 R (no trades closed → no period return), so serial
+    dependence is read on a true calendar timeline rather than a trade-compressed
+    one — the point of the block test. Returns an empty Series when the log carries
+    no usable dates. ``freq`` is any pandas offset alias ('ME' month-end, 'W' weekly,
+    'QE' quarterly); larger periods mean fewer, coarser observations."""
+    f = trades.frame
+    order = "exit_date" if "exit_date" in f.columns else (
+        "entry_date" if "entry_date" in f.columns else None)
+    if order is None or len(f) == 0:
+        return pd.Series(dtype=float)
+    idx = pd.to_datetime(f[order])
+    s = pd.Series(f["r"].to_numpy(dtype=float), index=idx).sort_index()
+    return s.resample(freq).sum()
+
+
 def metrics_table(trades: TradeLog) -> str:
     """Compact capital-free metrics as a horizontal stat strip (Trades, win rate,
     expectancy, PF, payoff, SQN-100, and excursion/exit-efficiency when present) —
@@ -405,14 +425,85 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
             f"</div>")
 
 
+def _block_bootstrap_panel(returns, *, block: int = 6, stationary: bool = False,
+                           alpha: float = 0.05, n_boot: int = 10_000,
+                           seed: int = 0) -> str:
+    """The pooled-book honesty panel: the mean of an ordered PERIOD-return series
+    with its i.i.d. bootstrap CI (``block=1``) drawn against its block-bootstrap CI
+    (``block=k``). Two whiskers on one period-mean axis — same series, same estimator,
+    only the block length differs — so the block whisker is *wider* exactly when the
+    series is positively autocorrelated (correlated trades exiting on one macro
+    shock). That makes the too-tight i.i.d. band the per-trade "Bootstrap expectancy"
+    panel shows visibly the optimistic one, and colors the block whisker by the honest
+    verdict (CI lower bound > 0 → holds, straddles zero → fragile, point ≤ 0 → fails).
+
+    Distinct from the per-trade panel on purpose: that one resamples individual trades
+    and lives in per-trade expectancy (R/trade); this one resamples calendar blocks and
+    lives in mean period return (R/period) — different units, its own axis. Returns an
+    embeddable Plotly div (plotly.js never inlined here — the page already ships it), or
+    ``''`` when the series has fewer than two periods (no block bootstrap possible)."""
+    import plotly.graph_objects as go
+    from crucible.edge.stats import block_bootstrap_ci, block_bootstrap_pvalue
+
+    r = np.asarray(getattr(returns, "values", returns), dtype=float)
+    r = r[~np.isnan(r)]
+    if len(r) < 2:
+        return ""
+    iid = block_bootstrap_ci(r, block=1, n_boot=n_boot, alpha=alpha, seed=seed)
+    blk = block_bootstrap_ci(r, block=block, n_boot=n_boot, stationary=stationary,
+                             alpha=alpha, seed=seed)
+    p = block_bootstrap_pvalue(r, block=block, n_boot=n_boot, stationary=stationary, seed=seed)
+
+    PASS, FAIL, WARN, MUTE = "#1a7f37", "#b42318", "#9a6700", "#8b949e"
+    bcolor = FAIL if blk.point <= 0 else (PASS if blk.low > 0 else WARN)
+    verdict = "holds" if blk.low > 0 else ("straddles zero" if blk.point > 0 else "fails")
+    lvl = int(round((1 - alpha) * 100))
+
+    go_ = go.Figure()
+    # block whisker on top (y=1), the i.i.d. reference muted below (y=0).
+    for lbl, ci, color, y in ((f"block={block}", blk, bcolor, 1.0),
+                              ("i.i.d. (block=1)", iid, MUTE, 0.0)):
+        go_.add_trace(go.Scatter(
+            x=[ci.point], y=[y], mode="markers",
+            marker=dict(color=color, size=11, line=dict(width=1, color="rgba(0,0,0,0.35)")),
+            error_x=dict(type="data", symmetric=False, array=[ci.high - ci.point],
+                         arrayminus=[ci.point - ci.low], color=color, thickness=2, width=7),
+            hovertemplate=(f"{lbl}<br>mean {ci.point:.3f} R/period<br>"
+                           f"{lvl}%% CI [{ci.low:.3f}, {ci.high:.3f}]<extra></extra>")))
+    go_.add_vline(x=0, line_dash="dot", line_color="rgba(128,128,128,0.6)")
+    go_.update_yaxes(tickvals=[0, 1], ticktext=["i.i.d.<br>block=1", f"block<br>={block}"],
+                     showgrid=False, zeroline=False, range=[-0.6, 1.6])
+    go_.update_xaxes(title_text="mean period return (R)",
+                     gridcolor="rgba(128,128,128,0.18)", zeroline=False)
+    go_.update_layout(
+        height=210, showlegend=False, bargap=0.05,
+        title=dict(text=(f"Block bootstrap — honest CI for a clustered book "
+                         f"(p={p:.3f}, edge {verdict})"),
+                   font=dict(color="#8b949e", size=13), x=0.0, xanchor="left"),
+        margin=dict(l=96, r=30, t=42, b=44),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#8b949e"))
+    return go_.to_html(full_html=False, include_plotlyjs=False)
+
+
 def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
-                n_boot: int = 10_000, seed: int = 0) -> str:
+                n_boot: int = 10_000, seed: int = 0,
+                period_returns=None, block: int = 6, stationary: bool = False,
+                alpha: float = 0.05) -> str:
     """The four capital-free edge panels as an embeddable HTML fragment:
     R-multiple distribution, cumulative R, MFE-vs-MAE excursion (when present),
     and the bootstrap expectancy distribution with its CI and point estimate.
 
     ``include_plotlyjs=False`` (the default) omits the plotly.js payload so the
-    host page can load it once; pass ``True`` for a standalone fragment."""
+    host page can load it once; pass ``True`` for a standalone fragment.
+
+    The "Bootstrap expectancy" panel is the **i.i.d.** trade bootstrap — honest for a
+    single instrument, but too tight for a **pooled multi-asset book** whose trades
+    cluster in calendar time. Pass ``period_returns`` (an ordered period-return series
+    — e.g. ``monthly_r(trades)``) to append a **block-bootstrap panel** that draws the
+    correlation-preserving CI against the i.i.d. one on the period-mean axis; ``block``
+    (periods), ``stationary`` (Politis–Romano random block lengths) and ``alpha`` tune
+    it. Omitted (``None``) leaves the fragment exactly as before."""
     go, make_subplots = _plotly()
     r = trades.r
     v = reality_check(trades, n_boot=n_boot, seed=seed)
@@ -485,8 +576,15 @@ def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
     fig.update_xaxes(gridcolor=grid, zerolinecolor=grid)
     fig.update_yaxes(gridcolor=grid, zerolinecolor=grid)
     fig.update_annotations(font=dict(color="#8b949e"))  # subplot titles
-    return fig.to_html(full_html=False,
+    html = fig.to_html(full_html=False,
                        include_plotlyjs=(True if include_plotlyjs else "cdn"))
+    # Optional block-bootstrap panel: honest CI for a time-clustered pooled book,
+    # rendered below the 2×2 grid only when the caller supplies a period series. Its
+    # plotly.js is never re-inlined — the main fragment (or the host page) carries it.
+    if period_returns is not None:
+        html += _block_bootstrap_panel(period_returns, block=block, stationary=stationary,
+                                       alpha=alpha, n_boot=n_boot, seed=seed)
+    return html
 
 
 def _reality_banner(v) -> str:
@@ -579,23 +677,117 @@ def _strong_whisker(gate, trades: TradeLog, *, n_boot: int = 10_000,
     return fig.to_html(full_html=False, include_plotlyjs=False)
 
 
+# Friendly labels for the headline check of each pillar (falls back to the raw name).
+_BULLET_LABEL = {
+    "permutation_pvalue": "significance p",
+    "reality_check_pvalue": "data-mined p",
+    "expectancy_ci_lower": "expectancy CI-low (R)",
+    "profit_factor_ci_lower": "profit-factor CI-low",
+    "sqn_ci_lower": "SQN CI-low",
+    "wfe_sqn_aggregate": "walk-forward SQN",
+    "fold_dispersion": "fold dispersion",
+    "cross_market_reality_check": "cross-market p",
+}
+
+
+def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
+    """The four pillars as bullet plots — each pillar's headline (first hard) check as a
+    bar measured against its threshold (the dashed line), so *how far* it clears or
+    misses reads at a glance: the margin the ✓/✗ chips hide (REAL crushing the bar vs
+    GENERAL sitting right on it). Green clears; amber = a GENERAL (scope) miss; red = a
+    core REAL/STRONG/DURABLE miss. Each pillar keeps its own scale — the metrics live in
+    different units, so bar length is compared to that pillar's own line, not across
+    pillars. ``''`` when no gate exposes a numeric headline check.
+
+    Direction is inferred, not mapped: a check is higher-is-better exactly when
+    ``(value >= threshold) == passed`` — so p-values (lower better) and SQN/expectancy
+    (higher better) both read correctly without a per-metric table."""
+    go, make_subplots = _plotly()
+
+    def _num(x):
+        # scalar real only — some checks carry a tuple/None value (e.g. a pair) that
+        # has no single bar-vs-threshold reading; skip those, don't crash on them.
+        try:
+            float(x)
+            return not isinstance(x, bool)
+        except (TypeError, ValueError):
+            return False
+
+    rows = []
+    for g in gauntlet.gates:
+        checks = getattr(g, "checks", None) or []
+        hard = [c for c in checks if getattr(c, "hard", False)]
+        for c in (hard or checks):
+            if _num(c.value) and _num(c.threshold):
+                rows.append((g.name, c))
+                break
+    if not rows:
+        return ""
+
+    PASS, WARN, FAIL = "#1a7f37", "#9a6700", "#b42318"
+    titles = [f"{name}  ·  {_BULLET_LABEL.get(c.name, c.name.replace('_', ' '))}"
+              for name, c in rows]
+    fig = make_subplots(rows=len(rows), cols=1, vertical_spacing=0.26, subplot_titles=titles)
+    for i, (name, c) in enumerate(rows, start=1):
+        v, t, passed = float(c.value), float(c.threshold), bool(c.passed)
+        color = PASS if passed else (WARN if name == "GENERAL" else FAIL)
+        higher_better = (v >= t) == passed
+        margin = (v - t) if higher_better else (t - v)          # >0 = clears the bar
+        lo, hi = min(0.0, v, t), max(0.0, v, t)                 # bar is measured from 0
+        pad = (hi - lo) * 0.18 or 0.1
+        fig.add_trace(go.Bar(
+            x=[v], y=[0], orientation="h", width=0.5,
+            marker=dict(color=color, line=dict(width=0)),
+            text=[f" {v:.4g}"], textposition="outside",
+            textfont=dict(color="#8b949e", size=11),
+            hovertemplate=(f"{name}<br>value {v:.4g} · bar {t:g}<br>"
+                           f"{'clears' if passed else 'misses'} by {abs(margin):.4g}"
+                           f"<extra></extra>")),
+            row=i, col=1)
+        fig.add_vline(x=t, line_dash="dash", line_color="rgba(148,163,184,0.85)",
+                      annotation_text=f"bar {t:g}", annotation_position="top left",
+                      annotation_font=dict(color="#8b949e", size=10), row=i, col=1)
+        fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False,
+                         range=[-0.8, 0.8], row=i, col=1)
+        fig.update_xaxes(gridcolor="rgba(128,128,128,0.18)", zeroline=False,
+                         range=[lo - pad, hi + pad], row=i, col=1)
+    fig.update_layout(height=68 * len(rows) + 50, margin=dict(l=20, r=44, t=30, b=18),
+                      showlegend=False, bargap=0.4, paper_bgcolor="rgba(0,0,0,0)",
+                      plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
+    fig.update_annotations(font=dict(color="#c9d1d9", size=13))   # subplot titles
+    # As the FIRST figure on the gauntlet page, the bullet strip carries plotly.js
+    # (inline, or a synchronous CDN tag) so it loads before this figure's own init
+    # script — later figures (edge panels, whisker) then find window.Plotly already up.
+    return fig.to_html(full_html=False,
+                       include_plotlyjs=(True if include_plotlyjs else "cdn"))
+
+
 def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
                     title: str = "crucible gauntlet", subtitle: Optional[str] = None,
                     appendix_html: str = "", header_html: str = "",
                     n_boot: int = 10_000, seed: int = 0,
-                    include_plotlyjs: bool = True, pillar_notes: Optional[dict] = None) -> str:
+                    include_plotlyjs: bool = True, pillar_notes: Optional[dict] = None,
+                    period_returns=None, block: int = 6, stationary: bool = False) -> str:
     """Compose a full gauntlet-organized page: verdict banner → optional
     ``header_html`` (a host note that sits right under the verdict, e.g. a
     net/gross badge) → edge panels + metrics → one section per pillar that ran
     (REAL / STRONG / DURABLE / GENERAL; STRONG carries a CI-whisker plot of its
     checks) → an optional host-supplied
     ``appendix_html`` (e.g. capital-aware panels the host owns). ``pillar_notes``
-    relabels an un-run pillar in the banner (see `verdict_banner`). If ``path`` is
-    given the HTML is written there and the path is returned; otherwise the HTML
-    string is returned."""
+    relabels an un-run pillar in the banner (see `verdict_banner`).
+
+    For a pooled multi-asset book, pass ``period_returns`` (an ordered period-return
+    series such as ``monthly_r(trades)``) to add the block-bootstrap honesty panel
+    below the edge panels — the CI that survives calendar clustering, drawn against
+    the optimistic i.i.d. one (``block`` / ``stationary`` tune it; see `edge_panels`).
+    If ``path`` is given the HTML is written there and the path is returned; otherwise
+    the HTML string is returned."""
     banner = verdict_banner(gauntlet, title=title, subtitle=subtitle, pillar_notes=pillar_notes)
     summary = verdict_summary(gauntlet)
-    panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed)
+    # bullets is the FIRST figure → it carries plotly.js so everything below finds it
+    bullets = pillar_bullets(gauntlet, include_plotlyjs=include_plotlyjs)
+    panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed,
+                         period_returns=period_returns, block=block, stationary=stationary)
     metrics = metrics_table(trades)
     by_name = {g.name: g for g in gauntlet.gates}
 
@@ -607,7 +799,7 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
 
     pillars = "".join(_block(p) for p in _PILLARS if p in by_name)
     appendix = appendix_html or ""
-    inner = f"{banner}{metrics}{summary}{header_html or ''}{panels}{pillars}{appendix}{_FOOT}"
+    inner = f"{banner}{metrics}{summary}{bullets}{header_html or ''}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
     if path is None:
         return doc
@@ -619,18 +811,22 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
 def tearsheet(trades: TradeLog, path: str = "tearsheet.html", *,
               title: str = "crucible tearsheet", subtitle: Optional[str] = None,
               n_boot: int = 10_000, seed: int = 0,
-              include_plotlyjs: bool = True) -> str:
+              include_plotlyjs: bool = True,
+              period_returns=None, block: int = 6, stationary: bool = False) -> str:
     """Write a self-contained single-book HTML tearsheet and return its path.
 
     Built from the shared blocks: the reality-check verdict banner (HELD /
     FRAGILE / FAIL), the metrics table, and the four edge panels. For a
     gauntlet-organized page (REAL/STRONG/DURABLE/GENERAL) use `gauntlet_report`.
-    ``include_plotlyjs=True`` inlines plotly.js so the file renders offline."""
+    ``include_plotlyjs=True`` inlines plotly.js so the file renders offline. Pass
+    ``period_returns`` (e.g. ``monthly_r(trades)``) to append the block-bootstrap
+    honesty panel for a time-clustered book (``block`` / ``stationary`` tune it)."""
     v = reality_check(trades, n_boot=n_boot, seed=seed)
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
     banner = _reality_banner(v)
     metrics = metrics_table(trades)
-    panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed)
+    panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed,
+                         period_returns=period_returns, block=block, stationary=stationary)
     inner = f"<h1>{title}</h1>{sub}{banner}{metrics}{panels}{_FOOT}"
     doc = _page(title, inner)
     with open(path, "w", encoding="utf-8") as fh:
