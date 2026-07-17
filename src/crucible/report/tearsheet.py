@@ -113,6 +113,16 @@ def report_css() -> str:
                   color: var(--cr-fg); line-height: 1.15; }}
   .cr-metric .k {{ font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
                   color: var(--cr-muted); }}
+  /* Two-column verdict top: interpretation prose (left) + a stats card (right). */
+  .cr-top {{ display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; margin: 6px 0 2px; }}
+  .cr-top-left {{ flex: 1 1 52%; min-width: 300px; }}
+  .cr-top-right {{ flex: 1 1 30%; min-width: 236px; }}
+  .cr-top-left .cr-summary {{ margin: 0; max-width: none; }}
+  .cr-statcard {{ border: 1px solid var(--cr-border); border-radius: 10px;
+                 padding: 14px 18px; background: var(--cr-card); }}
+  .cr-statcard .cr-metrics {{ border: 0; margin: 0; padding: 0; display: grid;
+                 grid-template-columns: 1fr 1fr; gap: 14px 20px; }}
+  .cr-div {{ border: 0; border-top: 1px solid var(--cr-border); margin: 20px 0 16px; }}
   .cr-gate {{ border: 1px solid var(--cr-border); border-radius: 10px;
              margin: 12px 0; background: var(--cr-card); }}
   .cr-gate > summary {{ list-style: none; cursor: pointer; padding: 12px 16px;
@@ -859,7 +869,13 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     appendix = appendix_html or ""
     # Summary text (left) and the host note (e.g. the net-of-costs badge) sit on one row
     # so the note fills the space beside the ≤70ch prose instead of stranding it below.
-    inner = f"{banner}{metrics}{summary}{bullets}{panels}{pillars}{appendix}{_FOOT}"
+    # Two-column top: interpretation prose (left) + the stats as a card (right); then a
+    # rule before the pillar-margin bullets.
+    top = (f"<div class='cr-top'>"
+           f"<div class='cr-top-left'>{summary}</div>"
+           f"<div class='cr-top-right'><div class='cr-statcard'>{metrics}</div></div>"
+           f"</div>")
+    inner = f"{banner}{top}<hr class='cr-div'>{bullets}{panels}{pillars}{appendix}{_FOOT}"
     doc = _page(title, inner)
     if path is None:
         return doc
