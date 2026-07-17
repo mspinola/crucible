@@ -753,20 +753,25 @@ print(gauntlet.audit_report())
 print(gauntlet.passed)  # True only if every gate that ran passed
 ```
 
-| Gate | Proves | Built from |
+Read the table by the **claim**: find the sentence you want to be able to say out loud, and the
+gate is what earns you the right to say it.
+
+| Gate | the claim it earns | Built from |
 |---|---|---|
-| **DECLARE** *(preamble)* | the rule is mechanical; the search is logged | EBTA Ch. 1 (§0); the variant count feeds §5 |
-| **CLEAN** *(preamble)* | no look-ahead | purge/embargo — §8; the look-ahead-free simulator — §1 |
-| **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
-| **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
-| **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
-| **GENERAL** | travels across markets | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
-| **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
+| **DECLARE** *(preamble)* | *"the rule is mechanical, and I've admitted what I tried"* | EBTA Ch. 1 (§0); the variant count feeds §5 |
+| **CLEAN** *(preamble)* | *"I'm not reading the future"* | purge/embargo — §8; the look-ahead-free simulator — §1 |
+| **REAL** | *"it isn't luck, it isn't my search, and it isn't just a market that went up"* | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
+| **STRONG** | *"it's big enough to matter — at the CI lower bound, not my point estimate"* | edge metrics — §2, bootstrap CIs — §3 |
+| **DURABLE** | *"it keeps working"* | walk-forward + WFE + fold dispersion — §9 |
+| **GENERAL** | *"it isn't only this one market"* | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
+| **SURVIVE** *(handoff)* | *"I can actually trade it"* | **out of scope** — position sizing, drawdown, ruin |
 
 Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
 a strong later gate can't redeem an early failure. The non-negotiable rule: **a FAIL sends
 you back to DECLARE, never to tweaking the failing number.** That is the anti-data-mining
-discipline made procedural. Full write-up in
+discipline made procedural — and that loop is also the counter §5b asked you for: **every trip
+back around is `n_variants += 1`.** Going back to DECLARE is allowed and expected; going back
+having *forgotten* the last attempt is what turns an honest p-value into a lie. Full write-up in
 [`docs/edge_gate.md`](edge_gate.md).
 
 ### The gauntlet as a report — `gauntlet_report()` / `tearsheet()`
