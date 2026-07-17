@@ -773,35 +773,40 @@ def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
     PASS, WARN, FAIL = "#1a7f37", "#9a6700", "#b42318"
     titles = [f"{name}  ·  {_BULLET_LABEL.get(c.name, c.name.replace('_', ' '))}"
               for name, c in rows]
-    # generous inter-panel spacing (near plotly's 1/(rows-1) ceiling) + taller rows below,
-    # so each pillar's title/bar reads as its own band rather than a cramped stack
-    fig = make_subplots(rows=len(rows), cols=1,
-                        vertical_spacing=min(0.30, 0.9 / max(len(rows) - 1, 1)),
-                        subplot_titles=titles)
-    for i, (name, c) in enumerate(rows, start=1):
+    # 2-column grid (so four pillars read as a compact 2×2, not a tall 4×1); ≤1 pillar
+    # stays single. subplot_titles are row-major and must fill every grid cell.
+    n = len(rows)
+    ncols = 2 if n >= 2 else 1
+    nrows = (n + ncols - 1) // ncols
+    grid_titles = [titles[i] if i < n else "" for i in range(nrows * ncols)]
+    fig = make_subplots(rows=nrows, cols=ncols,
+                        vertical_spacing=(0.30 if nrows > 1 else 0.0),
+                        horizontal_spacing=0.13, subplot_titles=grid_titles)
+    for i, (name, c) in enumerate(rows):
+        rr, cc = i // ncols + 1, i % ncols + 1
         v, t, passed = float(c.value), float(c.threshold), bool(c.passed)
         color = PASS if passed else (WARN if name == "GENERAL" else FAIL)
         higher_better = (v >= t) == passed
         margin = (v - t) if higher_better else (t - v)          # >0 = clears the bar
         lo, hi = min(0.0, v, t), max(0.0, v, t)                 # bar is measured from 0
-        pad = (hi - lo) * 0.18 or 0.1
+        pad = (hi - lo) * 0.20 or 0.1
         fig.add_trace(go.Bar(
             x=[v], y=[0], orientation="h", width=0.5,
             marker=dict(color=color, line=dict(width=0)),
-            text=[f" {v:.4g}"], textposition="outside",
+            text=[f" {v:.4g}"], textposition="outside", cliponaxis=False,
             textfont=dict(color="#8b949e", size=11),
             hovertemplate=(f"{name}<br>value {v:.4g} · bar {t:g}<br>"
                            f"{'clears' if passed else 'misses'} by {abs(margin):.4g}"
                            f"<extra></extra>")),
-            row=i, col=1)
+            row=rr, col=cc)
         fig.add_vline(x=t, line_dash="dash", line_color="rgba(148,163,184,0.85)",
                       annotation_text=f"bar {t:g}", annotation_position="top left",
-                      annotation_font=dict(color="#8b949e", size=10), row=i, col=1)
+                      annotation_font=dict(color="#8b949e", size=10), row=rr, col=cc)
         fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False,
-                         range=[-0.8, 0.8], row=i, col=1)
+                         range=[-0.8, 0.8], row=rr, col=cc)
         fig.update_xaxes(gridcolor="rgba(128,128,128,0.18)", zeroline=False,
-                         range=[lo - pad, hi + pad], row=i, col=1)
-    fig.update_layout(height=104 * len(rows) + 54, margin=dict(l=20, r=44, t=30, b=18),
+                         range=[lo - pad, hi + pad], row=rr, col=cc)
+    fig.update_layout(height=120 * nrows + 46, margin=dict(l=20, r=30, t=30, b=18),
                       showlegend=False, bargap=0.4, paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
     fig.update_annotations(font=dict(color="#c9d1d9", size=13))   # subplot titles
