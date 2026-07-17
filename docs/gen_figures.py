@@ -132,6 +132,8 @@ def report_sheets() -> dict[str, str]:
     spec = importlib.util.spec_from_file_location("dg", REPO / "examples" / "donchian_gauntlet.py")
     dg = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dg)
+    import numpy as np
+    from crucible.edge import reality_check, expectancy
     from crucible.validation import walk_forward, run_gauntlet, Thresholds
     from crucible.report import (verdict_banner, metrics_table, verdict_summary,
                                  gate_block, cumulative_r, report_css)
@@ -188,9 +190,28 @@ def report_sheets() -> dict[str, str]:
     fig.update_yaxes(gridcolor=grid, zerolinecolor=grid)
     chart = fig.to_html(full_html=False, include_plotlyjs=True)
 
+    # Bootstrap-expectancy panel (the §3 picture): the distribution of expectancy
+    # over resamples, with the 95% CI (amber) and point (green) against zero.
+    r = trades.r
+    v = reality_check(trades, n_boot=10_000, seed=0)
+    rng = np.random.default_rng(0)
+    boot = np.array([expectancy(rng.choice(r, size=len(r), replace=True)) for _ in range(5000)])
+    figb = go.Figure(go.Histogram(x=boot, nbinsx=40, marker_color="#b0b0b0"))
+    for xval, dash, color in ((0, "dot", "#888"), (v.ci.low, "dash", "#9a6700"),
+                              (v.ci.high, "dash", "#9a6700"), (v.point, "solid", "#1a7f37")):
+        figb.add_vline(x=xval, line_dash=dash, line_color=color)
+    figb.update_layout(height=340, showlegend=False, margin=dict(t=44, l=48, r=24, b=40),
+                       title="Bootstrap expectancy — 95% CI (amber) vs the point estimate (green)",
+                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                       font=dict(color="#5b6570"))
+    figb.update_xaxes(gridcolor=grid, zerolinecolor=grid, title_text="expectancy (R)")
+    figb.update_yaxes(gridcolor=grid, zerolinecolor=grid)
+    chartb = figb.to_html(full_html=False, include_plotlyjs=True)
+
     return {
         "gauntlet_hero": _sheet(hero, 840, css),
         "gauntlet_scope": _sheet(scope, 840, css),
+        "gauntlet_bootstrap": _sheet(chartb, 840, css),
         "gauntlet_gates": _sheet(gates, 840, css),
         "gauntlet_cumr": _sheet(chart, 840, css),
     }

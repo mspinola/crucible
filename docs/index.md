@@ -176,6 +176,14 @@ Why it is the honest read: it makes no normality assumption (trade returns are s
 fat-tailed), and it works for *any* metric — expectancy, profit factor, SQN — not just the
 mean. On small samples the band is wide, and that width **is the message**.
 
+![Bootstrap distribution of expectancy: a grey histogram of resampled expectancies, a dotted line at zero, two dashed amber lines at the 2.5th and 97.5th percentiles (the 95% CI), and a green line at the point estimate.](img/gauntlet_bootstrap.png){ width="660" }
+*The bootstrap made visible — this is the report's "Bootstrap expectancy" panel (§11) for the
+worked example's out-of-sample log. Each grey bar is one resample's expectancy; the dashed
+**amber** lines are the 2.5/97.5-percentile **95% CI**, the **green** line the point estimate,
+the dotted line **zero**. Here the whole band sits right of zero — the edge holds across
+resamples (the **HELD** read of §4); when the amber lower line crosses left of zero, that's
+**FRAGILE**.*
+
 crucible's gauntlet gates on this: its **STRONG** gate requires the **CI lower bound**, not
 the point estimate, to clear each threshold (`gate_strong`, §11). This directly fixes the
 "PF 1.37 on 60 trades treated as a clean pass" failure: a positive point estimate whose CI
