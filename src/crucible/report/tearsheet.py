@@ -143,6 +143,8 @@ def report_css() -> str:
   table.cr-checks .cpass {{ color: var(--cr-pass); }}
   table.cr-checks .cfail {{ color: var(--cr-fail); }}
   table.cr-checks .cwarn {{ color: var(--cr-warn); }}
+  table.cr-checks td.bul {{ width: 132px; padding-right: 14px; }}
+  .cr-cbul {{ display: inline-block; vertical-align: middle; }}
   .cr-foot {{ color: var(--cr-faint); font-size: 12px; margin-top: 20px; }}
 """
 
@@ -309,6 +311,45 @@ def _fmt(x) -> str:
     return f"{xf:.3f}"
 
 
+def _check_bullet_svg(c) -> str:
+    """A tiny inline-SVG bullet for one check: a value bar measured against its
+    threshold tick, coloured to match the row's result (green pass / red hard-fail /
+    amber soft-fail). Inline SVG (not plotly) so a table of them stays cheap, and it
+    inherits the report's theme tokens. ``''`` when the check has no numeric
+    value/threshold to place."""
+    def _num(x):
+        try:
+            float(x)
+            return not isinstance(x, bool)
+        except (TypeError, ValueError):
+            return False
+
+    t = getattr(c, "threshold", None)
+    if not (_num(c.value) and _num(t)):
+        return ""
+    v, t = float(c.value), float(t)
+    hard, passed = bool(getattr(c, "hard", True)), bool(c.passed)
+    color = "var(--cr-pass)" if passed else ("var(--cr-fail)" if hard else "var(--cr-warn)")
+    W = 120.0
+    lo, hi = min(0.0, v, t), max(0.0, v, t)          # bar is measured from 0
+    pad = (hi - lo) * 0.10 or 0.1
+    span = (hi + pad) - (lo - pad)
+
+    def _x(val):
+        return (val - (lo - pad)) / span * W
+
+    x0, xv, tx = _x(0.0), _x(v), _x(t)
+    bx, bw = min(x0, xv), max(abs(xv - x0), 1.2)     # ≥1.2px so a hairline still shows
+    tip = f"{c.name}: {v:.4g} vs bar {t:g} — {'clears' if passed else 'misses'}"
+    return (
+        f"<svg class='cr-cbul' width='120' height='14' viewBox='0 0 120 14' "
+        f"role='img' aria-label='{tip}'><title>{tip}</title>"
+        f"<rect x='0' y='4.5' width='120' height='5' rx='2.5' fill='var(--cr-rule)'/>"
+        f"<rect x='{bx:.1f}' y='4.5' width='{bw:.1f}' height='5' rx='2' fill='{color}'/>"
+        f"<line x1='{tx:.1f}' y1='1' x2='{tx:.1f}' y2='13' "
+        f"stroke='var(--cr-faint)' stroke-width='1.5'/></svg>")
+
+
 def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = None,
                extra_html: str = "") -> str:
     """Render one audited :class:`Gate` as a collapsible card: a summary row (name,
@@ -343,9 +384,10 @@ def gate_block(gate, *, title: Optional[str] = None, expanded: Optional[bool] = 
             f"<tr><td class='name {'hard' if hard else 'soft'}'>{c.name}"
             f"{'' if hard else ' <span class=soft>(soft)</span>'}{note}</td>"
             f"<td>{_fmt(c.value)}</td><td class='{'hard' if hard else 'soft'}'>{cmp}</td>"
+            f"<td class='bul'>{_check_bullet_svg(c)}</td>"
             f"<td class='res {res_cls}'>{res_txt}</td></tr>"
         )
-    head = ("<tr><th>Check</th><th>Value</th><th>Threshold</th>"
+    head = ("<tr><th>Check</th><th>Value</th><th>Threshold</th><th></th>"
             "<th style='text-align:right'>Result</th></tr>")
     table = f"<table class='cr-checks'>{head}{''.join(body_rows)}</table>"
     blurb_html = f"<span class='blurb'>{blurb}</span>" if blurb else ""
