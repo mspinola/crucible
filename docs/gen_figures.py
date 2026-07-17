@@ -2,18 +2,19 @@
 """Regenerate the tutorial's figures (docs/img/*.png).
 
 A maintainer helper, NOT part of the docs build — the committed PNGs are what the
-site and PDF use. Run it when the worked example changes or a diagram needs an
-edit. It produces five images:
+site and PDF use. Run it when a worked example changes or a diagram needs an edit.
 
-  gauntlet_hero.png   verdict banner + pillar chips + metric row + verdict line
-  gauntlet_gates.png  the REAL / STRONG / DURABLE gate blocks with check tables
-  gauntlet_cumr.png   cumulative-R curve of the stitched out-of-sample log
-  triple_barrier.png  explainer: the triple-barrier labeling method (§1, §7)
-  gate_ladder.png     explainer: the gauntlet gate ladder (§11)
+Rendered from ``crucible.report`` blocks, so they never drift from the numbers:
+  gauntlet_hero/scope/gates/cumr/bootstrap.png  the §12 Donchian run (and §11 scope)
+  ml_decay.png / ml_verdict.png                 the §13 ML take/skip example
 
-The first three come straight from ``crucible.report`` blocks on the §12 Donchian
-run, so they never drift from the numbers. The last two are hand-authored HTML/SVG
-kept below as the editable source of truth.
+Hand-authored HTML/SVG explainers, kept below as the editable source of truth:
+  triple_barrier.png  the triple-barrier labeling method (§1, §7)
+  gate_ladder.png     the gauntlet gate ladder (§11)
+  meta_label.png      the meta-labeling take/skip pipeline (§7)
+  purge_embargo.png   the purge/embargo train-test split (§8)
+
+Plus the crucible mark in two colorways (crucible_logo{,_white}.png).
 
 Requirements (all outside the docs build): the ``[report]`` extra (plotly),
 Pillow, and Google Chrome for headless HTML→PNG. Usage::
@@ -82,6 +83,35 @@ GATE_LADDER_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"
   <div class="row hand"><div class="name">SURVIVE</div><div class="desc">capital survivability — <b style="color:#7a1c12">out of scope</b>; hand the surviving log to a position-sizing tool</div></div>
 
   <div class="rule"><span class="loop">&#10227;</span><div>The non-negotiable rule: a <b>FAIL</b> sends you back to <b>DECLARE</b> — <b>never</b> to tweaking the failing number. That is the anti-data-mining discipline made procedural.</div></div>
+</div></body></html>"""
+
+META_LABEL_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  :root{--ink:#17242b;--mut:#6b7680;--teal:#00695c;--tealbg:#e2f1ef;--tealbd:#8fc9c1;
+        --grey:#eef1f2;--greybd:#d3d9dc;--bg:#ffffff;}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);
+     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink)}
+  .wrap{max-width:640px;margin:0 auto;padding:26px 26px 22px}
+  h2{margin:0 0 4px;font-size:15px;color:var(--teal);letter-spacing:.02em}
+  .sub{font-size:12.5px;color:var(--mut);margin-bottom:14px;line-height:1.45}
+  .step{display:flex;gap:14px;align-items:baseline;border-radius:10px;padding:12px 16px}
+  .step .name{font-weight:700;font-size:15px;min-width:150px;letter-spacing:.02em}
+  .step .desc{font-size:13.5px;color:#38454c;line-height:1.4}
+  .step .tag{font-size:11px;color:var(--mut);font-weight:600}
+  .grey{background:var(--grey);border:1px solid var(--greybd)} .grey .name{color:#41515a}
+  .teal{background:var(--tealbg);border:1px solid var(--tealbd)} .teal .name{color:var(--teal)}
+  .arrow{color:#9aa4ab;font-size:18px;text-align:center;margin:3px 0 3px 60px;line-height:1}
+</style></head><body><div class="wrap">
+  <h2>Meta-labeling — a take/skip filter on a primary signal</h2>
+  <div class="sub">The primary signal decides <em>which</em> trades exist; the model decides <em>which of them to take</em>. crucible.ml judges the model's score before it reaches a backtester.</div>
+  <div class="step grey"><div class="name">Primary signal</div><div class="desc">fires often &mdash; many candidate trades, each with a direction</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="step grey"><div class="name">Triple-barrier label <span class="tag">&sect;1</span></div><div class="desc">each candidate runs to its barrier &rarr; a realized win / loss</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="step teal"><div class="name">Model score</div><div class="desc">a take / skip confidence for every candidate</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="step teal"><div class="name">crucible.ml <span class="tag">&sect;7</span></div><div class="desc">IC &middot; alpha-gate &middot; quantile decay &mdash; <b>is the score real?</b></div></div>
+  <div class="arrow">&darr;</div>
+  <div class="step teal"><div class="name">Filtered book <span class="tag">&sect;13</span></div><div class="desc">keep only the high scores &rarr; put that book through the gauntlet</div></div>
 </div></body></html>"""
 
 TRIPLE_BARRIER_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
@@ -220,6 +250,38 @@ def report_sheets() -> dict[str, str]:
     }
 
 
+PURGE_EMBARGO_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+  body{margin:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:22px}
+  h2{margin:0 0 2px;font-size:15px;color:#00695c}
+  .sub{font-size:12.5px;color:#6b7680;margin-bottom:8px;line-height:1.45}
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+</style></head><body><div class="wrap">
+  <h2>Purge &amp; embargo &mdash; making the train/test split leakage-proof</h2>
+  <div class="sub">A trade whose forward window straddles the split can't sit in train (it would peek past the boundary); the embargo drops the first slice of test to kill autocorrelation across the seam.</div>
+  <svg viewBox="0 0 820 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <text x="278" y="24" fill="#00695c" font-size="13" font-weight="700" text-anchor="middle">TRAIN &mdash; fit / choose here</text>
+    <text x="648" y="24" fill="#004d40" font-size="13" font-weight="700" text-anchor="middle">TEST &mdash; the untouched verdict</text>
+    <rect x="470" y="40" width="70" height="212" fill="#f0c674" fill-opacity="0.22"/>
+    <text x="505" y="272" fill="#9a6700" font-size="11.5" font-weight="700" text-anchor="middle">embargo</text>
+    <text x="505" y="286" fill="#9a6700" font-size="11" text-anchor="middle">(dropped)</text>
+    <line x1="470" y1="36" x2="470" y2="252" stroke="#6b7680" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="470" y="49" fill="#6b7680" font-size="12" font-weight="700" text-anchor="middle">split</text>
+    <line x1="90" y1="252" x2="792" y2="252" stroke="#c7ced2" stroke-width="1"/>
+    <text x="786" y="270" fill="#8a939a" font-size="11.5" text-anchor="end">time &rarr;</text>
+    <g stroke="#00695c" stroke-width="3.4" stroke-linecap="round"><line x1="120" y1="78" x2="214" y2="78"/><line x1="238" y1="106" x2="352" y2="106"/><line x1="372" y1="134" x2="452" y2="134"/></g>
+    <g fill="#00695c"><circle cx="120" cy="78" r="4.2"/><circle cx="214" cy="78" r="4.2"/><circle cx="238" cy="106" r="4.2"/><circle cx="352" cy="106" r="4.2"/><circle cx="372" cy="134" r="4.2"/><circle cx="452" cy="134" r="4.2"/></g>
+    <text x="120" y="70" fill="#38454c" font-size="11">train trades &mdash; enter and exit before the split</text>
+    <line x1="430" y1="176" x2="528" y2="176" stroke="#b0868a" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4"/>
+    <circle cx="430" cy="176" r="4.2" fill="#b0868a"/><circle cx="528" cy="176" r="4.2" fill="#b0868a"/>
+    <text x="430" y="168" fill="#8a3d34" font-size="11" font-weight="600">purged &mdash; straddles the split, so it can't be in train</text>
+    <g stroke="#185fa5" stroke-width="3.4" stroke-linecap="round"><line x1="566" y1="204" x2="648" y2="204"/><line x1="676" y1="232" x2="760" y2="232"/></g>
+    <g fill="#185fa5"><circle cx="566" cy="204" r="4.2"/><circle cx="648" cy="204" r="4.2"/><circle cx="676" cy="232" r="4.2"/><circle cx="760" cy="232" r="4.2"/></g>
+    <text x="566" y="196" fill="#38454c" font-size="11">test trades &mdash; begin only after the embargo</text>
+  </svg>
+</div></body></html>"""
+
+
 def ml_sheets() -> dict[str, str]:
     """Build the two §13 figures from examples/ml_meta_label.py: the score's
     quantile-decay bars and the unfiltered-vs-filtered gauntlet verdicts."""
@@ -328,6 +390,8 @@ def main() -> None:
     sheets.update(ml_sheets())
     sheets["triple_barrier"] = TRIPLE_BARRIER_HTML
     sheets["gate_ladder"] = GATE_LADDER_HTML
+    sheets["meta_label"] = META_LABEL_HTML
+    sheets["purge_embargo"] = PURGE_EMBARGO_HTML
     for name, html in sheets.items():
         render_png(html, IMG / f"{name}.png")
     render_logo(IMG / "crucible_logo.png", LOGO_FULL)
