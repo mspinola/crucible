@@ -616,6 +616,29 @@ The `HoldoutResult` runs a full `reality_check` on each side and declares **the 
 TEST period the verdict** (`holdout.py:56`, `:69`). Train is expected to look good — that's
 where an edge would have been chosen; only test counts.
 
+### What's being fitted when nothing is being optimized
+
+That last sentence hides the part that matters. If you come from a tool where "in-sample" means
+*an optimizer swept a grid*, then applying a holdout to a **fixed** strategy looks like ceremony
+— in-sample *what*? Nothing was fit. No solver ran. The parameters were never touched.
+
+But the holdout was never protecting you from the optimizer. **It protects you from you.** Every
+rule change you made after looking at a result is a fit: you saw the equity curve, you responded,
+and the response was chosen *because* of what you saw. That is the same act an optimizer performs,
+executed by hand and at a much lower sample rate. The optimizer's one real virtue is that it
+**counts** — the grid is self-documenting, and the tool hands you the trial number. A human search
+leaves no record at all, which is exactly what makes it the more dangerous of the two.
+
+So the discipline is unchanged even with no solver in the loop: the train period is the only place
+you are allowed to look. Every glance at test is a fit *to test*, whether or not any software
+registered it, and it spends the one thing the test period has — never having been seen. Once
+spent, a "holdout" is just more train.
+
+Note the contrast with **§9**, where a real optimizer *does* run: `walk_forward` picks the best
+lookback in-sample per fold, machine-fit and machine-counted. Both are IS → OOS and the logic is
+identical. The difference is only who did the fitting and who has to do the counting — and here,
+that's you.
+
 > **Sources.**
 > - **AFML Ch. 7 "Cross-Validation in Finance," §7.4 "A Solution: Purged K-Fold CV"** — the
 >   origin of purge + embargo for overlapping financial labels.
