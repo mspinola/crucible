@@ -182,7 +182,9 @@ worked example's out-of-sample log. Each grey bar is one resample's expectancy; 
 **amber** lines are the 2.5/97.5-percentile **95% CI**, the **green** line the point estimate,
 the dotted line **zero**. Here the whole band sits right of zero — the edge holds across
 resamples (the **HELD** read of §4); when the amber lower line crosses left of zero, that's
-**FRAGILE**.*
+**FRAGILE**. This panel is the **i.i.d.** bootstrap (it resamples individual trades); for a
+pooled multi-asset book the honest, wider band comes from `block_bootstrap_ci` (below) and is
+**not** drawn here.*
 
 crucible's gauntlet gates on this: its **STRONG** gate requires the **CI lower bound**, not
 the point estimate, to clear each threshold (`gate_strong`, §11). This directly fixes the
