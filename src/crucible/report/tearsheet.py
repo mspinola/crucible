@@ -99,7 +99,7 @@ def report_css() -> str:
   .cr-pillars .warn {{ color: var(--cr-warn); font-weight: 600; }}
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
-  .cr-summary {{ margin: 6px 0 16px; max-width: 70ch; color: var(--cr-fg); font-size: 14.5px; }}
+  .cr-summary {{ margin: 6px 0 16px; max-width: 90ch; color: var(--cr-fg); font-size: 14.5px; }}
   .cr-hostnote {{ margin-left: auto; align-self: center; }}   /* rides the right end of the verdict row */
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
