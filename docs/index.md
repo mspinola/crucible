@@ -30,6 +30,56 @@ equity curve enters the picture — everything here is capital-free. The concept
 (§1–§11); then **§12 works the whole pipeline end to end on a Donchian breakout**, so you can
 see exactly how to read every number and verdict.
 
+### If you're coming from a backtester
+
+Every number your backtester hands you **describes**. Nothing here disputes them — a profit
+factor of 1.37 on 214 trades is an arithmetic fact about what happened. The question is whether
+those numbers can **defend** themselves: whether they would still be there once the luck, the
+search, and the market's own drift are taken away. That arc — **describe → defend** — is the
+whole tutorial, and it maps onto the pipeline below exactly: the first stage describes the edge,
+and every stage after it defends the description.
+
+Most of what you already have maps onto something here:
+
+| what you have | what crucible asks of it |
+|---|---|
+| the equity curve | the **R-multiple trade log** underneath it — §1 |
+| "profit factor 1.37" | the same 1.37 **with a CI around it** — **STRONG** gates its *lower bound* against 1.25, not the point estimate — §2–§3, §11 |
+| the optimizer's trial count | `n_variants`, which **you** declare — nothing counts it for you — §5b |
+| the walk-forward report | **DURABLE** — the WFE *and* the fold dispersion — §9 |
+| Monte Carlo on the equity curve | the **sign-permutation p** — a different question entirely — §5a |
+| position sizing, drawdown, ruin | out of scope — the **SURVIVE** handoff — §11 |
+| "it passed" | `HELD` / `FRAGILE` / `FAIL` — §4 |
+
+**The Monte Carlo row is the one to slow down on**, because it's the one you think you've
+already done. Your backtester's Monte Carlo takes *your* trades and reshuffles their order —
+thousands of alternate sequences, a spread of drawdowns and final equities. Notice what never
+changes: every one of those curves is built from your wins and your losses. Your winners stay
+winners. The edge is *assumed*, and the question is how rough the ride around it could get.
+That's a real and useful question — it's just a question about **sequencing risk**, and it
+cannot tell you the edge exists, because it began by granting it.
+
+The sign-permutation test grants nothing. It keeps each trade's **magnitude** and flips its
+**sign** at random — a coin decides whether each trade won or lost. That builds the world where
+you had *no directional skill whatsoever* but the same trade sizes and the same volatility.
+Rebuild that world ten thousand times, and count how often it matches or beats what you actually
+got. That fraction is **p**. When §12's Donchian breakout comes back at `p = 0.0008`, it means:
+in a world with no edge at all, a result this good turned up 8 times in 10,000.
+
+So the two are near-opposites in what they assume. Monte Carlo assumes the edge and measures the
+ride; permutation assumes no edge and asks whether your results could have happened anyway.
+**This is why a strategy can sail through your Monte Carlo and still fail REAL** — the MC never
+tested the thing REAL tests.
+
+> The names collide, unhelpfully: §5a's technique *is* Monte Carlo — Masters calls it the
+> **Monte Carlo Permutation Method**. "Monte Carlo" is just the machinery — randomize, repeat,
+> count. What separates the two is **what you randomize and what you hold fixed**: your
+> backtester randomizes the *order* and holds the *outcomes* fixed; the permutation test
+> randomizes the *outcomes* and holds the *magnitudes* fixed. Same machinery, opposite question.
+
+**§12 is this table run end to end** — a Donchian breakout that hands you 162 trades and a
+profit factor of 1.90, and then has to defend them.
+
 Everything below is organized as a pipeline: **describe the edge → quantify sampling
 noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account
 for correlation**. Each section names the technique, the code that implements it, the
@@ -305,6 +355,14 @@ good by luck?* It is the conservative fallback when you only know the **count** 
 crucible's **REAL** gate applies it in the gauntlet — pass your `n_variants` (the total number
 of configs you searched, discards included).
 
+**`n_variants` counts *you*, not just a grid.** If you came from an optimizer, "trials" means
+grid points, and the tool counted them for you. Here it means every version you tried and
+rejected — the filter you added because the drawdown looked ugly, the stop you widened after
+seeing the stop-outs, the two markets you quietly dropped. Those are searches. They leave no
+log, which makes them more dangerous than a grid, not less: `n_variants` is a number *you*
+supply (`gauntlet.py:89`), and nothing in crucible can check it. An honest 40 you had to admit
+to beats a comfortable 4.
+
 ### 5c. White's Reality Check (you have every variant's returns)
 
 **Code:** `permutation.py:59` — `whites_reality_check`
@@ -558,6 +616,29 @@ The `HoldoutResult` runs a full `reality_check` on each side and declares **the 
 TEST period the verdict** (`holdout.py:56`, `:69`). Train is expected to look good — that's
 where an edge would have been chosen; only test counts.
 
+### What's being fitted when nothing is being optimized
+
+That last sentence hides the part that matters. If you come from a tool where "in-sample" means
+*an optimizer swept a grid*, then applying a holdout to a **fixed** strategy looks like ceremony
+— in-sample *what*? Nothing was fit. No solver ran. The parameters were never touched.
+
+But the holdout was never protecting you from the optimizer. **It protects you from you.** Every
+rule change you made after looking at a result is a fit: you saw the equity curve, you responded,
+and the response was chosen *because* of what you saw. That is the same act an optimizer performs,
+executed by hand and at a much lower sample rate. The optimizer's one real virtue is that it
+**counts** — the grid is self-documenting, and the tool hands you the trial number. A human search
+leaves no record at all, which is exactly what makes it the more dangerous of the two.
+
+So the discipline is unchanged even with no solver in the loop: the train period is the only place
+you are allowed to look. Every glance at test is a fit *to test*, whether or not any software
+registered it, and it spends the one thing the test period has — never having been seen. Once
+spent, a "holdout" is just more train.
+
+Note the contrast with **§9**, where a real optimizer *does* run: `walk_forward` picks the best
+lookback in-sample per fold, machine-fit and machine-counted. Both are IS → OOS and the logic is
+identical. The difference is only who did the fitting and who has to do the counting — and here,
+that's you.
+
 > **Sources.**
 > - **AFML Ch. 7 "Cross-Validation in Finance," §7.4 "A Solution: Purged K-Fold CV"** — the
 >   origin of purge + embargo for overlapping financial labels.
@@ -672,20 +753,25 @@ print(gauntlet.audit_report())
 print(gauntlet.passed)  # True only if every gate that ran passed
 ```
 
-| Gate | Proves | Built from |
+Read the table by the **claim**: find the sentence you want to be able to say out loud, and the
+gate is what earns you the right to say it.
+
+| Gate | the claim it earns | Built from |
 |---|---|---|
-| **DECLARE** *(preamble)* | the rule is mechanical; the search is logged | EBTA Ch. 1 (§0); the variant count feeds §5 |
-| **CLEAN** *(preamble)* | no look-ahead | purge/embargo — §8; the look-ahead-free simulator — §1 |
-| **REAL** | not noise, corrected for the search | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
-| **STRONG** | economically real at the **CI lower bound** | edge metrics — §2, bootstrap CIs — §3 |
-| **DURABLE** | survives IS → OOS over time | walk-forward + WFE + fold dispersion — §9 |
-| **GENERAL** | travels across markets | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
-| **SURVIVE** *(handoff)* | capital can trade it | **out of scope** — position sizing, drawdown, ruin |
+| **DECLARE** *(preamble)* | *"the rule is mechanical, and I've admitted what I tried"* | EBTA Ch. 1 (§0); the variant count feeds §5 |
+| **CLEAN** *(preamble)* | *"I'm not reading the future"* | purge/embargo — §8; the look-ahead-free simulator — §1 |
+| **REAL** | *"it isn't luck, it isn't my search, and it isn't just a market that went up"* | permutation + Šidák / White's Reality Check — §5; random-entry null — §6 |
+| **STRONG** | *"it's big enough to matter — at the CI lower bound, not my point estimate"* | edge metrics — §2, bootstrap CIs — §3 |
+| **DURABLE** | *"it keeps working"* | walk-forward + WFE + fold dispersion — §9 |
+| **GENERAL** | *"it isn't only this one market"* | cross-market Reality Check — **§5e**; breadth / N_eff — §10 |
+| **SURVIVE** *(handoff)* | *"I can actually trade it"* | **out of scope** — position sizing, drawdown, ruin |
 
 Each gate is an audited AND of its hard checks — a failing hard check can't be waived, and
 a strong later gate can't redeem an early failure. The non-negotiable rule: **a FAIL sends
 you back to DECLARE, never to tweaking the failing number.** That is the anti-data-mining
-discipline made procedural. Full write-up in
+discipline made procedural — and that loop is also the counter §5b asked you for: **every trip
+back around is `n_variants += 1`.** Going back to DECLARE is allowed and expected; going back
+having *forgotten* the last attempt is what turns an honest p-value into a lie. Full write-up in
 [`docs/edge_gate.md`](edge_gate.md).
 
 ### The gauntlet as a report — `gauntlet_report()` / `tearsheet()`
