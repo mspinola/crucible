@@ -30,6 +30,56 @@ equity curve enters the picture — everything here is capital-free. The concept
 (§1–§11); then **§12 works the whole pipeline end to end on a Donchian breakout**, so you can
 see exactly how to read every number and verdict.
 
+### If you're coming from a backtester
+
+Every number your backtester hands you **describes**. Nothing here disputes them — a profit
+factor of 1.37 on 214 trades is an arithmetic fact about what happened. The question is whether
+those numbers can **defend** themselves: whether they would still be there once the luck, the
+search, and the market's own drift are taken away. That arc — **describe → defend** — is the
+whole tutorial, and it maps onto the pipeline below exactly: the first stage describes the edge,
+and every stage after it defends the description.
+
+Most of what you already have maps onto something here:
+
+| what you have | what crucible asks of it |
+|---|---|
+| the equity curve | the **R-multiple trade log** underneath it — §1 |
+| "profit factor 1.37" | the same 1.37 **with a CI around it** — **STRONG** gates its *lower bound* against 1.25, not the point estimate — §2–§3, §11 |
+| the optimizer's trial count | `n_variants`, which **you** declare — nothing counts it for you — §5b |
+| the walk-forward report | **DURABLE** — the WFE *and* the fold dispersion — §9 |
+| Monte Carlo on the equity curve | the **sign-permutation p** — a different question entirely — §5a |
+| position sizing, drawdown, ruin | out of scope — the **SURVIVE** handoff — §11 |
+| "it passed" | `HELD` / `FRAGILE` / `FAIL` — §4 |
+
+**The Monte Carlo row is the one to slow down on**, because it's the one you think you've
+already done. Your backtester's Monte Carlo takes *your* trades and reshuffles their order —
+thousands of alternate sequences, a spread of drawdowns and final equities. Notice what never
+changes: every one of those curves is built from your wins and your losses. Your winners stay
+winners. The edge is *assumed*, and the question is how rough the ride around it could get.
+That's a real and useful question — it's just a question about **sequencing risk**, and it
+cannot tell you the edge exists, because it began by granting it.
+
+The sign-permutation test grants nothing. It keeps each trade's **magnitude** and flips its
+**sign** at random — a coin decides whether each trade won or lost. That builds the world where
+you had *no directional skill whatsoever* but the same trade sizes and the same volatility.
+Rebuild that world ten thousand times, and count how often it matches or beats what you actually
+got. That fraction is **p**. When §12's Donchian breakout comes back at `p = 0.0008`, it means:
+in a world with no edge at all, a result this good turned up 8 times in 10,000.
+
+So the two are near-opposites in what they assume. Monte Carlo assumes the edge and measures the
+ride; permutation assumes no edge and asks whether your results could have happened anyway.
+**This is why a strategy can sail through your Monte Carlo and still fail REAL** — the MC never
+tested the thing REAL tests.
+
+> The names collide, unhelpfully: §5a's technique *is* Monte Carlo — Masters calls it the
+> **Monte Carlo Permutation Method**. "Monte Carlo" is just the machinery — randomize, repeat,
+> count. What separates the two is **what you randomize and what you hold fixed**: your
+> backtester randomizes the *order* and holds the *outcomes* fixed; the permutation test
+> randomizes the *outcomes* and holds the *magnitudes* fixed. Same machinery, opposite question.
+
+**§12 is this table run end to end** — a Donchian breakout that hands you 162 trades and a
+profit factor of 1.90, and then has to defend them.
+
 Everything below is organized as a pipeline: **describe the edge → quantify sampling
 noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account
 for correlation**. Each section names the technique, the code that implements it, the
