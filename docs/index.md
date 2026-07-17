@@ -89,6 +89,8 @@ statistical logic, and where to read the primary source.
 
 ## 1. The substrate: a risk-normalized trade log (R-multiples)
 
+*Your trades are denominated in dollars. Everything downstream needs them in units of risk — this is that conversion.*
+
 **Code:** [`edge/trade_log.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/trade_log.py),
 [`edge/simulator.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/simulator.py)
 
@@ -148,6 +150,8 @@ whole null distribution.
 
 ## 2. Describing the edge: capital-free metrics
 
+*The numbers your backtester already prints, defined precisely enough to be tested.*
+
 **Code:** [`edge/metrics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/metrics.py)
 
 Before any significance test, you summarize the sample. These are point estimates — they
@@ -203,6 +207,8 @@ a claim at all.
 ---
 
 ## 3. Quantifying sampling noise: the bootstrap confidence interval
+
+*You have one number from a couple of hundred trades. This asks how much of it is the sample.*
 
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `bootstrap_ci`,
 `p_value_positive`, and `bootstrap_metric_cis` (the whole metric set in one resample pass).
@@ -291,6 +297,8 @@ picture of "the i.i.d. band is too tight" rather than just the assertion.
 
 ## 4. The verdict: folding point + CI + p-value into a label
 
+*Your backtester said "profitable." This turns that into HELD, FRAGILE or FAIL — and means it.*
+
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `reality_check`, `Verdict`
 (`stats.py:44`)
 
@@ -317,6 +325,8 @@ a p-value to be argued over.
 ---
 
 ## 5. Ruling out data-mining luck: permutation tests
+
+*You tried forty things and kept the best one. This section prices that.*
 
 This is the heart of the significance story and the reason Aronson & Masters matter.
 
@@ -558,6 +568,8 @@ check that runs on a different object than the one the report shows.
 
 ## 6. Ruling out drift: the random-entry / detrended benchmark
 
+*Did you have timing skill, or just exposure? This answers it without picking a benchmark.*
+
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `random_entry_null`,
 `detrended_timing_null`
 
@@ -608,6 +620,8 @@ also means there's no benchmark selection to quietly optimize.
 ---
 
 ## 7. The ML track: is the signal real?
+
+*Your backtester has no opinion about a model's score. That's what this section is for.*
 
 **Code:** [`ml/`](https://github.com/mspinola/crucible/tree/main/src/crucible/ml/) · [`edge/simulator.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/simulator.py)
 
@@ -668,6 +682,8 @@ predictions rather than an equity curve.
 
 ## 8. Confirming out-of-sample: holdout, purge & embargo
 
+*The test period is worth exactly one look. This is how not to waste it.*
+
 **Code:** [`validation/holdout.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/holdout.py) — `holdout`,
 `split_train_test`
 
@@ -720,6 +736,8 @@ that's you.
 
 ## 9. Confirming it *keeps* working: walk-forward analysis & efficiency
 
+*The one test you already run — and the two instincts that make you misread it.*
+
 **Code:** [`validation/walk_forward.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/walk_forward.py) —
 `walk_forward`, `_wfe`
 
@@ -734,8 +752,7 @@ Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
 ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
 
-**If you already run walk-forward, this section is about reading it.** Two instincts carried over
-from the equity-curve world will quietly invert the result.
+Two instincts carried over from the equity-curve world will quietly invert the result.
 
 The first is that **higher WFE is better**. It isn't — the metric has a *ceiling*, not just a
 floor. WFE is out-of-sample over in-sample, so a WFE above 1.00 says your strategy did **better**
@@ -768,6 +785,8 @@ dispersion is itself a rejection, independent of the average.
 ---
 
 ## 10. Correcting for correlation: effective sample size & portfolio survivability
+
+*You counted every market as a fresh confirmation. Most of them were the same bet.*
 
 A book of 665 trades across 20 markets is not 665 independent bets — eight currency futures
 are roughly one dollar bet. Two tools account for this: one **capital-free** and native to
@@ -818,6 +837,8 @@ hand the `TradeLog` to a capital-aware tool.
 ---
 
 ## 11. The whole pipeline, as one gate — `crucible.validation.run_gauntlet`
+
+*Every technique above, wired into one audited pass/fail that nobody gets to argue with.*
 
 Every primitive above answers one question. The **gauntlet** runs them as an ordered set
 of audited hard gates and returns a single, capital-free pass/fail — crucible's own
@@ -897,6 +918,8 @@ edge. This is a **presentation** distinction — `gauntlet.passed` stays strict 
 ---
 
 ## 12. Worked example: a Donchian breakout, read end to end
+
+*A profit factor of 1.90, taken apart on the page. It does not survive.*
 
 Everything above, run as one script on a **Donchian channel breakout** — go long when price
 closes above the prior 20-bar high; exit on a 2.5R target, a 1R stop, or a 30-bar cap. The
