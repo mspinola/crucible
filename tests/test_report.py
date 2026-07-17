@@ -333,9 +333,12 @@ def test_gauntlet_report_has_logo_favicon_and_metric_order(ohlc):
     # the crucible mark is in the header lockup, and the favicon carries it too
     assert "cr-title" in doc and "aria-label='crucible'" in doc
     assert 'rel="icon"' in doc and "data:image/svg+xml," in doc
-    # metric-reorder: numbers sit right under the verdict, before the prose summary
-    # (match the body elements, not the .cr-* rule order in the <style> head)
-    assert doc.index("class='cr-metrics'") < doc.index("class='cr-summary'")
+    # two-column top: interpretation prose (left) + the stats as a card (right), then a
+    # rule before the pillar bullets. Match the class='' body elements, not the .cr-*
+    # rules in the <style> head.
+    assert "class='cr-top-left'" in doc and "class='cr-statcard'" in doc
+    assert doc.index("class='cr-summary'") < doc.index("class='cr-statcard'")  # prose left, card right
+    assert doc.index("class='cr-statcard'") < doc.index("class='cr-div'")      # card, then divider
 
 
 def test_report_css_is_style_body_only():
