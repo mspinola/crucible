@@ -10,6 +10,8 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
                  across every variant you searched
   pbo            probability of backtest overfitting (CSCV) + deflated Sharpe —
                  how much the ACT OF SELECTING the best config overfit
+  search_space   the search ledger — an honest N for the data-mining correction,
+                 counting every variant tried (not just the winner you kept)
   gate           an audited, un-overridable pass/fail gate (and a Gauntlet of them)
   diagnostics    fold-level robustness reads (dispersion, walk-forward efficiency)
   gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
@@ -25,6 +27,7 @@ from crucible.validation.permutation import (
 from crucible.validation.pbo import (
     pbo_cscv, PBOResult, deflated_sharpe, DeflatedSharpe,
 )
+from crucible.validation.search_space import SearchSpaceLog
 from crucible.validation.gate import Gate, GateCheck, Gauntlet
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.thresholds import Thresholds
@@ -37,6 +40,7 @@ __all__ = [
     "walk_forward", "WalkForwardResult", "Fold",
     "sign_permutation_pvalue", "sidak_correction", "whites_reality_check", "spa_test",
     "pbo_cscv", "PBOResult", "deflated_sharpe", "DeflatedSharpe",
+    "SearchSpaceLog",
     "Gate", "GateCheck", "Gauntlet",
     "fold_dispersion", "walk_forward_efficiency",
     "Thresholds",
