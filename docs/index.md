@@ -734,6 +734,22 @@ Each fold carries the same purge/embargo hygiene (`purge_days`, `embargo_days`,
 ratio of *annualized OOS return / annualized IS return* (`_wfe`, `:47`). WFE ≈ 50–80% is
 healthy; below ~30% is fragile, above 100% is "too good to be true" (usually a bug or luck).
 
+**If you already run walk-forward, this section is about reading it.** Two instincts carried over
+from the equity-curve world will quietly invert the result.
+
+The first is that **higher WFE is better**. It isn't — the metric has a *ceiling*, not just a
+floor. WFE is out-of-sample over in-sample, so a WFE above 1.00 says your strategy did **better**
+on data it had never seen than on the data it was fitted to. That is not a triumph; it's a
+statement that something is wrong, and `wfe_reject_high = 1.00` (`thresholds.py:29`) rejects it
+outright. Usually it's a bug, a leak, or a couple of freak folds — but whatever it is, it isn't
+skill, because fitting is supposed to *help* on the data you fit to. §12 fails on exactly this.
+
+The second is that **the aggregate is the answer**. It's a mean, and means get carried. A healthy
+aggregate WFE can be a strategy that was mediocre in most of its folds and extraordinary in two —
+and those two are the least likely to repeat, because outliers are the thing that doesn't. Read
+the fold column, not the summary row. (§12 is this exact shape: an aggregate of 1.34 with
+individual folds at 3.5 and 3.7.)
+
 crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
 [`validation/diagnostics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/diagnostics.py)): a healthy *average*
 WFE can hide individually chaotic folds, so it adds a **fold-dispersion** check — what fraction
