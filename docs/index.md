@@ -355,6 +355,14 @@ good by luck?* It is the conservative fallback when you only know the **count** 
 crucible's **REAL** gate applies it in the gauntlet — pass your `n_variants` (the total number
 of configs you searched, discards included).
 
+**`n_variants` counts *you*, not just a grid.** If you came from an optimizer, "trials" means
+grid points, and the tool counted them for you. Here it means every version you tried and
+rejected — the filter you added because the drawdown looked ugly, the stop you widened after
+seeing the stop-outs, the two markets you quietly dropped. Those are searches. They leave no
+log, which makes them more dangerous than a grid, not less: `n_variants` is a number *you*
+supply (`gauntlet.py:89`), and nothing in crucible can check it. An honest 40 you had to admit
+to beats a comfortable 4.
+
 ### 5c. White's Reality Check (you have every variant's returns)
 
 **Code:** `permutation.py:59` — `whites_reality_check`
