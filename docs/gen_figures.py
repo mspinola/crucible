@@ -220,6 +220,49 @@ def report_sheets() -> dict[str, str]:
     }
 
 
+def ml_sheets() -> dict[str, str]:
+    """Build the two §13 figures from examples/ml_meta_label.py: the score's
+    quantile-decay bars and the unfiltered-vs-filtered gauntlet verdicts."""
+    spec = importlib.util.spec_from_file_location("mm", REPO / "examples" / "ml_meta_label.py")
+    mm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mm)
+    from crucible.ml import quantile_decay
+    from crucible.edge import TradeLog
+    from crucible.validation import run_gauntlet
+    from crucible.report import verdict_banner, report_css
+    from crucible.report.tearsheet import _plotly
+
+    go, _ = _plotly()
+    css = report_css()
+    book = mm.synthetic_meta_book()
+    grid = "rgba(128,128,128,0.18)"
+
+    t = quantile_decay(book[["score", "label"]], q=5).table
+    fig = go.Figure(go.Bar(x=[f"Q{int(q)}" for q in t["quantile"]], y=t["win_rate"].to_numpy(),
+                           text=[f"{v*100:.1f}%" for v in t["win_rate"]], textposition="outside",
+                           marker_color="#1d9e75"))
+    fig.add_hline(y=0.5, line_dash="dash", line_color="#9a6700",
+                  annotation_text="coin flip (50%)", annotation_position="top left")
+    fig.update_layout(height=360, showlegend=False, margin=dict(t=48, l=54, r=24, b=36),
+                      title="Win rate by score quantile (worst → best)",
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#5b6570"))
+    fig.update_yaxes(tickformat=".0%", gridcolor=grid, zerolinecolor=grid, title="realized win rate")
+    fig.update_xaxes(gridcolor=grid)
+    decay = fig.to_html(full_html=False, include_plotlyjs=True)
+
+    take = book[book["score"] >= book["score"].quantile(0.60)]
+    g_all = run_gauntlet(TradeLog.from_arrays(r=book["r"].to_numpy()), n_variants=1)
+    g_take = run_gauntlet(TradeLog.from_arrays(r=take["r"].to_numpy()), n_variants=1)
+    lab = "font:600 12px/1.4 -apple-system,system-ui,sans-serif;color:#6b7680;margin:0 0 4px"
+    verdict = (f"<div style='{lab}'>Primary book — 1,600 candidate trades</div>"
+               + verdict_banner(g_all, title="Unfiltered", subtitle="every candidate trade")
+               + f"<div style='{lab};margin-top:22px'>Filtered — top 40% by score, 640 trades</div>"
+               + verdict_banner(g_take, title="Filtered", subtitle="the model's take/skip filter"))
+
+    return {"ml_decay": _sheet(decay, 720, css), "ml_verdict": _sheet(verdict, 720, css)}
+
+
 def render_png(html: str, out: Path, pad: int = 22) -> None:
     """Headless-render HTML to a 2x PNG, then autocrop the page background."""
     from PIL import Image, ImageChops
@@ -282,6 +325,7 @@ def render_logo(out: Path, colors: dict = LOGO_FULL, size: int = 96, pad: int = 
 def main() -> None:
     IMG.mkdir(exist_ok=True)
     sheets = dict(report_sheets())
+    sheets.update(ml_sheets())
     sheets["triple_barrier"] = TRIPLE_BARRIER_HTML
     sheets["gate_ladder"] = GATE_LADDER_HTML
     for name, html in sheets.items():

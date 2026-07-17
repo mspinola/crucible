@@ -661,7 +661,7 @@ scored by whichever fires first — a profit barrier (`+tp·ATR`), a stop (`−s
 cap. Because the label looks forward until a barrier is touched, it creates the leakage the
 §8 purge/embargo controls. If a *model* then chooses which labeled trades to take
 (**meta-labeling** — a take/skip filter on a primary signal), you judge that filter's score
-with `crucible.ml` below.
+with `crucible.ml` below — **worked end to end in §13**.
 
 > **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (with §3.5 "Learning
 > Side and Size" and §3.6 "Meta-Labeling") — the labeling and take/skip framing.
@@ -1064,6 +1064,102 @@ whole reason to run the gauntlet instead of trusting a curve.
 
 ---
 
+## 13. Worked example: an ML take/skip filter, read end to end
+
+*The score is real — which is not the same as the book being strong. Watch a marginal edge cross the line.*
+
+The ML track (§7) run as one script on a **meta-labeling take/skip filter**: a primary signal
+has already produced a book of candidate trades, and a model scores each one — *take it* or *skip
+it*. The full runnable version is in
+[`examples/ml_meta_label.py`](https://github.com/mspinola/crucible/blob/main/examples/ml_meta_label.py);
+it uses a reproducible synthetic book (no network), so you can run it and get these exact numbers.
+
+```python
+from crucible.ml import information_coefficient, alpha_gate, quantile_decay, fold_ic
+from crucible.validation import run_gauntlet
+from crucible.edge import TradeLog
+
+book  = synthetic_meta_book()          # 1,600 candidate trades: score, label, r
+preds = book[["score", "label"]]       # the model's score and the realized win/loss
+```
+
+Each candidate carries a hidden edge *quality*; the model's `score` reads that quality
+imperfectly — a real but noisy signal, never the label itself. The first two questions are §7's,
+the third is §11's.
+
+### Step 1 — is the score real? (§7)
+
+```
+information_coefficient(preds)   IC = +0.218          alpha_gate(min_ic=0.03): PASS
+fold_ic(book, ["score"])         out-of-fold IC = +0.214 ± 0.061   (positive in all 5 folds, IR +3.53)
+```
+
+**How to read it.** The Information Coefficient is the rank correlation between score and
+outcome: **+0.218** says higher scores really do rank better trades, and `alpha_gate` passes it.
+But the number that carries more weight is the **out-of-fold** one — measured on trades the score
+didn't see — and its **sign-stability**: +0.214, positive in every one of the five folds. Per §7,
+a consistently-positive IC beats a bigger one that flips sign fold to fold; this one never flips.
+That out-of-fold split is also what keeps it honest — a score fit *and* judged on the same trades
+would be the §8 leakage mistake.
+
+### Step 2 — does the score rank outcomes? (§7)
+
+```
+quantile_decay(preds, q=5)
+   score quantile    Q1      Q2      Q3      Q4      Q5
+   win rate        26.6%   34.1%   37.2%   45.0%   57.8%     monotonic ✓   spread +31 pts
+```
+
+![Win rate by score quantile: five bars climbing left to right from about 27% at Q1 to 58% at Q5, crossing the 50% coin-flip line only at the top quantile.](img/ml_decay.png){ width="620" }
+*The decay picture §7 describes: bucket the score into fifths, read the realized win rate per
+bucket. A real, well-ordered score makes win rate climb **monotonically** — here 26.6% → 57.8%,
+a +31-point spread, crossing the 50% coin-flip line only in the top quantile.*
+
+**How to read it.** IC gives one number; the decay shows its *shape*. Win rate climbs every
+bucket, Q1 to Q5 — the mark of a score that orders trades, not one lucky bucket carrying the
+average. And notice **where 50% is crossed**: only the top quantile wins more often than a coin.
+That is the meta-labeling thesis in a picture — the edge lives in the high scores.
+
+### Step 3 — does the filter pay? (§11)
+
+Take the top 40% by score, and put both books — the whole primary book and the filtered one —
+through the gauntlet. (No price series or multiple markets here, so this is the trade-log
+gauntlet: **REAL + STRONG**; DURABLE and GENERAL would need §9's walk-forward and §10's breadth.)
+
+```
+                     trades    win        E        PF     gauntlet
+   unfiltered         1600    40.1%    +0.197R    1.33    REAL ✓ · STRONG ✗   → FAIL
+   filtered (top 40%)  640    51.4%    +0.538R    2.11    REAL ✓ · STRONG ✓   → PASS
+```
+
+![Two gauntlet verdict banners: the unfiltered primary book reads GAUNTLET FAIL, with REAL passing and STRONG failing; the filtered top-40% book reads GAUNTLET PASS, with REAL and STRONG both passing.](img/ml_verdict.png){ width="640" }
+*Same book, split on the score: the primary book (top) is real but not strong; the top-40% book
+(bottom) clears both gates.*
+
+**How to read it — and this is the whole point.** The primary book is **real but not strong**,
+and *why* it fails STRONG is the lesson: its profit factor is **1.33**, comfortably over the 1.25
+bar. But STRONG gates the **CI lower bound**, not the point estimate (§3, §11) — and the PF lower
+bound is **1.20**, *under* the bar. The point estimate looked fine; the honest, pessimistic read
+did not. This is exactly the trap §0's table named — "the same 1.37 with a CI around it" — now
+landing on an ML book.
+
+The filter fixes it by construction: keep only the top-score trades and win rate climbs 40% → 51%,
+expectancy nearly triples (+0.197R → +0.538R), and PF rises to **2.11**, whose lower bound now
+clears 1.25 with room. **REAL ✓ · STRONG ✓ · PASS.** Meta-labeling turned a marginal edge into a
+strong one — not by finding a new signal, but by *declining the bottom of the one it already had*.
+
+**The lesson.** A score can be genuinely real (Step 1) and cleanly ordered (Step 2) and still
+leave you a book that misses STRONG (Step 3, unfiltered): *"the score is real"* and *"the book is
+strong"* are different claims, and only the gauntlet separates them. The filter earns its keep
+because the *filtered* book passes at the CI lower bound — but read the trade count, **1,600 →
+640**. Filtering is not free; it spends sample, and take too little and STRONG fails the other
+way, on a CI too wide to clear the bar (§3). The take/skip model is itself a fitted thing, so it
+owes the same discipline as any book: out-of-fold scoring (Step 1), a holdout on the selection
+(§8), and its search counted in `n_variants` (§5). Real, strong, and honestly filtered — then it
+goes on to **DURABLE** and the rest of the ladder, same as any other edge.
+
+---
+
 ## Bibliography
 
 Listed in rough order of contribution to the significance machinery. Where a book is
@@ -1159,7 +1255,8 @@ Information Coefficient (§7).
 | Audited gate + Gauntlet | `crucible/src/crucible/validation/gate.py` |
 | The gauntlet (REAL/STRONG/DURABLE/GENERAL) + Thresholds | `crucible/src/crucible/validation/gauntlet.py` |
 | Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
-| Worked example (Donchian breakout) | `crucible/examples/` |
+| Worked example (Donchian breakout, §12) | `crucible/examples/donchian_gauntlet.py` |
+| Worked example (ML take/skip filter, §13) | `crucible/examples/ml_meta_label.py` |
 
 ---
 
