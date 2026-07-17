@@ -320,6 +320,55 @@ a p-value to be argued over.
 
 This is the heart of the significance story and the reason Aronson & Masters matter.
 
+### First, a lens: what does the test hold fixed?
+
+§0 took your backtester's Monte Carlo apart with two questions — *what does it randomize, and
+what does it hold fixed?* That lens isn't special to Monte Carlo. It is how **every** test in
+this tutorial works, and it's the fastest way to know what one can and cannot tell you. Each
+test builds a world and drops your results into it. What it **holds fixed** is what it grants
+you for free; what it **randomizes** is the thing whose contribution it is actually measuring.
+Sorted that way, the whole toolkit is three families.
+
+**1 — Resample your own trades.** These grant your results and ask how much of the number is
+noise.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `bootstrap_ci` — §3 | your trades, treated as the population | which trades you drew | how much of the number is the sample |
+| `block_bootstrap_ci` — §3 | contiguous blocks of calendar time | which blocks you drew | the same, with autocorrelation left intact |
+| *your backtester's Monte Carlo* | **the outcomes themselves** | their order | how rough the ride could get |
+
+**2 — Build a world where you had no skill.** These grant nothing. This is where *"is the edge
+real?"* actually gets answered.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `sign_permutation_pvalue` — §5a | each trade's magnitude | its **sign** | is there directional skill at all |
+| `random_entry_null` — §6 | the prices, the barriers, the trade count, the holding period | ***when* you entered** | timing skill, or just exposure |
+| `detrended_timing_null` — §6 | your directions and holding periods | timing, on **drift-removed** returns | timing skill once the market's own drift is gone |
+| `block_bootstrap_pvalue` — §3 | the block structure | which blocks — **zero-centered to impose a no-edge null** | the same, for a serially dependent book |
+
+**3 — Correct for how hard you looked.** These grant that you found something, and ask whether
+the finding survives the size of the search that found it.
+
+| test | holds fixed | randomizes | answers |
+|---|---|---|---|
+| `whites_reality_check` — §5c | the whole variant pool | signs across **every** variant, keeping the max | did the size of my search manufacture this winner |
+| Hansen's SPA — §5d | the same pool, studentized, clear losers dropped | the same | the same question, without one wild variant setting the bar |
+| cross-market RC — §5e | the markets, used as the variant pool | the same — best market vs best-under-null | does it travel, or is one market carrying the book |
+| PBO — §5, below | the config pool | which period blocks are IS vs OOS (it enumerates every symmetric split rather than sampling) | did the act of *choosing* the winner overfit |
+
+(§5b's Šidák correction is the odd one out — it randomizes nothing at all. It's the arithmetic
+shortcut for family three when the only thing you know is the **count**.)
+
+Now read the first table against the other two. Your backtester's Monte Carlo sits in family
+one, and it is the only test here that holds the **outcomes** fixed — which is exactly why it
+can measure the ride but never the edge. It grants the thing in question. Families two and
+three are what crucible adds, and no amount of family-one resampling is a substitute for them:
+they are different questions, not stronger versions of the same one.
+
+The rest of §5 is family three.
+
 ### 5a. Sign-permutation test (one strategy)
 
 **Code:** [`validation/permutation.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/permutation.py) —
