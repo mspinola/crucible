@@ -110,6 +110,8 @@ Before any significance test, you summarize the sample. These are point estimate
 | **Payoff ratio** (a.k.a. RR / risk-reward) | avg win / avg loss, `:51` | terminal reward-to-risk geometry |
 | **Win rate** | fraction of `r > 0`, `:23` | how often you're right — read *with* payoff, never alone (35% is excellent at RR 3) |
 | **SQN** | `mean/std · √min(n,100)`, `:60` | *signal-to-noise* — the risk-adjusted quality score |
+| **MFE** — max favorable excursion | *per trade:* furthest it ran *for* you while open, in R; a trade-log column the simulator records (`simulator.py`) | the unrealized profit that was on the table |
+| **MAE** — max adverse excursion | *per trade:* furthest it ran *against* you while open, in R (≤ 0); simulator column | the worst heat taken to hold it |
 | **Excursion / E-ratio** | mean MFE / mean\|MAE\|, `:76`,`:85` | is there directional edge *before* the exit rule? |
 | **Time asymmetry** | avg bars in wins / avg bars in losses, `:91` | "let winners run, cut losers" |
 | **Exit efficiency** | captured / available MFE, `:102` | how much of the move the exit banked |
@@ -174,6 +176,16 @@ Why it is the honest read: it makes no normality assumption (trade returns are s
 fat-tailed), and it works for *any* metric — expectancy, profit factor, SQN — not just the
 mean. On small samples the band is wide, and that width **is the message**.
 
+![Bootstrap distribution of expectancy: a grey histogram of resampled expectancies, a dotted line at zero, two dashed amber lines at the 2.5th and 97.5th percentiles (the 95% CI), and a green line at the point estimate.](img/gauntlet_bootstrap.png){ width="660" }
+*The bootstrap made visible — this is the report's "Bootstrap expectancy" panel (§11) for the
+worked example's out-of-sample log. Each grey bar is one resample's expectancy; the dashed
+**amber** lines are the 2.5/97.5-percentile **95% CI**, the **green** line the point estimate,
+the dotted line **zero**. Here the whole band sits right of zero — the edge holds across
+resamples (the **HELD** read of §4); when the amber lower line crosses left of zero, that's
+**FRAGILE**. This panel is the **i.i.d.** bootstrap (it resamples individual trades); for a
+pooled multi-asset book the honest, wider band comes from `block_bootstrap_ci` (below) and is
+**not** drawn here.*
+
 crucible's gauntlet gates on this: its **STRONG** gate requires the **CI lower bound**, not
 the point estimate, to clear each threshold (`gate_strong`, §11). This directly fixes the
 "PF 1.37 on 60 trades treated as a clean pass" failure: a positive point estimate whose CI
@@ -191,8 +203,11 @@ lower bound is negative does not clear the gate.
 
 ### When the observations aren't independent — the block bootstrap
 
-The i.i.d. bootstrap above (and the sign-permutation of §5) treats trades as **exchangeable**.
-That's fine for a single instrument, but it *breaks* for a **pooled multi-asset book**: one
+The i.i.d. bootstrap above (and the sign-permutation of §5) treats trades as **exchangeable** —
+*i.i.d.* means **independent** (one trade's outcome carries no information about the others) and
+**identically distributed** (all drawn from one fixed distribution), so their order doesn't
+matter and you can resample them one at a time. That's fine for a single instrument, but it
+*breaks* for a **pooled multi-asset book**: one
 macro shock in Oct-2008 fires correlated longs across equities, metals, and FX at once, so those
 trades are not independent draws. Resampling them independently **overstates** the edge's
 significance — too-tight CIs, too-small p.
@@ -273,6 +288,12 @@ flip while its *magnitude* is whatever it was. Shuffling signs builds the distri
 outcomes a skill-less system would produce on these same magnitudes; the p-value is how
 often chance matches or beats you. This is **Timothy Masters' Monte Carlo Permutation
 Method**, the public-domain alternative to White's patented Reality Check.
+
+In the gauntlet this *is* the **REAL** gate's `corrected_pvalue` hard check: the sign-permutation
+p, Šidák-corrected (§5b) for your variant count, must clear α = 0.05. On the report it's the
+`corrected_pvalue` row in the REAL block, with the raw sign-permutation p in its detail line.
+(Hand `gate_real` every variant's returns instead and it swaps to White's Reality Check — §5c —
+as `reality_check_pvalue`.)
 
 ### 5b. Šidák correction (you tried N variants)
 
@@ -413,6 +434,12 @@ the complementary question: given that you searched N configs and kept the best-
 Where the permutation test corrects the *p-value* for the search, these correct the *IS ranking*
 and the *Sharpe* for it — the same multiple-testing disease, caught two more ways. Capital-free
 (stdlib `NormalDist`, no scipy).
+
+Unlike the trade-log tests, these two aren't drawn on the report or wired into the gauntlet —
+they need the **whole search** as input (`pbo_cscv` a `T×N` periods×configs matrix;
+`deflated_sharpe` the winner's Sharpe plus the trial count), which a single `TradeLog` doesn't
+carry. Call them yourself with that matrix — same story as the block bootstrap (§3): a standalone
+check that runs on a different object than the one the report shows.
 
 > **Sources.** **PBO / CSCV**: Bailey, Borwein, López de Prado & Zhu (2017), "The Probability of
 > Backtest Overfitting," *Journal of Computational Finance*; **AFML Ch. 11–12**. **Deflated /
