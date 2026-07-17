@@ -100,7 +100,7 @@ def report_css() -> str:
   .cr-pillars .na {{ color: var(--cr-faint); }}
   .cr-cols {{ display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }}
   .cr-summary {{ margin: 6px 0 16px; max-width: 90ch; color: var(--cr-fg); font-size: 14.5px; }}
-  .cr-hostnote {{ margin-left: auto; align-self: center; }}   /* rides the right end of the verdict row */
+  .cr-hostnote {{ margin-top: auto; align-self: flex-start; padding-top: 16px; }}   /* bottom of the left column */
   .cr-summary .lead {{ font-weight: 600; }}
   .cr-summary .no {{ color: var(--cr-fail); font-weight: 600; }}
   .cr-summary .ok {{ color: var(--cr-pass); font-weight: 600; }}
@@ -114,8 +114,8 @@ def report_css() -> str:
   .cr-metric .k {{ font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
                   color: var(--cr-muted); }}
   /* Two-column verdict top: interpretation prose (left) + a stats card (right). */
-  .cr-top {{ display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; margin: 6px 0 2px; }}
-  .cr-top-left {{ flex: 1 1 52%; min-width: 300px; }}
+  .cr-top {{ display: flex; gap: 30px; align-items: stretch; flex-wrap: wrap; margin: 6px 0 2px; }}
+  .cr-top-left {{ flex: 1 1 52%; min-width: 300px; display: flex; flex-direction: column; }}
   .cr-top-right {{ flex: 1 1 30%; min-width: 236px; }}
   .cr-top-left .cr-summary {{ margin: 0; max-width: none; }}
   .cr-statcard {{ border: 1px solid var(--cr-border); border-radius: 10px;
@@ -850,7 +850,7 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     the HTML string is returned."""
     # the host note (e.g. net-of-costs badge) rides the right end of the verdict row
     banner = verdict_banner(gauntlet, title=title, subtitle=subtitle,
-                            pillar_notes=pillar_notes, note_html=header_html)
+                            pillar_notes=pillar_notes)
     summary = verdict_summary(gauntlet)
     # bullets is the FIRST figure → it carries plotly.js so everything below finds it
     bullets = pillar_bullets(gauntlet, include_plotlyjs=include_plotlyjs)
@@ -871,8 +871,11 @@ def gauntlet_report(gauntlet, trades: TradeLog, path: Optional[str] = None, *,
     # so the note fills the space beside the ≤70ch prose instead of stranding it below.
     # Two-column top: interpretation prose (left) + the stats as a card (right); then a
     # rule before the pillar-margin bullets.
+    # the host note (net-of-costs badge) sits at the bottom of the left column so the
+    # prose + note balance the taller stats card on the right
+    note = f"<div class='cr-hostnote'>{header_html}</div>" if header_html else ""
     top = (f"<div class='cr-top'>"
-           f"<div class='cr-top-left'>{summary}</div>"
+           f"<div class='cr-top-left'>{summary}{note}</div>"
            f"<div class='cr-top-right'><div class='cr-statcard'>{metrics}</div></div>"
            f"</div>")
     inner = f"{banner}{top}<hr class='cr-div'>{bullets}{panels}{pillars}{appendix}{_FOOT}"
