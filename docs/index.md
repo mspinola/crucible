@@ -561,6 +561,17 @@ check that runs on a different object than the one the report shows.
 **Code:** [`edge/stats.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/edge/stats.py) — `random_entry_null`,
 `detrended_timing_null`
 
+Your system made money in a market that went up. This section is about separating those two
+facts, because your equity curve cannot.
+
+That is an uncomfortable sentence, so be precise about the claim: nobody is saying the money
+wasn't made. The question is *who made it*. Take your rule away, keep everything else — the same
+instrument, the same barriers, the same number of trades, the same holding period — and just
+enter at **random**. In a market that trended up, that random system also makes money. So the
+bar your signal has to clear was never zero. It's whatever coin-flip timing would have handed
+you on this instrument over this period, and on a trending market that bar can be a long way
+above zero.
+
 Beating zero is not enough on an instrument that drifts up. The right null is *"did my
 signal beat coin-flip timing on this same instrument?"* crucible offers two, both capital-free:
 
@@ -576,6 +587,15 @@ Detrending is what isolates *timing skill* from *riding the market*. It also mak
 benchmark automatically asset-class-appropriate: an equity index's structural long drift is
 removed the same way a currency's near-zero drift is, so no hand-picked per-class benchmark
 is needed.
+
+That last property is worth pausing on, because it quietly removes an argument you would
+otherwise have to have. The usual way to answer "did you just ride the market?" is to *pick a
+benchmark* — SPY, buy-and-hold, some index — and then defend the choice, which is unfalsifiable
+in exactly the way a good test shouldn't be (pick a weak benchmark and your edge appears). Here
+nothing gets picked. **The asset becomes its own benchmark**: its drift is estimated from its own
+bars and subtracted, so what remains is the timing. The same line of code does the right thing
+for an equity index and for a currency, and there is no benchmark selection to litigate — which
+also means there's no benchmark selection to quietly optimize.
 
 > **Sources.**
 > - **EBTA Appendix "Proof That Detrending Is Equivalent to Benchmarking Based on Position
