@@ -405,7 +405,8 @@ can measure the ride but never the edge. It grants the thing in question. Famili
 three are what crucible adds, and no amount of family-one resampling is a substitute for them:
 they are different questions, not stronger versions of the same one.
 
-The rest of §5 is family three.
+§5a is the family-two test — the blunt question, *is there any edge at all?* Everything after
+it (§5b onward) is family three, correcting for how hard you looked.
 
 ### 5a. Sign-permutation test (one strategy)
 
