@@ -289,38 +289,82 @@ narrow question (*is this trade-level edge real, or a small-sample artifact?*)
 and answers it out loud, before you ever open a funded account or a full
 backtester.
 
-### Feeding crucible from a RealTest export
+### From a RealTest export: a worked round trip
 
-The two tools compose cleanly. RealTest runs headless from the command line
-(`realtest -test script.rts`) and, with `SaveTradesAs` set, writes the trade log
-to CSV. RealTest's default trade export carries these columns:
+RealTest runs a strategy and, with `SaveTradesAs` set, writes its trade log to
+CSV. crucible reads that CSV and answers the question RealTest's equity curve
+cannot: is the edge distinguishable from noise, or a small-sample artifact?
+
+The repo ships the matched pair so you can see the whole flow:
+
+- [`examples/realtest/ma_cross.rts`](examples/realtest/ma_cross.rts), a 20/50 SMA
+  crossover (long only) written as a RealTest strategy,
+- [`examples/realtest_ingest.py`](examples/realtest_ingest.py), the crucible
+  importer, and
+- a bundled sample export,
+  [`examples/realtest/ma_cross_trades.csv`](examples/realtest/ma_cross_trades.csv),
+  so the crucible side runs right now, with no RealTest license.
+
+```bash
+pip install "crucible-quant[report]"
+python examples/realtest_ingest.py          # reads the bundled sample, 100 trades
+```
+
+```
+VERDICT (expectancy): +0.211 R   95% CI [-0.143, +0.599]
+                     p(edge>0) = 0.872        ->  FRAGILE
+  point positive, but the CI straddles zero, not distinguishable
+  from noise at this sample size. Do NOT size it up.
+```
+
+![A crucible tearsheet from the imported RealTest trades: a FRAGILE verdict banner, the metric row, an R-multiple distribution, a rising cumulative-R curve, an MFE/MAE excursion scatter, and a bootstrap-expectancy histogram whose 95% CI straddles zero.](docs/img/realtest_tearsheet.png)
+
+The cumulative-R curve rises convincingly, the kind of picture a backtester sells
+you on. But at a hundred trades the expectancy is +0.211R with a 95% CI of
+[-0.143, +0.599], so the edge is not distinguishable from zero. RealTest draws
+the curve. crucible tells you not to fund it yet. (`--no-tearsheet` prints the
+report only, skipping the plotly figure.)
+
+**To reproduce it against real data**, run `ma_cross.rts` in RealTest (point its
+`Import` at your feed), then import your own export:
+
+```bash
+python examples/realtest_ingest.py --csv path/to/your_trades.csv --r-pct 5
+```
+
+Keep `--r-pct` equal to the strategy's protective-stop distance (`StopPct` in the
+`.rts`), because that stop is what defines 1R.
+
+#### The one modeling choice, and two honesty notes
+
+RealTest's stock export carries these columns (the `Trades` section of your
+script defines them, so a customized export can rename or add some):
 
 ```
 Trade, Strategy, Symbol, Side, DateIn, TimeIn, QtyIn, PriceIn, DateOut, TimeOut,
 QtyOut, PriceOut, Reason, Bars, PctGain, Profit, PctMFE, PctMAE, Fraction, Size, Dividends
 ```
 
-(The `Trades` section of your script defines these, so a customized export can
-rename or add columns. Treat the list above as the stock layout, not a fixed
-schema.) Two things to know before mapping it:
+- **P&L is in percent, not R.** `PctGain` is the return as a percent of position
+  size, and there is **no per-trade risk column**, so the 1R denominator is yours
+  to declare. The importer takes it as `--r-pct` and computes `r = PctGain / R_PCT`.
+  `PctMFE` / `PctMAE` (percent runup and drawdown during the trade) convert the
+  same way, so choose 1R deliberately: the whole report rides on it.
+- **De-duplicate a multi-strategy run.** If several sub-strategies took the same
+  fill, those rows are duplicated and correlated, and crucible's bootstrap assumes
+  independent trades. The importer drops exact duplicate fills. Collapse to one
+  book yourself if your export is subtler, or the confidence interval will look
+  tighter than reality.
 
-- **P&L is in percent and dollars, not R.** `PctGain` is the return as a percent
-  of position size and `Profit` is net dollars. Neither is an R-multiple. There
-  is **no per-trade risk column** in the export, so choosing the 1R denominator
-  is a real modeling decision you own, not a column rename.
-- **MFE/MAE *are* exported**, as `PctMFE` / `PctMAE` (percent runup / drawdown
-  during the trade). Put them in the same R unit as the return.
-
-If you define 1R as a fixed fractional risk `R_PCT` (e.g. you risked ~1% of the
-position per trade), the conversion is one division each:
+The conversion is one division per column. To map columns by hand instead of
+using the importer:
 
 ```python
 import pandas as pd
 from crucible.edge import TradeLog, edge_report, reality_check
 
-raw = pd.read_csv("trades.csv")                 # RealTest SaveTradesAs output
-
-R_PCT = 1.0                                      # your 1R, as a % move (YOUR choice)
+raw = pd.read_csv("trades.csv")                  # RealTest SaveTradesAs output
+R_PCT = 5.0                                       # 1R = your protective-stop %, YOUR choice
 raw["r"]   = raw["PctGain"].str.rstrip("%").astype(float) / R_PCT
 raw["mfe"] = raw["PctMFE"].str.rstrip("%").astype(float)  / R_PCT
 raw["mae"] = raw["PctMAE"].str.rstrip("%").astype(float)  / R_PCT
@@ -329,22 +373,12 @@ trades = TradeLog.from_frame(
     raw, mapping={"DateIn": "entry_date", "DateOut": "exit_date", "Bars": "bars_held"},
 )
 print(edge_report(trades))
-print(reality_check(trades))                     # the verdict RealTest's MC doesn't give
+print(reality_check(trades))                      # the verdict RealTest's MC doesn't give
 ```
 
-Map your columns onto the [`TradeLog`](src/crucible/edge/trade_log.py) schema
-(`r` required. `mfe`, `mae`, `bars_held`, `prob`, `entry_date`, `exit_date`
-optional) with `mapping=`. Two honesty notes that matter more than the plumbing:
-without a defined per-trade risk, the R denominator is an assumption the whole
-report rides on. Pick it deliberately. And if the RealTest run is a
-multi-strategy portfolio where several sub-strategies take the same trade, those
-rows are duplicated and correlated. Crucible's bootstrap assumes independent
-trades, so de-duplicate (or collapse to one book) first or the confidence
-interval will look tighter than reality.
-
-*(Comparison verified against RealTest's published documentation as of
-July 2026. RealTest is actively developed. Check its docs for the current
-feature set.)*
+*(RealTest is paid software and is actively developed. The `.rts` here was written
+from its published documentation, not executed by this repo, so treat it as a
+template to adapt and verify. Comparison current as of July 2026.)*
 
 ## Ecosystem
 
