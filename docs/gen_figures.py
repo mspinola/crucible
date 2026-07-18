@@ -181,11 +181,15 @@ def report_sheets() -> dict[str, str]:
     # the honest read here — mirror what gauntlet_report() stamps under the verdict
     note = f"<div class='cr-hostnote'>{_COSTS_NOT_ATTESTED}</div>"
 
-    hero = (verdict_banner(g, title="Donchian breakout — the gauntlet",
-                           subtitle="stitched OOS log · 20/40 lookback search")
-            + metrics_table(trades) + verdict_summary(g) + note)
+    banner = verdict_banner(g, title="Donchian breakout — the gauntlet",
+                            subtitle="stitched OOS log · 20/40 lookback search")
+    hero = banner + metrics_table(trades) + verdict_summary(g) + note
     by = {x.name: x for x in g.gates}
-    gates = "".join(gate_block(by[p]) for p in _PILLARS if p in by)
+    gate_blocks = "".join(gate_block(by[p]) for p in _PILLARS if p in by)
+    # §11 "the gauntlet as a report": lead with the verdict the section describes
+    # (banner + pillar chips + metric row), then the per-gate blocks with the failing
+    # DURABLE gate expanded — so the figure reads as a report, not a bare fold table.
+    gates = banner + metrics_table(trades) + gate_blocks
 
     # Amber "scope-limited" illustration (#41): real strong metrics paired with a
     # synthetic gauntlet whose only miss is GENERAL (core REAL/STRONG/DURABLE hold),

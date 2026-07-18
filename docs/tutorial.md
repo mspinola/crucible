@@ -931,9 +931,10 @@ from crucible.report import gauntlet_report
 gauntlet_report(gauntlet, wf.stitched, path="gauntlet.html")   # one self-contained file
 ```
 
-![The computed gates as report blocks: REAL and STRONG pass, DURABLE fails and expands to show its per-check table (wfe_aggregate, fold dispersion).](img/gauntlet_gates.png){ width="620" }
-*Each gate block states its plain-English claim and its PASS/FAIL. The failing gate expands
-to the exact checks and thresholds. `tearsheet()` renders a single book the same way.*
+![The gauntlet report: a GAUNTLET FAIL banner with pillar chips (REAL and STRONG pass, DURABLE fails, GENERAL not run), the metric row, then one block per gate with the failing DURABLE gate expanded to its per-check table (wfe_aggregate, fold dispersion).](img/gauntlet_gates.png){ width="640" }
+*The verdict banner and pillar chips, the metric row, then one block per gate. Each block
+states its plain-English claim and its PASS/FAIL, and the failing gate expands to the exact
+checks and thresholds. `tearsheet()` renders a single book the same way.*
 
 #### The verdict reads in three states, not two
 
