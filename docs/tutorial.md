@@ -27,8 +27,9 @@ have to be ruled out (the framing is Aronson's):
 
 `crucible` answers these at the **trade-log level**, before any capital, position sizing, or
 equity curve enters the picture. Everything here is capital-free. The concepts come first
-(§1–§11). Then **§12 works the whole pipeline end to end on a Donchian breakout**, so you can
-see exactly how to read every number and verdict.
+(§1–§11). Then the [Run modes](run_modes.md) page works the whole pipeline end to end on a
+Donchian breakout, and §12 does the same for an ML take/skip filter, so you can see exactly
+how to read every number and verdict.
 
 ### If you're coming from a backtester
 
@@ -63,7 +64,7 @@ The sign-permutation test grants nothing. It keeps each trade's **magnitude** an
 **sign** at random. A coin decides whether each trade won or lost. That builds the world where
 you had *no directional skill whatsoever* but the same trade sizes and the same volatility.
 Rebuild that world ten thousand times, and count how often it matches or beats what you actually
-got. That fraction is **p**. When §12's Donchian breakout comes back at `p = 0.0008`, it means:
+got. That fraction is **p**. When the [Run modes](run_modes.md) page's Donchian breakout comes back at `p = 0.0008`, it means:
 in a world with no edge at all, a result this good turned up 8 times in 10,000.
 
 So the two are near-opposites in what they assume. Monte Carlo assumes the edge and measures the
@@ -77,8 +78,8 @@ tested the thing REAL tests.
 > backtester randomizes the *order* and holds the *outcomes* fixed. The permutation test
 > randomizes the *outcomes* and holds the *magnitudes* fixed. Same machinery, opposite question.
 
-**§12 is this table run end to end**, a Donchian breakout that hands you 162 trades and a
-profit factor of 1.90, and then has to defend them.
+**The [Run modes](run_modes.md) page is this table run end to end**, a Donchian breakout that
+hands you 162 trades and a profit factor of 1.90, and then has to defend them.
 
 Everything below is organized as a pipeline: **describe the edge → quantify sampling
 noise → rule out data-mining luck → rule out drift → confirm out-of-sample → account
@@ -662,12 +663,12 @@ scored by whichever fires first: a profit barrier (`+tp·ATR`), a stop (`−sl·
 cap. Because the label looks forward until a barrier is touched, it creates the leakage the
 §8 purge/embargo controls. If a *model* then chooses which labeled trades to take
 (**meta-labeling**, a take/skip filter on a primary signal), you judge that filter's score
-with `crucible.ml` below, **worked end to end in §13**.
+with `crucible.ml` below, **worked end to end in §12**.
 
 ![A vertical flow: a primary signal produces many candidate trades, the triple-barrier method labels each a win or loss, a model scores each trade take-or-skip, crucible.ml judges whether that score is real, and the high-score trades become the filtered book that goes through the gauntlet.](img/meta_label.png){ width="560" }
 *Meta-labeling splits the decision: the primary signal decides which trades exist, the model
 decides which to take. `crucible.ml` judges the model's score before it ever reaches a
-backtester, the pipeline §13 runs end to end.*
+backtester, the pipeline §12 runs end to end.*
 
 > **Sources.** **AFML Ch. 3 "Labeling," §3.4 "The Triple-Barrier Method"** (with §3.5 "Learning
 > Side and Size" and §3.6 "Meta-Labeling"), the labeling and take/skip framing.
@@ -798,13 +799,14 @@ floor. WFE is out-of-sample over in-sample, so a WFE above 1.00 says your strate
 on data it had never seen than on the data it was fitted to. That is not a triumph. It's a
 statement that something is wrong, and `wfe_reject_high = 1.00` (`thresholds.py:29`) rejects it
 outright. Usually it's a bug, a leak, or a couple of freak folds, but whatever it is, it isn't
-skill, because fitting is supposed to *help* on the data you fit to. §12 fails on exactly this.
+skill, because fitting is supposed to *help* on the data you fit to. The Donchian on the
+[Run modes](run_modes.md) page fails on exactly this.
 
 The second is that **the aggregate is the answer**. It's a mean, and means get carried. A healthy
 aggregate WFE can be a strategy that was mediocre in most of its folds and extraordinary in two,
 and those two are the least likely to repeat, because outliers are the thing that doesn't. Read
-the fold column, not the summary row. (§12 is this exact shape: an aggregate of 1.34 with
-individual folds at 3.5 and 3.7.)
+the fold column, not the summary row. (the [Run modes](run_modes.md) Donchian is this exact
+shape: an aggregate of 1.34 with individual folds at 3.5 and 3.7.)
 
 crucible's **DURABLE** gate hardens this against a specific trap (`fold_dispersion` in
 [`validation/diagnostics.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/diagnostics.py)): a healthy *average*
@@ -957,126 +959,7 @@ edge. This is a **presentation** distinction, `gauntlet.passed` stays strict (`T
 
 ---
 
-## 12. Worked example: a Donchian breakout, read end to end
-
-*A profit factor of 1.90, taken apart on the page. It does not survive.*
-
-Everything above, run as one script on a **Donchian channel breakout**: go long when price
-closes above the prior 20-bar high. Exit on a 2.5R target, a 1R stop, or a 30-bar cap. The
-full runnable version is in [`examples/donchian_gauntlet.py`](https://github.com/mspinola/crucible/blob/main/examples/donchian_gauntlet.py);
-it uses reproducible synthetic prices, so you can run it with no network and get these exact
-numbers.
-
-```python
-from crucible.edge import barrier_trades, edge_report, reality_check
-from crucible.validation import walk_forward, run_gauntlet
-
-def donchian(df, lookback=20):
-    return df["Close"] > df["High"].rolling(lookback).max().shift(1)
-
-entries = donchian(px, lookback=20)                                  # your signal
-trades  = barrier_trades(px, entries, side="long", tp=2.5, sl=1.0, timeout=30)
-```
-
-### Step 1: describe the edge (§2)
-
-```
-edge_report(trades)
-   Trades        : 162          Payoff ratio  : 2.50
-   Win rate      : 43.2 %       SQN-100       : 2.95
-   Expectancy    : +0.512 R     Excursion     : 1.77   [PASS]
-   Profit factor : 1.90         Time asymmetry: 2.19   [PASS]
-```
-
-**How to read it.** A textbook trend-following shape: a *low* win rate (43%) paired with a
-payoff of 2.5 (winners run about 2.5× the size of losers) nets a positive expectancy and PF
-1.90. Excursion and time-asymmetry both above 1 say the signal has directional edge *before*
-the exit rule even acts. But these are point estimates on 162 trades: they **describe**, they
-don't yet **defend**. SQN 2.95 hints the sample can support a claim. Keep going.
-
-### Step 2: is it real, or small-sample luck? (§3–§4)
-
-```
-reality_check(trades)
-   VERDICT (expectancy): +0.512 R   95% CI [+0.253, +0.772]
-                         p(edge>0) = 1.000   ->  HELD
-```
-
-**How to read it.** The bootstrap CI lower bound (**+0.253**) clears zero. Across 10,000
-resamples the edge stays positive. Verdict **HELD**: on the whole history this is not
-small-sample noise. A backtester would stop right here, with a rising equity curve. crucible
-doesn't. HELD on the pooled log is necessary, not sufficient.
-
-### Step 3: does it survive out of sample, over time? (§9)
-
-```
-walk_forward(px, donchian, {"lookback": [20, 40]}, is_days=3yr, oos_days=1yr)
-   OOS year   IS E     OOS E    WFE          OOS year   IS E     OOS E    WFE
-   2011      +0.925   +2.150   3.52          2016      +1.000   −1.000  −0.14
-   2012      +1.258   +1.227   1.40          …
-   2013      +1.220   +1.000   0.71          2022      +0.690   +0.969   3.66
-   2014      +1.214   −1.000  −0.31          2023      +0.716   +0.925   3.77
-   2015      +1.087   −0.125  −0.06          folds=14  mean WFE=1.34  stitched=105
-```
-
-**How to read it.** Optimize the lookback in-sample, apply the winner to the next *unseen*
-year, step forward, stitch the out-of-sample slices into one log. The in-sample expectancy is
-steadily positive, but the **OOS** column lurches: +2.15, +1.23, +1.00, then −1.00, −0.13,
-−1.00 … a few great years and a run of losing ones, and only half the years profitable. The mean
-WFE of 1.34 looks respectable until you notice it's *above 1.00*, the out-of-sample outran the
-in-sample, which §9 flagged as too-good-to-be-true. A few outlier years (fold WFEs of 3.5, 3.7,
-5.3) inflated the average. Step 4 makes the call.
-
-![Cumulative R of the stitched out-of-sample log: an early climb, a long flat and choppy middle, then a late rip up to about 78R.](img/gauntlet_cumr.png){ width="660" }
-*The stitched out-of-sample slices as one cumulative-R curve, an early climb, a long flat/choppy
-middle (the losing years), then a late rip a few outlier years drive. Convincing as a curve. The
-gauntlet still rejects it.*
-
-### Step 4: the verdict (§11)
-
-```
-run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
-   REAL     ✓   corrected p = 0.0008   ·   beats 100% of random-entry timing
-   STRONG   ✓   expectancy CI-low +0.40 · PF CI-low 1.67 · SQN CI-low 2.32
-   DURABLE  ✗   wfe_aggregate 1.34 above the [0.30, 1.00] ceiling  ·  fold_dispersion CV 1.51 → PASS
-   ─────────────────────────────────────────────────────────────────────
-   GAUNTLET: FAIL   (2 of 3 gates passed, failing: DURABLE)
-```
-
-![The gauntlet report for this run: GAUNTLET FAIL, with REAL and STRONG passing and DURABLE failing. The metric row and the plain-English 'Not validated' verdict.](img/gauntlet_hero.png){ width="660" }
-*The same verdict as `gauntlet_report()` renders it (§11): pillar chips, the metric row, and a
-plain-English read, real and strong, but not durable, so **not validated**. This run fails on
-**DURABLE**, a core gate, so it's a genuine red FAIL. Had REAL/STRONG/DURABLE held and only
-GENERAL missed, the same report would read amber, **EDGE VALIDATED · scope-limited** (§11).*
-
-**Reading it gate by gate:**
-
-- **REAL ✓**, the sign-permutation p is 0.0008 (well under 0.05, Šidák-adjusted for the 2
-  lookbacks searched), and the expectancy beats **100%** of random-entry books on the same
-  prices. Not noise, and not just riding the drift: real *timing* edge.
-- **STRONG ✓**, every hard metric clears its bar at the **pessimistic CI lower bound**, not the
-  point estimate: expectancy-low +0.40 (> 0), PF-low 1.67 (> 1.25), SQN-low 2.32 (> 1.6).
-  Economically real even under sampling noise.
-- **DURABLE ✗**, and here it dies. The aggregate WFE is 1.34, *above* the 1.00
-  "too-good-to-be-true" ceiling: the out-of-sample outran the in-sample, inflated by a few outlier
-  years (fold WFEs of 3.5–5.3), the opposite of the graceful 50–80% degradation a robust edge
-  shows. Fold dispersion itself passes, but barely, only **half** the folds are individually
-  tradable (CV 1.51 vs. a bar of 2.0).
-
-**The lesson.** Pooled, and even out-of-sample in aggregate, this breakout is real and strong:
-`reality_check` said **HELD**, and two of three gates are green. A backtester's equity curve would
-have sold it to you. But **DURABLE**, the gate crucible won't let you skip, exposes it. The edge
-doesn't hold up *through time*. Overall **FAIL**: back to DECLARE, don't size it up. That is the
-whole reason to run the gauntlet instead of trusting a curve.
-
-> A **PASS** reads the same way with three green gates and `GAUNTLET: PASS`, an edge that's
-> real, strong, *and* durable, leaving only **SURVIVE** (capital), which you take to a
-> position-sizing tool (§10's sources). Most naive signals look like this Donchian: convincing on
-> the surface, caught by DURABLE or REAL.
-
----
-
-## 13. Worked example: an ML take/skip filter, read end to end
+## 12. Worked example: an ML take/skip filter, read end to end
 
 *The score is real, which is not the same as the book being strong. Watch a marginal edge cross the line.*
 
@@ -1270,8 +1153,8 @@ Information Coefficient (§7).
 | Audited gate + Gauntlet | `crucible/src/crucible/validation/gate.py` |
 | The gauntlet (REAL/STRONG/DURABLE/GENERAL) + Thresholds | `crucible/src/crucible/validation/gauntlet.py` |
 | Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
-| Worked example (Donchian breakout, §12) | `crucible/examples/donchian_gauntlet.py` |
-| Worked example (ML take/skip filter, §13) | `crucible/examples/ml_meta_label.py` |
+| Worked example (Donchian breakout, Run modes) | `crucible/examples/donchian_gauntlet.py` |
+| Worked example (ML take/skip filter, §12) | `crucible/examples/ml_meta_label.py` |
 
 ---
 
