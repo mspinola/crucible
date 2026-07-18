@@ -6,7 +6,7 @@ site and PDF use. Run it when a worked example changes or a diagram needs an edi
 
 Rendered from ``crucible.report`` blocks, so they never drift from the numbers:
   gauntlet_hero/scope/gates/cumr/bootstrap.png  the Donchian gauntlet run (and §11 scope)
-  donchian_tearsheet.png                        the Donchian full-range tearsheet (run modes)
+  donchian_fullrange.png / donchian_holdout.png the run-mode scorecards (run modes page)
   ml_decay.png / ml_verdict.png                 the §13 ML take/skip example
 
 Hand-authored HTML/SVG explainers, kept below as the editable source of truth:
@@ -167,10 +167,8 @@ def report_sheets() -> dict[str, str]:
     from crucible.edge import reality_check, expectancy, barrier_trades
     from crucible.validation import walk_forward, run_gauntlet, Thresholds
     from crucible.report import (verdict_banner, metrics_table, verdict_summary,
-                                 gate_block, cumulative_r, report_css,
-                                 edge_panels, title_lockup)
-    from crucible.report.tearsheet import (_PILLARS, _plotly, _COSTS_NOT_ATTESTED,
-                                           _reality_banner, _FOOT)
+                                 gate_block, cumulative_r, report_css)
+    from crucible.report.tearsheet import _PILLARS, _plotly, _COSTS_NOT_ATTESTED
 
     px = dg.synthetic_prices()
     tp, sl, to = 2.5, 1.0, 30
@@ -248,17 +246,19 @@ def report_sheets() -> dict[str, str]:
     figb.update_yaxes(gridcolor=grid, zerolinecolor=grid)
     chartb = figb.to_html(full_html=False, include_plotlyjs=True)
 
-    # Full-range single-book tearsheet (the "run modes" page): the WHOLE-history
-    # Donchian log (not the stitched OOS one `trades` points at) judged by
-    # reality_check — HELD, before the walk-forward durability gate rejects it.
-    # This is what tearsheet() renders, shown alongside the gauntlet report so
-    # both output shapes appear on the site.
+    # The two run-mode scorecards (the "run modes" page), built on the WHOLE-history
+    # Donchian log (not the stitched OOS one `trades` points at). These are distinct
+    # report layouts, styled apart from the gauntlet report so each run mode looks
+    # like itself. Both return a full page, so force light and render as-is (no
+    # _sheet wrap). See crucible.report.scorecards.
+    from crucible.report import fullrange_scorecard, holdout_report
     full_trades = barrier_trades(px, dg.donchian(px, 20), side="long", tp=tp, sl=sl, timeout=to)
-    full = reality_check(full_trades)
-    ts = (title_lockup("Donchian breakout — full range")
-          + f"<div class='cr-sub'>whole history · {full_trades.n} trades · reality_check</div>"
-          + _reality_banner(full) + metrics_table(full_trades)
-          + edge_panels(full_trades, include_plotlyjs=True) + _FOOT)
+    light = lambda doc: doc.replace("<html", '<html data-theme="light"', 1)
+    fullrange = light(fullrange_scorecard(
+        full_trades, title="Donchian breakout",
+        subtitle="20-bar high breakout, 2.5R / 1R / 30-bar cap"))
+    holdout_sc = light(holdout_report(
+        full_trades, "2016-01-01", embargo_weeks=8, title="Donchian breakout"))
 
     return {
         "gauntlet_hero": _sheet(hero, 840, css),
@@ -266,7 +266,8 @@ def report_sheets() -> dict[str, str]:
         "gauntlet_bootstrap": _sheet(chartb, 840, css),
         "gauntlet_gates": _sheet(gates, 840, css),
         "gauntlet_cumr": _sheet(chart, 840, css),
-        "donchian_tearsheet": _sheet(ts, 840, css),
+        "donchian_fullrange": fullrange,
+        "donchian_holdout": holdout_sc,
     }
 
 
@@ -415,7 +416,7 @@ def main() -> None:
     sheets["gate_ladder"] = GATE_LADDER_HTML
     sheets["meta_label"] = META_LABEL_HTML
     sheets["purge_embargo"] = PURGE_EMBARGO_HTML
-    tall = {"donchian_tearsheet": 2600}    # full tearsheets need a taller capture
+    tall = {"donchian_fullrange": 2600, "donchian_holdout": 1600}  # tall pages need a taller capture
     for name, html in sheets.items():
         render_png(html, IMG / f"{name}.png", win_h=tall.get(name, 1500))
     render_logo(IMG / "crucible_logo.png", LOGO_FULL)

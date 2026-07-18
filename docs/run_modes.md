@@ -9,9 +9,12 @@ diagnosis.
 
 | Mode | The question it answers | What you call | Output |
 |---|---|---|---|
-| **Full range** | Is there an edge at all, or small-sample noise? | `edge_report` + `reality_check` | console report + a `tearsheet()` (HELD / FRAGILE / FAIL) |
-| **Holdout** | Does it survive an early-train / late-confirm split? | `validation.holdout` | console scorecard (TRAIN vs the untouched TEST) |
+| **Full range** | Is there an edge at all, or small-sample noise? | `edge_report` + `reality_check` | console + a `fullrange_scorecard()` (verdict, total R, R/year) |
+| **Holdout** | Does it survive an early-train / late-confirm split? | `validation.holdout` | console + a `holdout_report()` scorecard (TRAIN vs the untouched TEST) |
 | **Gauntlet** | Real, strong, durable, general: the deployable verdict? | `validation.run_gauntlet` | console audit + a `gauntlet_report()` tearsheet |
+
+Each mode has its own report layout in `crucible.report`, styled apart so a full-range
+read never gets mistaken for the gauntlet verdict.
 
 Below, one strategy runs through all three. It is a **Donchian channel breakout** that
 looks great and does not survive: go long when price closes above the prior 20-bar high,
@@ -53,11 +56,16 @@ reality_check(trades)
 ```
 
 The CI lower bound (**+0.253**) clears zero, and across 10,000 resamples the edge stays
-positive. Verdict **HELD**: on the whole history this is not small-sample noise. The
-same read renders as a shareable tearsheet, the verdict banner, the metric row, and the
-edge panels behind it:
+positive. Verdict **HELD**: on the whole history this is not small-sample noise.
+`fullrange_scorecard()` renders it as a shareable page, led by the numbers the verdict is
+about, total R and R per year, then the metric row and the edge panels:
 
-![A crucible full-range tearsheet for the Donchian breakout: a green HELD banner (expectancy +0.512R, CI [+0.253, +0.772]), the metric row, the R-multiple distribution, a cumulative-R curve rising to about 80R, the MFE/MAE excursion scatter, and a bootstrap-expectancy histogram sitting entirely right of zero.](img/donchian_tearsheet.png){ width="640" }
+```python
+from crucible.report import fullrange_scorecard
+fullrange_scorecard(trades, "fullrange.html")
+```
+
+![A crucible full-range scorecard for the Donchian breakout: an eyebrow reading 'full range, whole history, reality_check', then big stat tiles, a green HELD verdict, +83.0R total, +5.3R per year, +0.512R expectancy, then the metric row and four edge panels (R-multiple distribution, a cumulative-R curve rising to about 80R, the MFE/MAE excursion scatter, and a bootstrap-expectancy histogram right of zero).](img/donchian_fullrange.png){ width="640" }
 
 A backtester would stop right here, with that rising curve, and sell you the system.
 crucible does not: **HELD on the pooled log is necessary, not sufficient.** It says the
@@ -82,8 +90,15 @@ HOLDOUT @ 2016-01-01 (embargo 8w)
 The TRAIN half looks good, as it should, that is where an edge would have been chosen.
 The honest read is the **TEST** half, and it is **HELD** too: expectancy +0.500R with a
 CI clear of zero on 84 trades the split kept hidden. So a single clean early/late split
-does *not* catch this breakout either. (Holdout is a console scorecard. crucible does not
-render a tearsheet for it.)
+does *not* catch this breakout either. `holdout_report()` renders the split as two cards,
+TRAIN and the emphasized TEST, over a cumulative-R curve marked at the split and embargo:
+
+```python
+from crucible.report import holdout_report
+holdout_report(trades, "2016-01-01", "holdout.html", embargo_weeks=8)
+```
+
+![A crucible holdout scorecard for the Donchian breakout: an eyebrow reading 'holdout, early-train / late-confirm, split 2016-01-01, embargo 8w', a TRAIN card (n=77, HELD, +0.545R) and an emphasized TEST card (n=84, HELD, +0.500R, 'the honest read'), and a cumulative-R chart with the split line and embargo band marked.](img/donchian_holdout.png){ width="640" }
 
 ## Gauntlet: the deployable verdict
 

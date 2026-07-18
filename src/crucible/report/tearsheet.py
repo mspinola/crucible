@@ -154,6 +154,29 @@ def report_css() -> str:
   table.cr-checks td.bul {{ width: 132px; padding-right: 14px; }}
   .cr-cbul {{ display: inline-block; vertical-align: middle; }}
   .cr-foot {{ color: var(--cr-faint); font-size: 12px; margin-top: 20px; }}
+  /* Scorecard chrome (fullrange_scorecard / holdout_report) — deliberately unlike
+     the gauntlet banner: an eyebrow + big stat tiles, not a pill + pillar chips. */
+  .cr-eyebrow {{ font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+               color: var(--cr-muted); font-weight: 600; margin: 2px 0 12px; }}
+  .cr-tiles {{ display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 18px; }}
+  .cr-tile {{ flex: 1 1 132px; min-width: 122px; border: 1px solid var(--cr-border);
+            border-radius: 10px; padding: 13px 16px; background: var(--cr-card); }}
+  .cr-tile .v {{ font-size: 23px; font-weight: 700; font-variant-numeric: tabular-nums;
+               line-height: 1.12; }}
+  .cr-tile .k {{ font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+               color: var(--cr-muted); margin-top: 4px; display: block; }}
+  .cr-tile.cr-verdict-tile {{ color: #fff; border: 0; }}
+  .cr-tile.cr-verdict-tile .k {{ color: rgba(255,255,255,.85); }}
+  .cr-split {{ display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 16px; }}
+  .cr-splitcard {{ flex: 1 1 250px; border: 1px solid var(--cr-border); border-radius: 10px;
+                 padding: 14px 18px; background: var(--cr-card); }}
+  .cr-splitcard.cr-honest {{ border-width: 2px; }}
+  .cr-splitcard .role {{ font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+                       color: var(--cr-muted); }}
+  .cr-splitcard .verd {{ font-size: 19px; font-weight: 700; margin: 3px 0 7px; }}
+  .cr-splitcard .line {{ font-size: 13.5px; color: var(--cr-fg);
+                       font-variant-numeric: tabular-nums; }}
+  .cr-splitcard .sub {{ font-size: 12px; color: var(--cr-muted); margin-top: 7px; }}
 """
 
 

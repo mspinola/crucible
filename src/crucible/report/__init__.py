@@ -27,10 +27,13 @@ from crucible.report.tearsheet import (
     cumulative_r,
     monthly_r,
 )
+from crucible.report.scorecards import fullrange_scorecard, holdout_report
 
 __all__ = [
     "tearsheet",
     "gauntlet_report",
+    "fullrange_scorecard",
+    "holdout_report",
     "verdict_banner",
     "verdict_summary",
     "pillar_bullets",
