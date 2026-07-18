@@ -435,6 +435,14 @@ def _favicon_href() -> str:
     return "data:image/svg+xml," + quote(svg)
 
 
+def title_lockup(title: str, *, size: int = 34) -> str:
+    """The crucible mark + page title as one top-left lockup (the ``.cr-title`` row
+    from ``report_css``). The single source of the branded header so every tearsheet
+    — crucible's own and any host's — carries the logo, not just the gauntlet page.
+    Returns ``''`` for a falsy title so callers can drop the header cleanly."""
+    return f"<div class='cr-title'>{_logo_svg(size=size)}<h1>{title}</h1></div>" if title else ""
+
+
 def verdict_banner(gauntlet, *, title: Optional[str] = None,
                    subtitle: Optional[str] = None, pillar_notes: Optional[dict] = None,
                    note_html: str = "") -> str:
@@ -469,7 +477,7 @@ def verdict_banner(gauntlet, *, title: Optional[str] = None,
         else:
             chips.append(f"<span class='na'>{p} {pillar_notes.get(p, '—')}</span>")
     summary = " &nbsp;·&nbsp; ".join(chips)
-    head = (f"<div class='cr-title'>{_logo_svg(size=34)}<h1>{title}</h1></div>") if title else ""
+    head = title_lockup(title)
     sub = f"<div class='cr-sub'>{subtitle}</div>" if subtitle else ""
     pill = (f"<div class='cr-verdict' style='background:{color}'>{label}"
             f"{' <small>scope-limited</small>' if state == 'scope' else ''}</div>")
@@ -921,7 +929,7 @@ def tearsheet(trades: TradeLog, path: str = "tearsheet.html", *,
     metrics = metrics_table(trades)
     panels = edge_panels(trades, include_plotlyjs=include_plotlyjs, n_boot=n_boot, seed=seed,
                          period_returns=period_returns, block=block, stationary=stationary)
-    inner = f"<h1>{title}</h1>{sub}{banner}{metrics}{panels}{_FOOT}"
+    inner = f"{title_lockup(title)}{sub}{banner}{metrics}{panels}{_FOOT}"
     doc = _page(title, inner)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(doc)
