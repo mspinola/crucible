@@ -169,7 +169,7 @@ whole null distribution.
 > return accounting: the ATR-based risk unit (`1R = sl × ATR`) is the trade-log echo of
 > Carver, *Systematic Trading*, **Ch. 9 "Volatility Targeting"** — the same volatility unit,
 > applied to *measuring* each trade rather than *sizing* it (position sizing itself is the
-> **SURVIVE** handoff, §10). The leakage-free barrier construction is
+> **SURVIVE** handoff, §11; its sources are in §10). The leakage-free barrier construction is
 > the same geometry ML uses to label forward outcomes (López de Prado, *Advances in
 > Financial Machine Learning*, **§3.4 "The Triple-Barrier Method"**, cross-referenced in
 > §7) — but here it turns *any* entry rule into trades, ML or not.
@@ -520,7 +520,7 @@ across markets), where studentization matters most.
 
 The tests above correct for **one** search: the parameter/config variants you tried. But a book
 that applies **one universal rule across many markets** is running a *second*, implicit search —
-testing 27 markets is 27 shots at a winner. The **GENERAL** gate asks whether the edge *travels*,
+testing 28 markets is 28 shots at a winner. The **GENERAL** gate asks whether the edge *travels*,
 and prices that second search exactly as §5c/§5d price the first.
 
 It's the same max-statistic idea, one axis over: treat **each market's per-trade returns as a
@@ -1173,9 +1173,11 @@ goes on to **DURABLE** and the rest of the ladder, same as any other edge.
 
 ## Bibliography
 
-Listed in rough order of contribution to the significance machinery. Where a book is
-organized by topic rather than fixed pagination (SSML) or where I cite a chapter rather than
-a verified page, that is stated explicitly.
+Listed in rough order of contribution to the significance machinery. Items **1–6 are the
+significance canon** — "the six-book set" referenced above; **7–8** cover the position-sizing
+(SURVIVE) layer crucible hands off. Where a book is organized by topic rather than fixed
+pagination (SSML) or where I cite a chapter rather than a verified page, that is stated
+explicitly.
 
 1. **Aronson, David R. — *Evidence-Based Technical Analysis*** (Wiley, 2006/2007).
    *The statistical backbone.* Ch. 4 "Statistical Analysis" (p. 165); Ch. 5 "Hypothesis
@@ -1214,7 +1216,7 @@ a verified page, that is stated explicitly.
 5. **Carver, Robert — *Systematic Trading*** (Harriman House, 2015). *Overfitting discipline
    and portfolio structure.* Ch. 3 "Fitting" → in-sample/out-of-sample, robust simple
    parameters; Ch. 9 "Volatility Targeting" → the volatility risk unit behind R-normalized
-   returns (§1), Ch. 10 "Position Sizing" → the sizing handoff (SURVIVE, §10); Ch. 11
+   returns (§1), Ch. 10 "Position Sizing" → the sizing handoff (SURVIVE, §11); Ch. 11
    "Portfolios" and Appendix C "Portfolio Optimisation" (bootstrapping,
    rule-of-thumb correlations) and Appendix D "→ Calculation of diversification multiplier"
    → the number-of-independent-bets idea behind `N_eff`.
@@ -1223,7 +1225,8 @@ a verified page, that is stated explicitly.
    *Referenced to a lesser extent.* The Sharpe-ratio / return-evaluation chapters (a
    performance statistic is itself an estimate with error) and the instrument-diversification
    / diversification-multiplier material across a large futures universe — the practical
-   counterpart to `crucible.breadth` and `portfolio_mc.py`. *(Cited at concept/chapter level.)*
+   counterpart to `crucible.breadth` and the portfolio Monte Carlo crucible hands off (§10).
+   *(Cited at concept/chapter level.)*
 
 7. **Van Tharp, Van K. — *Definitive Guide to Position Sizing*** (IITM, 2008) and ***Trade Your
    Way to Financial Freedom***, 2nd ed. (McGraw-Hill, 2007). *The R/SQN origin and the
