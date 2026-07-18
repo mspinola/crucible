@@ -233,9 +233,11 @@ Still capital-free: it judges *signals and features*, never an equity curve.
 ## What this is, and isn't
 
 ✅ Trade-level edge metrics, excursion efficiency, bootstrap CIs, a random-entry
-reality check, all **capital-free**.
+reality check, all **capital-free**. Costs are in scope: test on `r` **net of
+your commission and slippage**. The tutorial provides a simple per-trade cost
+model for the netting, or supply your own.
 
-❌ No capital, position sizing, commissions, CAGR, drawdown, or
+❌ No capital, position sizing, CAGR, drawdown, or
 Monte-Carlo-on-equity. *If you want an equity curve, hand the `TradeLog` to
 [quantstats](https://github.com/ranaroussi/quantstats). crucible stops at the edge.*
 
@@ -346,21 +348,24 @@ feature set.)*
 
 ## Ecosystem
 
-crucible is one piece of a small, deliberately unbundled toolchain. Each part
-owns one layer and stops there:
+The only input crucible needs is a trade log: the bundled barrier simulator, a
+backtester export (see the RealTest section above), or any frame you map onto
+`TradeLog`. If you also need futures/COT data to build a signal from, there is
+an optional companion:
 
-- **[cotdata](https://github.com/mspinola/cotdata)**: the *data* layer. A local,
-  file-based store for futures prices and CFTC Commitments-of-Traders positioning,
-  with a producer/consumer split so research, backtests, and dashboards all read
-  identical data. Point it at a store, `import cotdata`, and you have the OHLC
-  frames and COT series you build a signal from.
+- **[cotdata](https://github.com/mspinola/cotdata)**: an *optional* data layer. A
+  local, file-based store for futures prices and CFTC Commitments-of-Traders
+  positioning: a common wrapper around Norgate, Databento, or yfinance behind
+  one read API, extensible to other data providers. Point it at a store,
+  `import cotdata`, and you have the OHLC frames and COT series you build a
+  signal from.
 - **crucible** *(this package)*: the *edge* layer. Turn that signal into a trade
   log and find out whether the edge is real.
 
 The flow runs one direction: **`cotdata` (data) → your signal → `crucible`
-(edge)**. Neither imports the other, so either works alone, but together they
-take you from raw CFTC/price data to a capital-free verdict with no vendor SDK at
-runtime.
+(edge)**. Neither imports the other. crucible works alone with any source of
+trades, and together they take you from raw CFTC/price data to a capital-free
+verdict with no vendor SDK at runtime.
 
 ## Releasing
 

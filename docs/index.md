@@ -179,10 +179,13 @@ print(gauntlet.passed)  # True only if every gate that ran passed
 ## What this is, and isn't
 
 ✅ Trade-level edge metrics, excursion efficiency, bootstrap CIs, a
-random-entry reality check, all **capital-free**.
+random-entry reality check, all **capital-free**. Costs are in scope: test on
+`r` **net of your commission and slippage** — the
+[tutorial provides a simple per-trade cost model](tutorial.md#1-the-substrate-a-risk-normalized-trade-log-r-multiples)
+for the netting, or supply your own.
 
-❌ No capital, position sizing, commissions, CAGR, drawdown, or
-Monte-Carlo-on-equity. *If you want an equity curve, hand the `TradeLog` to
+❌ No capital, position sizing, CAGR, drawdown, or Monte-Carlo-on-equity. *If
+you want an equity curve, hand the `TradeLog` to
 [quantstats](https://github.com/ranaroussi/quantstats). crucible stops at the
 edge.*
 
@@ -195,16 +198,21 @@ Prefer offline? [Download it as a PDF](https://mspinola.github.io/crucible/tutor
 
 ## Ecosystem
 
-crucible is one piece of a small, deliberately unbundled toolchain:
+**The only input crucible needs is a trade log.** Build one with the bundled
+barrier simulator, export it from your backtester, or map any frame onto
+`TradeLog` — crucible hands back the verdict either way, whatever your data
+source.
 
-- **[cotdata](https://github.com/mspinola/cotdata)** — the *data* layer. A
-  local, file-based store for futures prices and CFTC Commitments-of-Traders
-  positioning.
-- **crucible** *(this package)* — the *edge* layer. Turn a signal into a trade
-  log and find out whether the edge is real.
+If you also need futures / COT data to build a signal from, there's an
+optional companion:
+
+- **[cotdata](https://github.com/mspinola/cotdata)** — an *optional* data
+  layer: a local, file-based store that wraps Norgate, Databento, or yfinance
+  behind one read API, extensible to other data providers.
 
 The flow runs one direction: **`cotdata` (data) → your signal → `crucible`
-(edge)**. Neither imports the other, so either works alone.
+(edge)**. Neither imports the other — crucible works alone with any source of
+trades.
 
 ---
 
