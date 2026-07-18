@@ -5,7 +5,8 @@ A maintainer helper, NOT part of the docs build — the committed PNGs are what 
 site and PDF use. Run it when a worked example changes or a diagram needs an edit.
 
 Rendered from ``crucible.report`` blocks, so they never drift from the numbers:
-  gauntlet_hero/scope/gates/cumr/bootstrap.png  the §12 Donchian run (and §11 scope)
+  gauntlet_hero/scope/gates/cumr/bootstrap.png  the Donchian gauntlet run (and §11 scope)
+  donchian_tearsheet.png                        the Donchian full-range tearsheet (run modes)
   ml_decay.png / ml_verdict.png                 the §13 ML take/skip example
 
 Hand-authored HTML/SVG explainers, kept below as the editable source of truth:
@@ -163,11 +164,13 @@ def report_sheets() -> dict[str, str]:
     dg = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dg)
     import numpy as np
-    from crucible.edge import reality_check, expectancy
+    from crucible.edge import reality_check, expectancy, barrier_trades
     from crucible.validation import walk_forward, run_gauntlet, Thresholds
     from crucible.report import (verdict_banner, metrics_table, verdict_summary,
-                                 gate_block, cumulative_r, report_css)
-    from crucible.report.tearsheet import _PILLARS, _plotly, _COSTS_NOT_ATTESTED
+                                 gate_block, cumulative_r, report_css,
+                                 edge_panels, title_lockup)
+    from crucible.report.tearsheet import (_PILLARS, _plotly, _COSTS_NOT_ATTESTED,
+                                           _reality_banner, _FOOT)
 
     px = dg.synthetic_prices()
     tp, sl, to = 2.5, 1.0, 30
@@ -245,12 +248,25 @@ def report_sheets() -> dict[str, str]:
     figb.update_yaxes(gridcolor=grid, zerolinecolor=grid)
     chartb = figb.to_html(full_html=False, include_plotlyjs=True)
 
+    # Full-range single-book tearsheet (the "run modes" page): the WHOLE-history
+    # Donchian log (not the stitched OOS one `trades` points at) judged by
+    # reality_check — HELD, before the walk-forward durability gate rejects it.
+    # This is what tearsheet() renders, shown alongside the gauntlet report so
+    # both output shapes appear on the site.
+    full_trades = barrier_trades(px, dg.donchian(px, 20), side="long", tp=tp, sl=sl, timeout=to)
+    full = reality_check(full_trades)
+    ts = (title_lockup("Donchian breakout — full range")
+          + f"<div class='cr-sub'>whole history · {full_trades.n} trades · reality_check</div>"
+          + _reality_banner(full) + metrics_table(full_trades)
+          + edge_panels(full_trades, include_plotlyjs=True) + _FOOT)
+
     return {
         "gauntlet_hero": _sheet(hero, 840, css),
         "gauntlet_scope": _sheet(scope, 840, css),
         "gauntlet_bootstrap": _sheet(chartb, 840, css),
         "gauntlet_gates": _sheet(gates, 840, css),
         "gauntlet_cumr": _sheet(chart, 840, css),
+        "donchian_tearsheet": _sheet(ts, 840, css),
     }
 
 
@@ -329,15 +345,18 @@ def ml_sheets() -> dict[str, str]:
     return {"ml_decay": _sheet(decay, 720, css), "ml_verdict": _sheet(verdict, 720, css)}
 
 
-def render_png(html: str, out: Path, pad: int = 22) -> None:
-    """Headless-render HTML to a 2x PNG, then autocrop the page background."""
+def render_png(html: str, out: Path, pad: int = 22, win_h: int = 1500) -> None:
+    """Headless-render HTML to a 2x PNG, then autocrop the page background.
+    ``win_h`` is the capture window height; a full tearsheet needs a taller one
+    than a single report block so the bottom panels aren't clipped."""
     from PIL import Image, ImageChops
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as fh:
         fh.write(html)
         src = fh.name
     raw = out.with_suffix(".raw.png")
     subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                    "--force-device-scale-factor=2", "--window-size=880,1500",
+                    "--force-device-scale-factor=2", f"--window-size=880,{win_h}",
+                    "--virtual-time-budget=4000",
                     f"--screenshot={raw}", f"file://{src}"],
                    check=True, capture_output=True)
     im = Image.open(raw).convert("RGB")
@@ -396,8 +415,9 @@ def main() -> None:
     sheets["gate_ladder"] = GATE_LADDER_HTML
     sheets["meta_label"] = META_LABEL_HTML
     sheets["purge_embargo"] = PURGE_EMBARGO_HTML
+    tall = {"donchian_tearsheet": 2600}    # full tearsheets need a taller capture
     for name, html in sheets.items():
-        render_png(html, IMG / f"{name}.png")
+        render_png(html, IMG / f"{name}.png", win_h=tall.get(name, 1500))
     render_logo(IMG / "crucible_logo.png", LOGO_FULL)
     render_logo(IMG / "crucible_logo_white.png", LOGO_MONO)  # site header (teal bar)
 
