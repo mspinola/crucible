@@ -1,3 +1,26 @@
+/* Landing page hero — centred pitch with the mark above the headline. */
+.md-typeset .hero {
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+.md-typeset .hero .hero-logo {
+  height: 5rem;
+  width: auto;
+}
+.md-typeset .hero h1 {
+  font-size: 2.1em;
+  margin: 0.4em auto 0.5em;
+  max-width: 24em;
+}
+.md-typeset .hero p {
+  max-width: 42em;
+  margin-left: auto;
+  margin-right: auto;
+}
+.md-typeset .hero .md-button {
+  margin: 0.25rem 0.25rem;
+}
+
 /* The crucible mark inline in the tutorial's H1 title — scale it to the title
    and centre it vertically (baseline alignment sits it too low). */
 .md-typeset h1 img.logo {
