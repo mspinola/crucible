@@ -6,7 +6,7 @@ from crucible.edge import barrier_trades          # noqa: E402
 from crucible.strategies import ma_cross           # noqa: E402
 from crucible.report import (                      # noqa: E402
     tearsheet, cumulative_r, gauntlet_report, verdict_banner, verdict_summary,
-    gate_block, edge_panels, metrics_table, report_css, monthly_r,
+    gate_block, edge_panels, metrics_table, report_css, monthly_r, title_lockup,
 )
 from crucible.validation import run_gauntlet, walk_forward  # noqa: E402
 
@@ -38,6 +38,8 @@ def test_tearsheet_writes_self_contained_html(ohlc, tmp_path):
     assert any(v in html for v in ("HELD", "FRAGILE", "FAIL"))   # verdict rendered
     assert "plotly" in html.lower()                              # js inlined
     assert out.stat().st_size > 100_000                          # self-contained (plotly.js)
+    # the crucible mark now rides the top-left of every tearsheet, not just the gauntlet
+    assert "cr-title" in html and "aria-label='crucible'" in html
 
 
 def test_tearsheet_handles_empty_log(tmp_path):
@@ -378,3 +380,18 @@ def test_strong_whisker_guards(ohlc):
     strong = next(gt for gt in g.gates if gt.name == "STRONG")
     assert _strong_whisker(None, tl) == ""                        # no gate
     assert _strong_whisker(strong, TradeLog.from_arrays(r=[])) == ""  # no trades
+
+
+def test_title_lockup_pairs_logo_with_title():
+    html = title_lockup("My Book")
+    assert "cr-title" in html                       # the lockup row
+    assert "aria-label='crucible'" in html          # the mark
+    assert "<h1>My Book</h1>" in html
+    assert title_lockup("") == ""                    # falsy title → droppable header
+
+
+def test_gauntlet_report_uses_the_same_lockup(ohlc):
+    # the gauntlet banner must render via the shared lockup, not a bespoke header
+    tl, g = _full_gauntlet(ohlc)
+    doc = gauntlet_report(g, tl, title="Book", include_plotlyjs=False)
+    assert title_lockup("Book") in doc

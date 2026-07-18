@@ -23,6 +23,7 @@ from crucible.report.tearsheet import (
     edge_panels,
     metrics_table,
     report_css,
+    title_lockup,
     cumulative_r,
     monthly_r,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "edge_panels",
     "metrics_table",
     "report_css",
+    "title_lockup",
     "cumulative_r",
     "monthly_r",
 ]
