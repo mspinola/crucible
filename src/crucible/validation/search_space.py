@@ -92,7 +92,29 @@ class SearchSpaceLog:
         return entry
 
     def mark_selected(self, params: Dict[str, Any], score: Optional[float] = None, **extra):
-        """Convenience: record the variant that was ultimately chosen."""
+        """Mark an already-recorded variant as the one that was chosen.
+
+        Updates the most recent matching non-selected entry IN PLACE. It does not
+        append — appending would add a phantom variant and inflate `n_variants` /
+        `session_n_variants`, the very count the ledger exists to keep honest (a
+        winner is a variant you *tried*, not an extra one). If `params` were never
+        recorded, falls back to recording a new 'selected' variant, since it
+        genuinely is one.
+
+        Note: on the in-place path a persisted JSONL file keeps its original
+        'tried' line — correct for the COUNT (still one variant tried). The
+        'selected' status is authoritative in memory for this run; it is not
+        re-persisted, because the ledger's persisted job is the cumulative count,
+        not per-run selection.
+        """
+        for entry in reversed(self.entries):
+            if entry['params'] == params and entry['status'] != 'selected':
+                entry['status'] = 'selected'
+                if score is not None:
+                    entry['score'] = score
+                if extra:
+                    entry.update(extra)
+                return entry
         return self.record(params, score=score, status='selected', **extra)
 
     @property

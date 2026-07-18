@@ -90,3 +90,29 @@ def test_extra_kwargs_are_stored():
     log = SearchSpaceLog(scope='ES:ma_cross_grid')
     entry = log.record({'fast': 10}, fixed={'kind': 'sma', 'tp': 2.0})
     assert entry['fixed'] == {'kind': 'sma', 'tp': 2.0}
+
+
+def test_mark_selected_updates_in_place_and_does_not_inflate_the_count():
+    # Pre-register the grid, then mark the winner. The winner is a variant that
+    # was TRIED, not an extra one — marking it must not add a phantom variant.
+    log = SearchSpaceLog(scope='ES:ma_cross_grid')
+    for slow in (50, 100, 200):
+        log.record({'slow': slow}, status='tried')
+    assert log.session_n_variants == 3
+
+    entry = log.mark_selected({'slow': 100}, score=0.4)
+    assert log.session_n_variants == 3          # not 4 — the bug this fixes
+    assert log.n_variants == 3
+    assert entry['status'] == 'selected' and entry['score'] == 0.4
+    # the pre-registered entry was flipped, not duplicated
+    selected = [e for e in log.entries if e['status'] == 'selected']
+    assert len(selected) == 1 and selected[0]['params'] == {'slow': 100}
+
+
+def test_mark_selected_records_a_new_variant_when_not_pre_registered():
+    # If the chosen params were never tried, it genuinely is a new variant.
+    log = SearchSpaceLog(scope='ES:ma_cross_grid')
+    log.record({'slow': 50}, status='tried')
+    log.mark_selected({'slow': 999}, score=1.0)
+    assert log.session_n_variants == 2
+    assert log.best()['params'] == {'slow': 999}
