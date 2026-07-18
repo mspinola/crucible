@@ -18,9 +18,10 @@ read never gets mistaken for the gauntlet verdict.
 
 Below, one strategy runs through all three. It is a **Donchian channel breakout** that
 looks great and does not survive: go long when price closes above the prior 20-bar high,
-exit on a 2.5R target, a 1R stop, or a 30-bar cap. The full runnable script is
-[`examples/donchian_gauntlet.py`](https://github.com/mspinola/crucible/blob/main/examples/donchian_gauntlet.py),
-on reproducible synthetic prices, so these are the exact numbers you get.
+exit on a 2.5R target, a 1R stop, or a 30-bar cap. Each mode has a runnable script in
+[`examples/`](https://github.com/mspinola/crucible/tree/main/examples), one per section
+below, all on the same reproducible synthetic prices, so these are the exact numbers you
+get.
 
 ```python
 from crucible.edge import barrier_trades, edge_report, reality_check
@@ -62,7 +63,7 @@ about, total R and R per year, then the metric row and the edge panels:
 
 ```python
 from crucible.report import fullrange_scorecard
-fullrange_scorecard(trades, "fullrange.html")
+fullrange_scorecard(trades, "fullrange.html")   # or run: python examples/donchian_fullrange.py
 ```
 
 ![A crucible full-range scorecard for the Donchian breakout: an eyebrow reading 'full range, whole history, reality_check', then big stat tiles, a green HELD verdict, +83.0R total, +5.3R per year, +0.512R expectancy, then the metric row and four edge panels (R-multiple distribution, a cumulative-R curve rising to about 80R, the MFE/MAE excursion scatter, and a bootstrap-expectancy histogram right of zero).](img/donchian_fullrange.png){ width="640" }
@@ -95,7 +96,7 @@ TRAIN and the emphasized TEST, over a cumulative-R curve marked at the split and
 
 ```python
 from crucible.report import holdout_report
-holdout_report(trades, "2016-01-01", "holdout.html", embargo_weeks=8)
+holdout_report(trades, "2016-01-01", "holdout.html", embargo_weeks=8)  # or: python examples/donchian_holdout.py
 ```
 
 ![A crucible holdout scorecard for the Donchian breakout: an eyebrow reading 'holdout, early-train / late-confirm, split 2016-01-01, embargo 8w', a TRAIN card (n=77, HELD, +0.545R) and an emphasized TEST card (n=84, HELD, +0.500R, 'the honest read'), and a cumulative-R chart with the split line and embargo band marked.](img/donchian_holdout.png){ width="640" }
@@ -109,7 +110,7 @@ stitches the out-of-sample slices into one honest log.
 
 ```python
 wf = walk_forward(px, donchian, {"lookback": [20, 40]}, is_days=3*365, oos_days=365)
-run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)
+run_gauntlet(wf.stitched, prices=px, wf=wf, n_variants=2)   # or: python examples/donchian_gauntlet.py
 ```
 
 ```

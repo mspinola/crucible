@@ -1,10 +1,12 @@
-"""Worked example for the tutorial (docs/tutorial.md §12; https://mspinola.github.io/crucible/tutorial/).
+"""Gauntlet run of the Donchian breakout (the Run modes page:
+https://mspinola.github.io/crucible/run_modes/).
 
 A Donchian channel breakout run end to end through crucible: describe the edge,
 reality-check it, walk it forward, and put it through the gauntlet. Uses
 reproducible synthetic prices (no network) so it prints the exact numbers the
-tutorial walks through — a breakout that is real and strong in aggregate (REAL ✓,
-STRONG ✓) yet fails DURABLE, so the gauntlet rejects it.
+Run modes page walks through — a breakout that is real and strong in aggregate
+(REAL ✓, STRONG ✓) yet fails DURABLE, so the gauntlet rejects it. Its whole-history
+and holdout reads are donchian_fullrange.py and donchian_holdout.py.
 
     python examples/donchian_gauntlet.py
 """
