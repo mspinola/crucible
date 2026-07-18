@@ -1,4 +1,4 @@
-"""Worked example for the tutorial (docs/index.md §13; https://mspinola.github.io/crucible/).
+"""Worked example for the tutorial (docs/tutorial.md §13; https://mspinola.github.io/crucible/tutorial/).
 
 A meta-labeling take/skip filter, run end to end through crucible's ML track and
 gauntlet. A primary signal has already produced a book of candidate trades; a model

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the tutorial (docs/index.md) to a distribution PDF.
+"""Render the tutorial (docs/tutorial.md) to a distribution PDF.
 
 Pure-Python pipeline, no system libraries: python-markdown builds styled HTML,
 xhtml2pdf turns it into a paginated PDF. The docs CI runs this after
@@ -26,7 +26,7 @@ import markdown
 from gate_tokens import wrap_gate_tokens
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_SRC = HERE / "index.md"
+DEFAULT_SRC = HERE / "tutorial.md"
 SITE_URL = "https://mspinola.github.io/crucible/"
 
 # xhtml2pdf renders on the built-in Helvetica/Courier fonts, which don't cover
@@ -162,7 +162,7 @@ def render_pdf(src_path: Path, out_path: Path) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--src", type=Path, default=DEFAULT_SRC, help="Markdown source (default: docs/index.md)")
+    ap.add_argument("--src", type=Path, default=DEFAULT_SRC, help="Markdown source (default: docs/tutorial.md)")
     ap.add_argument("--out", type=Path, default=Path("tutorial.pdf"), help="output PDF path")
     args = ap.parse_args()
     render_pdf(args.src, args.out)

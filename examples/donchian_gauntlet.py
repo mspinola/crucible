@@ -1,4 +1,4 @@
-"""Worked example for the tutorial (docs/index.md §12; https://mspinola.github.io/crucible/).
+"""Worked example for the tutorial (docs/tutorial.md §12; https://mspinola.github.io/crucible/tutorial/).
 
 A Donchian channel breakout run end to end through crucible: describe the edge,
 reality-check it, walk it forward, and put it through the gauntlet. Uses
