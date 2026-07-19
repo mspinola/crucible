@@ -4,7 +4,11 @@ crucible.validation — does the edge survive out of sample?
 The honest tests you run once you have a TradeLog (or a strategy + prices):
 
   holdout        an early-train / late-confirm temporal split, leakage-controlled
+                 (segmented_holdout runs the same split sliced by a group column;
+                 full_sample is the whole-book, in-sample counterpart — no split)
   walk_forward   Pardo anchored/rolling walk-forward with per-fold efficiency
+  windows        windowed_segments — a descriptive (segment × era) metric grid
+                 over an existing log (no refit); shows where/when the edge lived
   permutation    sign-permutation p-value, data-mining correction, White's
                  Reality Check + Hansen's SPA (its more powerful successor)
                  across every variant you searched
@@ -17,9 +21,15 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
   gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
                  DURABLE / GENERAL gates + run_gauntlet, gated by Thresholds
 """
-from crucible.validation.holdout import holdout, split_train_test, HoldoutResult
+from crucible.validation.holdout import (
+    holdout, split_train_test, HoldoutResult,
+    segmented_holdout, SegmentedHoldout, full_sample,
+)
 from crucible.validation.walk_forward import (
     walk_forward, WalkForwardResult, Fold,
+)
+from crucible.validation.windows import (
+    windowed_segments, WindowedSegments, WindowCell,
 )
 from crucible.validation.permutation import (
     sign_permutation_pvalue, sidak_correction, whites_reality_check, spa_test,
@@ -37,7 +47,9 @@ from crucible.validation.gauntlet import (
 
 __all__ = [
     "holdout", "split_train_test", "HoldoutResult",
+    "segmented_holdout", "SegmentedHoldout", "full_sample",
     "walk_forward", "WalkForwardResult", "Fold",
+    "windowed_segments", "WindowedSegments", "WindowCell",
     "sign_permutation_pvalue", "sidak_correction", "whites_reality_check", "spa_test",
     "pbo_cscv", "PBOResult", "deflated_sharpe", "DeflatedSharpe",
     "SearchSpaceLog",
