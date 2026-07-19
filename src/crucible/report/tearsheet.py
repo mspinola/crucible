@@ -883,6 +883,172 @@ def edge_ratio_curve(horizons, eratio, *, include_plotlyjs: bool = False) -> str
     return _embed(fig, include_plotlyjs)
 
 
+def gross_net_equity(trades: TradeLog, *, cost=None,
+                     include_plotlyjs: bool = False) -> str:
+    """Gross vs net cumulative R with the cost-drag haircut annotated. Net is the log's
+    own ``r``; gross is net + the per-trade cost, so this needs a cost series in R.
+    Provide it as ``cost`` — an array aligned to the trades, or the name of a column —
+    or let it fall back to a ``cost``/``cost_r`` column on the log. Costs are a haircut
+    in R (≥ 0), keeping the panel capital-free. Trades are ordered by exit date (entry
+    date as a fallback). Returns '' when no cost is available or the total cost is 0."""
+    go, _ = _plotly()
+    if trades.n == 0:
+        return ""
+    if isinstance(cost, str):
+        cost = trades.col(cost)
+    for fallback in ("cost", "cost_r"):          # convention columns, if not passed
+        if cost is None:
+            cost = trades.col(fallback)
+    if cost is None:
+        return ""
+    cost = np.asarray(cost, dtype=float)
+    net_r = trades.r
+    if len(cost) != len(net_r):
+        return ""
+    f = trades.frame
+    order = "exit_date" if "exit_date" in f.columns else (
+        "entry_date" if "entry_date" in f.columns else None)
+    d = pd.DataFrame({"net": net_r, "cost": cost})
+    if order is not None:
+        d[order] = pd.to_datetime(f[order].to_numpy())
+    d = d.dropna(subset=["net", "cost"])
+    if d.empty or float(d["cost"].abs().sum()) == 0:
+        return ""
+    if order is not None:
+        d = d.sort_values(order)
+        x = d[order]
+    else:
+        x = pd.Series(range(len(d)))
+    net = d["net"].cumsum().to_numpy()
+    gross = (d["net"] + d["cost"]).cumsum().to_numpy()
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x, y=gross, mode="lines", line=dict(color="#8b949e", width=1.5, dash="dot"),
+        name="Gross", hovertemplate="%{x}<br>gross ΣR %{y:+.1f}<extra></extra>"))
+    fig.add_trace(go.Scatter(x=x, y=net, mode="lines", line=dict(color=_POS, width=2), name="Net",
+        fill="tonexty", fillcolor="rgba(180,35,24,0.12)",
+        hovertemplate="%{x}<br>net ΣR %{y:+.1f}<extra></extra>"))
+    fig.add_hline(y=0, line_dash="dot", line_color="rgba(128,128,128,0.5)")
+    haircut = float(gross[-1] - net[-1])
+    fig.add_annotation(xref="paper", yref="paper", x=0.02, y=0.96, xanchor="left", showarrow=False,
+        text=f"cost drag <b>{haircut:.1f} R</b> over {len(d)} trades "
+             f"(gross {gross[-1]:+.1f} → net {net[-1]:+.1f})", font=dict(size=12, color="#8b949e"))
+    fig.update_layout(height=360, margin=dict(l=55, r=20, t=20, b=45),
+        legend=dict(orientation="h", y=1.08, x=1, xanchor="right"),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title="Exit date" if order else "Trade #", yaxis_title="Cumulative R")
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    return _embed(fig, include_plotlyjs)
+
+
+def concurrency_timeline(trades: TradeLog, *, cap=None,
+                         include_plotlyjs: bool = False) -> str:
+    """Concurrent open positions over time — a step area built from entry/exit events,
+    with the peak marked and an optional ``cap`` drawn as a reference line. The
+    cross-position concurrency that drives a book's drawdown. Needs ``entry_date`` and
+    ``exit_date``; returns '' when either is absent or empty."""
+    go, _ = _plotly()
+    ent, ex = trades.col("entry_date"), trades.col("exit_date")
+    if ent is None or ex is None or trades.n == 0:
+        return ""
+    d = pd.DataFrame({"entry_date": ent, "exit_date": ex}).dropna()
+    if d.empty:
+        return ""
+    ent, ex = pd.to_datetime(d["entry_date"]), pd.to_datetime(d["exit_date"])
+    ev = pd.concat([pd.DataFrame({"t": ent, "delta": 1}),
+                    pd.DataFrame({"t": ex, "delta": -1})]).sort_values("t")
+    conc, t = ev["delta"].cumsum().to_numpy(), ev["t"].to_numpy()
+    peak, ipk = int(conc.max()), int(np.argmax(conc))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=t, y=conc, mode="lines", line=dict(color="#3b82f6", width=1, shape="hv"),
+        fill="tozeroy", fillcolor="rgba(59,130,246,0.16)",
+        hovertemplate="%{x|%Y-%m-%d}<br>%{y} open<extra></extra>"))
+    if cap:
+        fig.add_hline(y=cap, line_dash="dash", line_color="#d29922",
+            annotation_text=f"cap = {cap}", annotation_position="top left",
+            annotation_font=dict(color="#d29922", size=11))
+    fig.add_annotation(x=t[ipk], y=peak, text=f"peak {peak}", showarrow=True, arrowhead=0,
+                       ax=0, ay=-18, font=dict(color="#3b82f6", size=11))
+    fig.update_layout(height=340, margin=dict(l=48, r=20, t=22, b=42), showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title="Date", yaxis_title="Concurrent open positions")
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID, rangemode="tozero")
+    return _embed(fig, include_plotlyjs)
+
+
+def _forest_verdict(point: float, ci_low: float) -> str:
+    """The reality-check verdict from a point estimate and its CI lower bound, without
+    a second bootstrap: HELD (point>0, CI clears 0) / FRAGILE (point>0, CI straddles) /
+    FAIL. Mirrors :func:`crucible.edge.stats.reality_check`'s labelling."""
+    if point > 0 and ci_low > 0:
+        return "HELD"
+    return "FRAGILE" if point > 0 else "FAIL"
+
+
+def _as_segments(segments, by):
+    """Normalize the two accepted forms into an ordered ``{label: TradeLog}`` mapping:
+    a mapping is used as-is; a single TradeLog is split on the ``by`` column."""
+    if isinstance(segments, TradeLog):
+        if by is None:
+            raise ValueError("segment_forest needs a {label: TradeLog} mapping, "
+                             "or a single TradeLog with by=<column>.")
+        f = segments.frame
+        if by not in f.columns:
+            return {}
+        return {key: TradeLog(sub.reset_index(drop=True))
+                for key, sub in f.groupby(by, sort=False)}
+    return dict(segments)
+
+
+def segment_forest(segments, *, by=None, alpha: float = 0.10, n_boot: int = 2_000,
+                   seed: int = 0, include_plotlyjs: bool = False) -> str:
+    """Forest plot of per-segment expectancy, one bootstrap-CI whisker per row — the
+    generic form of a per-class expectancy table. Each row is a caller-supplied
+    segment: the marker is its expectancy (R), the whisker its ``1 - alpha`` bootstrap
+    CI, the color the HELD / FRAGILE / FAIL reality-check verdict, and the marker size
+    scales with √n. Rows whose whisker clears the dotted zero line are the ones
+    carrying the edge.
+
+    ``segments`` is either a mapping ``{label: TradeLog}`` (drawn top-to-bottom in the
+    given order) or a single TradeLog plus ``by`` — the name of a column to split it
+    on. Segments with no trades are dropped; returns '' when none remain."""
+    go, _ = _plotly()
+    from crucible.edge.stats import bootstrap_ci
+    segs = _as_segments(segments, by)
+    xs, ys, elo, ehi, colors, sizes, hover = [], [], [], [], [], [], []
+    for lab, tl in segs.items():
+        if tl is None or tl.n == 0:
+            continue
+        e = float(expectancy(tl.r))
+        ci = bootstrap_ci(tl, expectancy, n_boot=n_boot, alpha=alpha, seed=seed)
+        lo = e if not np.isfinite(ci.low) else float(ci.low)     # thin n -> collapse whisker
+        hi = e if not np.isfinite(ci.high) else float(ci.high)
+        xs.append(e); ys.append(str(lab))
+        elo.append(max(e - lo, 0.0)); ehi.append(max(hi - e, 0.0))
+        colors.append(_VERDICT_COLOR.get(_forest_verdict(e, lo), "#8b949e"))
+        sizes.append(min(8.0 + 2.2 * tl.n ** 0.5, 26.0))
+        hover.append(f"<b>{lab}</b><br>E {e:+.2f}R &nbsp;(n={tl.n})<br>"
+                     f"{(1 - alpha) * 100:.0f}% CI [{lo:+.2f}, {hi:+.2f}]")
+    if not xs:
+        return ""
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers",
+        marker=dict(color=colors, size=sizes, line=dict(width=1, color="rgba(0,0,0,0.35)")),
+        error_x=dict(type="data", symmetric=False, array=ehi, arrayminus=elo,
+                     color="rgba(148,163,184,0.55)", thickness=1.4, width=4),
+        hoverinfo="text", hovertext=hover, showlegend=False))
+    fig.add_vline(x=0, line_dash="dot", line_color="rgba(148,163,184,0.55)")
+    fig.update_layout(height=max(220, 66 + 30 * len(ys)),
+        margin=dict(l=110, r=24, t=24, b=45), showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title=f"Segment expectancy (R), {(1 - alpha) * 100:.0f}% CI")
+    fig.update_xaxes(gridcolor=_GRID, zeroline=False)
+    # first label on top: plotly stacks the first y category at the bottom, so reverse
+    fig.update_yaxes(gridcolor=_GRID, categoryorder="array", categoryarray=list(reversed(ys)))
+    return _embed(fig, include_plotlyjs)
+
+
 def _reality_banner(v) -> str:
     """The single-book reality-check verdict banner (HELD / FRAGILE / FAIL)."""
     color = _VERDICT_COLOR.get(v.label, "#888")

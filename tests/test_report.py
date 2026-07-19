@@ -8,7 +8,7 @@ from crucible.report import (                      # noqa: E402
     tearsheet, cumulative_r, gauntlet_report, verdict_banner, verdict_summary,
     gate_block, edge_panels, metrics_table, report_css, monthly_r, title_lockup,
     equity_drawdown, exit_reason_breakdown, holding_vs_r, exit_efficiency_dist,
-    edge_ratio_curve,
+    edge_ratio_curve, gross_net_equity, concurrency_timeline, segment_forest,
 )
 from crucible.validation import run_gauntlet, walk_forward  # noqa: E402
 
@@ -492,3 +492,78 @@ def test_edge_ratio_curve_from_sequences(ohlc):
 def test_edge_ratio_curve_guards_empty_and_mismatched():
     assert edge_ratio_curve([], []) == ""
     assert edge_ratio_curve([1, 2, 3], [0.9, 1.1]) == ""         # length mismatch
+
+
+# --------------------------------------------------------------------------- #
+# Borderline panels, promoted with light generalization
+# --------------------------------------------------------------------------- #
+def _with_cost(ohlc, cost=0.05):
+    """A barrier TradeLog with a constant per-trade cost column (in R)."""
+    from crucible.edge import TradeLog
+    tl = _bars(ohlc)
+    return TradeLog(tl.frame.assign(cost=cost))
+
+
+def test_gross_net_equity_from_cost_column(ohlc):
+    frag = gross_net_equity(_with_cost(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Gross" in frag and "Net" in frag and "cost drag" in frag
+
+
+def test_gross_net_equity_accepts_cost_array_and_column_name(ohlc):
+    import numpy as np
+    tl = _bars(ohlc)
+    arr = gross_net_equity(tl, cost=np.full(tl.n, 0.05))          # explicit array
+    named = gross_net_equity(_with_cost(ohlc), cost="cost")       # column by name
+    assert "cost drag" in arr and "cost drag" in named
+
+
+def test_gross_net_equity_degrades_without_or_zero_cost(ohlc):
+    import numpy as np
+    tl = _bars(ohlc)
+    assert gross_net_equity(tl) == ""                             # no cost anywhere
+    assert gross_net_equity(tl, cost=np.zeros(tl.n)) == ""        # zero drag -> nothing
+
+
+def test_concurrency_timeline_renders_and_marks_peak(ohlc):
+    frag = concurrency_timeline(_bars(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Concurrent open positions" in frag and "peak" in frag
+    assert "cap =" in concurrency_timeline(_bars(ohlc), cap=3)    # reference line
+
+
+def test_concurrency_timeline_degrades_without_dates():
+    from crucible.edge import TradeLog
+    assert concurrency_timeline(TradeLog.from_arrays(r=[0.3, -1.0])) == ""
+
+
+def test_segment_forest_from_mapping(ohlc):
+    from crucible.strategies import ma_cross
+    long = barrier_trades(ohlc, ma_cross(ohlc), side="long")
+    short = barrier_trades(ohlc, ma_cross(ohlc), side="short")
+    frag = segment_forest({"long": long, "short": short})
+    assert _is_embed_fragment(frag)
+    assert "Segment expectancy" in frag
+    assert "90% CI" in frag                                       # default alpha=0.10
+    # markers are colored by the HELD/FRAGILE/FAIL verdict
+    assert any(c in frag for c in ("#1a7f37", "#9a6700", "#b42318"))
+
+
+def test_segment_forest_splits_on_group_column(ohlc):
+    tl = _bars(ohlc)
+    frag = segment_forest(tl, by="exit_reason")
+    assert _is_embed_fragment(frag)
+    assert "Segment expectancy" in frag
+
+
+def test_segment_forest_guards():
+    from crucible.edge import TradeLog
+    import pytest as _pytest
+    # empty mapping / all-empty segments -> nothing to plot
+    assert segment_forest({}) == ""
+    assert segment_forest({"a": TradeLog.from_arrays(r=[])}) == ""
+    # a bare TradeLog needs a `by` column to split on
+    with _pytest.raises(ValueError):
+        segment_forest(TradeLog.from_arrays(r=[0.3, -1.0]))
+    # a by-column that isn't present -> empty, not a crash
+    assert segment_forest(TradeLog.from_arrays(r=[0.3, -1.0]), by="nope") == ""
