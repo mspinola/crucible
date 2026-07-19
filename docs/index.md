@@ -20,7 +20,6 @@ thing you run *before* a backtester.
 [Read the tutorial](tutorial.md){ .md-button }
 [View on GitHub](https://github.com/mspinola/crucible){ .md-button }
 
-[Run modes](run_modes.md){ .md-button }
 [The gauntlet (design)](edge_gate.md){ .md-button }
 [Architecture](architecture.md){ .md-button }
 
