@@ -1,4 +1,6 @@
-# crucible
+<p align="center">
+  <img src="brand/crucible-header.png" alt="crucible: capital-free edge validation" width="900">
+</p>
 
 [![PyPI](https://img.shields.io/pypi/v/crucible-quant)](https://pypi.org/project/crucible-quant/)
 [![CI](https://github.com/mspinola/crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/mspinola/crucible/actions/workflows/ci.yml)

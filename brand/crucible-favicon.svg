@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="crucible">
+  <!-- favicon-safe reduction: cone + pour + one bold gold candle. No shank/spout/pool. -->
+  <rect width="240" height="240" rx="50" fill="#1c1f27"/>
+  <path d="M96,56 L56,66 C46,78 52,92 72,94 L146,106" fill="none" stroke="#b4bac4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="126" cy="86" rx="28" ry="9" fill="#f2b62c" transform="rotate(42 126 86)"/>
+  <ellipse cx="123" cy="82" rx="36" ry="12" fill="none" stroke="#b4bac4" stroke-width="12" transform="rotate(42 123 82)"/>
+  <path d="M158,108 C161,130 161,150 161,168" fill="none" stroke="#f2b62c" stroke-width="16" stroke-linecap="round"/>
+  <rect x="160" y="134" width="7" height="80" rx="3.5" fill="#f2b62c"/>
+  <rect x="150" y="150" width="27" height="48" rx="6" fill="#f2b62c"/>
+</svg>

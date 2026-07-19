@@ -7,8 +7,8 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: img/crucible_logo_white.png     # header bar (teal) — white mono mark
-  favicon: img/crucible_logo.png        # browser tab — slate colorway
+  logo: img/crucible_mark_white.png     # header bar (teal) — white cone-crucible mark
+  favicon: img/crucible_favicon.png     # browser tab — slate, cone + pour + candle
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

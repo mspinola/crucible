@@ -7,7 +7,7 @@ hide:
 
 <div class="hero" markdown>
 
-![crucible](img/crucible_logo.png){ .hero-logo }
+![crucible](img/crucible_mark_color.png){ .hero-logo }
 
 # Measure the edge *before* you ever open a $100k account.
 
