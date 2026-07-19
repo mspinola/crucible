@@ -34,6 +34,7 @@ theme:
 nav:
   - Home: index.md
   - Tutorial: tutorial.md
+  - Visualizations: visualizations.md
   - The gauntlet (design): edge_gate.md
   - Architecture: architecture.md
 
