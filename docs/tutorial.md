@@ -1,4 +1,4 @@
-# ![crucible](img/crucible_logo.png){ .logo } From Trade Log to Verdict: The Statistics of a Significant Edge
+# ![crucible](img/crucible_mark_color.png){ .logo } From Trade Log to Verdict: The Statistics of a Significant Edge
 
 **A standalone tutorial on the statistical techniques in `crucible`: how each one
 contributes to declaring a trade log statistically significant, worked end to end on an

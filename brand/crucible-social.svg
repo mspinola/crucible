@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="crucible — capital-free edge validation, from trade log to verdict">
+  <defs>
+    <linearGradient id="sbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21242c"/><stop offset="1" stop-color="#141619"/></linearGradient>
+    <radialGradient id="sglow" cx="50%" cy="34%" r="42%"><stop offset="0" stop-color="#f2b62c" stop-opacity="0.15"/><stop offset="1" stop-color="#f2b62c" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#sbg)"/>
+  <rect width="1200" height="630" fill="url(#sglow)"/>
+
+  <!-- faint candlesticks along the base -->
+  <g fill="#f2b62c" opacity="0.10">
+    <rect x="150" y="556" width="16" height="34" rx="3"/><rect x="156" y="544" width="4" height="58" rx="2"/>
+    <rect x="196" y="540" width="16" height="50" rx="3"/><rect x="202" y="528" width="4" height="76" rx="2"/>
+    <rect x="988" y="548" width="16" height="42" rx="3"/><rect x="994" y="536" width="4" height="66" rx="2"/>
+    <rect x="1034" y="534" width="16" height="56" rx="3"/><rect x="1040" y="520" width="4" height="86" rx="2"/>
+  </g>
+
+  <!-- cone-crucible mark, centered upper -->
+  <g transform="translate(444,66) scale(1.38)">
+    <path d="M60,64 L20,44" fill="none" stroke="#8b929c" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="18" cy="43" r="7" fill="#8b929c"/>
+    <path d="M96,56 L54,64 C44,76 50,92 70,94 L150,106" fill="none" stroke="#b4bac4" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="126" cy="85" rx="30" ry="9" fill="#f2b62c" transform="rotate(42 126 85)"/>
+    <ellipse cx="123" cy="81" rx="37" ry="12" fill="none" stroke="#b4bac4" stroke-width="10" transform="rotate(42 123 81)"/>
+    <path d="M144,100 L166,107 L149,116 Z" fill="#b4bac4"/>
+    <path d="M162,108 C162,132 158,152 155,170" fill="none" stroke="#f2b62c" stroke-width="14" stroke-linecap="round"/>
+    <ellipse cx="165" cy="182" rx="50" ry="12" fill="#f2b62c"/>
+    <rect x="173.5" y="142" width="5" height="44" rx="2.5" fill="#e04a4a"/><rect x="168" y="150" width="17" height="26" rx="4" fill="#e04a4a"/>
+    <rect x="201.5" y="102" width="5" height="82" rx="2.5" fill="#35b45b"/><rect x="196" y="118" width="18" height="50" rx="4" fill="#35b45b"/>
+  </g>
+
+  <text x="600" y="452" text-anchor="middle" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="128" font-weight="600" letter-spacing="-4" fill="#f2efe8">crucible</text>
+  <rect x="512" y="482" width="176" height="4" rx="2" fill="#f2b62c"/>
+  <text x="600" y="530" text-anchor="middle" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="38" font-weight="400" fill="#a2a8b2">capital-free edge validation</text>
+  <text x="600" y="576" text-anchor="middle" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="26" font-weight="400" fill="#6f7681">from trade log to verdict  ·  numpy + pandas  ·  MIT</text>
+</svg>
