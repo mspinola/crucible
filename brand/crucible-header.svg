@@ -1,21 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 340" width="1280" height="340" role="img" aria-label="crucible — capital-free edge validation">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="crucible — from trade log to verdict. The quantitative gauntlet for evaluating trading strategy expectancy.">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20232b"/><stop offset="1" stop-color="#14161b"/></linearGradient>
-    <radialGradient id="glow" cx="16%" cy="50%" r="34%"><stop offset="0" stop-color="#f2b62c" stop-opacity="0.16"/><stop offset="1" stop-color="#f2b62c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20232b"/><stop offset="1" stop-color="#141619"/></linearGradient>
+    <radialGradient id="glow" cx="82%" cy="46%" r="30%"><stop offset="0" stop-color="#f2b62c" stop-opacity="0.14"/><stop offset="1" stop-color="#f2b62c" stop-opacity="0"/></radialGradient>
   </defs>
-  <rect width="1280" height="340" fill="url(#bg)"/>
-  <rect width="1280" height="340" fill="url(#glow)"/>
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <rect width="1280" height="420" fill="url(#glow)"/>
 
-  <!-- faint rising candlesticks (validated edge compounding) -->
-  <g fill="#f2b62c" opacity="0.13">
-    <rect x="1004" y="210" width="16" height="40" rx="3"/><rect x="1010" y="196" width="4" height="70" rx="2"/>
-    <rect x="1052" y="188" width="16" height="52" rx="3"/><rect x="1058" y="172" width="4" height="86" rx="2"/>
-    <rect x="1100" y="162" width="16" height="64" rx="3"/><rect x="1106" y="146" width="4" height="98" rx="2"/>
-    <rect x="1148" y="132" width="16" height="78" rx="3"/><rect x="1154" y="116" width="4" height="112" rx="2"/>
+  <!-- background flourish: faint grid + a gold dashed equity curve + a green wave -->
+  <g stroke="#ffffff" stroke-width="1" opacity="0.030">
+    <path d="M160 0V420M400 0V420M640 0V420M880 0V420M1120 0V420"/>
+    <path d="M0 105H1280M0 210H1280M0 315H1280"/>
   </g>
+  <path d="M-20 372 C 300 300, 560 404, 900 300 S 1320 210 1320 210" fill="none" stroke="#f2b62c" stroke-width="2.5" stroke-dasharray="7 9" opacity="0.28"/>
+  <path d="M-20 300 C 320 214, 620 360, 940 250 S 1320 168 1320 168" fill="none" stroke="#35b45b" stroke-width="2.5" opacity="0.16"/>
 
-  <!-- cone-crucible mark (icon geometry, scaled) -->
-  <g transform="translate(72,42) scale(1.07)">
+  <!-- cone-crucible mark, right -->
+  <g transform="translate(1018,96) scale(0.9)">
     <path d="M60,64 L20,44" fill="none" stroke="#8b929c" stroke-width="10" stroke-linecap="round"/>
     <circle cx="18" cy="43" r="7" fill="#8b929c"/>
     <path d="M96,56 L54,64 C44,76 50,92 70,94 L150,106" fill="none" stroke="#b4bac4" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
@@ -28,9 +28,28 @@
     <rect x="201.5" y="102" width="5" height="82" rx="2.5" fill="#35b45b"/><rect x="196" y="118" width="18" height="50" rx="4" fill="#35b45b"/>
   </g>
 
-  <!-- wordmark + tagline -->
-  <text x="368" y="182" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="104" font-weight="600" letter-spacing="-3" fill="#f2efe8">crucible</text>
-  <rect x="372" y="206" width="300" height="4" rx="2" fill="#f2b62c"/>
-  <text x="372" y="252" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="400" fill="#9aa0aa">capital-free edge validation</text>
-  <text x="372" y="290" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="22" font-weight="400" fill="#6f7681">from trade log to verdict  ·  numpy + pandas  ·  MIT</text>
+  <!-- wordmark -->
+  <text x="62" y="152" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="104" font-weight="600" letter-spacing="-3" fill="#f2efe8">crucible</text>
+
+  <!-- gold tagline -->
+  <text x="66" y="210" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="27" font-weight="500" letter-spacing="10" fill="#f2b62c">FROM TRADE LOG TO VERDICT</text>
+
+  <!-- gauntlet stage row: names in steel, real drawn green checks, dashes muted -->
+  <text x="66" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DECLARE</text>
+  <polyline points="176,272 181,278 191,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="206" y1="271" x2="224" y2="271" stroke="#565c66" stroke-width="2"/>
+  <text x="238" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">CLEAN</text>
+  <polyline points="316,272 321,278 331,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="346" y1="271" x2="364" y2="271" stroke="#565c66" stroke-width="2"/>
+  <text x="378" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">REAL</text>
+  <polyline points="438,272 443,278 453,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="468" y1="271" x2="486" y2="271" stroke="#565c66" stroke-width="2"/>
+  <text x="500" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">STRONG</text>
+  <polyline points="596,272 601,278 611,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="626" y1="271" x2="644" y2="271" stroke="#565c66" stroke-width="2"/>
+  <text x="658" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DURABLE</text>
+  <polyline points="768,272 773,278 783,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- subtitle -->
+  <text x="66" y="332" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="25" font-weight="400" fill="#9aa0aa">The quantitative gauntlet for evaluating trading strategy expectancy.</text>
 </svg>
