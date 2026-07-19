@@ -34,6 +34,7 @@ theme:
 nav:
   - Home: index.md
   - Tutorial: tutorial.md
+  - Run modes: run_modes.md
   - Visualizations: visualizations.md
   - The gauntlet (design): edge_gate.md
   - Architecture: architecture.md

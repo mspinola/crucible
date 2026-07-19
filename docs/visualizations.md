@@ -89,8 +89,8 @@ table; rows whose whisker clears the dotted zero line carry the edge.
 segment_forest({"Early": tl_a, "Mid": tl_b, "Late": tl_c})
 ```
 
-*Pairs with* [`segmented_holdout`](https://github.com/mspinola/crucible) — feed its
-per-segment stats to draw the forest against the very same numbers.
+*Pairs with* [`segmented_holdout`](run_modes.md#by-segment) — feed its per-segment stats
+to draw the forest against the very same numbers.
 
 ![segment_forest](img/panel_segment_forest.png){ width="720" }
 
