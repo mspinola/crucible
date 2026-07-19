@@ -61,13 +61,11 @@ flowchart TD
     classDef output fill:#D85A30,stroke:#993C1D,color:#fff;
 ```
 
-**Colour encodes role.** <span style="color:#0F6E56">■</span> **producer** (teal) — makes the
-`TradeLog`. <span style="color:#534AB7">■</span> **judges** (purple) — assess it:
-`validation`, the gauntlet, and `ml` (which judges model *scores*). <span
-style="color:#5F5E5A">■</span> **inputs** (gray) — fed in: the signal, plus the honest
-`N` (from `search_space`) and `N_eff` (from `breadth`) the judges divide by. <span
-style="color:#993C1D">■</span> **outputs** (coral) — what comes out: the verdict and the
-tearsheet.
+**Colour encodes role.**
+<span class="sw sw-producer"></span> **producer** (teal) — makes the `TradeLog`.
+<span class="sw sw-judge"></span> **judges** (purple) — assess it: `validation`, the gauntlet, and `ml` (which judges model *scores*).
+<span class="sw sw-input"></span> **inputs** (gray) — fed in: the signal, plus the honest `N` (from `search_space`) and `N_eff` (from `breadth`) the judges divide by.
+<span class="sw sw-output"></span> **outputs** (coral) — what comes out: the verdict and the tearsheet.
 
 | Module | Package? | Purpose | Public entry points |
 |---|---|---|---|

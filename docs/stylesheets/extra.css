@@ -43,3 +43,17 @@
 [data-md-color-scheme="slate"] .md-typeset .gate {
   color: #5dcaa5;
 }
+
+/* Legend swatches for the Architecture module map (colour = role). */
+.md-typeset .sw {
+  display: inline-block;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 2px;
+  vertical-align: -1px;
+  margin-right: 0.15em;
+}
+.md-typeset .sw-producer { background: #1D9E75; }
+.md-typeset .sw-judge    { background: #7F77DD; }
+.md-typeset .sw-input    { background: #D3D1C7; }
+.md-typeset .sw-output   { background: #D85A30; }
