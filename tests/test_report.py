@@ -567,3 +567,57 @@ def test_segment_forest_guards():
         segment_forest(TradeLog.from_arrays(r=[0.3, -1.0]))
     # a by-column that isn't present -> empty, not a crash
     assert segment_forest(TradeLog.from_arrays(r=[0.3, -1.0]), by="nope") == ""
+
+
+# --------------------------------------------------------------------------- #
+# Embed modes and the generalized forest (crucible-side prerequisites for npf)
+# --------------------------------------------------------------------------- #
+def test_include_plotlyjs_bare_emits_scriptless_div(ohlc):
+    tl = barrier_trades(ohlc, ma_cross(ohlc), side="long")
+    bare = edge_panels(tl, include_plotlyjs="bare")
+    assert "plotly-graph-div" in bare
+    assert "cdn.plot" not in bare and "<script src" not in bare   # no library at all
+    # the default still loads plotly from the CDN; inline is far larger
+    assert "cdn.plot" in edge_panels(tl)
+    assert len(bare) < len(edge_panels(tl, include_plotlyjs=True))
+    # the promoted panels honor "bare" too — so a host can inline plotly.js once itself
+    assert "cdn.plot" not in holding_vs_r(_bars(ohlc), include_plotlyjs="bare")
+
+
+def test_segment_forest_precomputed_points_use_given_ci():
+    # A host that already scored its segments passes stats, not TradeLogs — the picture
+    # is drawn against the very same numbers as its tables (no second bootstrap).
+    pts = {
+        "Equities": {"e": 0.28, "ci_low": 0.06, "ci_high": 0.50, "n": 130, "held": True},
+        "Rates":    {"e": -0.11, "ci_low": -0.30, "ci_high": 0.08, "n": 60, "held": False},
+        "FX":       {"e": 0.09, "ci_low": -0.02, "ci_high": 0.20, "n": 110},  # verdict derived
+        "Empty":    {"e": 0.0, "n": 0},                                       # dropped
+    }
+    frag = segment_forest(pts)
+    assert _is_embed_fragment(frag)
+    assert "Segment expectancy" in frag
+    # HELD (green), FAIL (red), and the derived FRAGILE (amber) markers all present
+    for c in ("#1a7f37", "#b42318", "#9a6700"):
+        assert c in frag
+    # the precomputed CI bounds are rendered verbatim, not re-bootstrapped
+    assert "90% CI [+0.06, +0.50]" in frag and "n=130" in frag
+    assert "Empty" not in frag                                    # n=0 cell dropped
+
+
+def test_segment_forest_two_columns_and_emphasis(ohlc):
+    long = barrier_trades(ohlc, ma_cross(ohlc), side="long")
+    short = barrier_trades(ohlc, ma_cross(ohlc), side="short")
+    segs = {"OVERALL": {"long": long, "short": short},
+            "trend":   {"long": long, "short": short}}
+    frag = segment_forest(segs, columns=["long", "short"], emphasis="OVERALL")
+    assert _is_embed_fragment(frag)
+    assert "long" in frag and "short" in frag                     # column subplot titles
+    assert "diamond" in frag                                      # OVERALL emphasized
+    assert frag.count("Expectancy (R)") >= 2                      # one x-axis per column
+
+
+def test_segment_forest_columns_and_by_are_exclusive():
+    from crucible.edge import TradeLog
+    tl = TradeLog.from_arrays(r=[0.3, -1.0, 2.0])
+    with pytest.raises(ValueError):
+        segment_forest({"a": {"long": tl}}, by="x", columns=["long"])

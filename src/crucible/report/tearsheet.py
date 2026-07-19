@@ -552,7 +552,7 @@ def _block_bootstrap_panel(returns, *, block: int = 6, stationary: bool = False,
     return go_.to_html(full_html=False, include_plotlyjs=False)
 
 
-def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
+def edge_panels(trades: TradeLog, *, include_plotlyjs: bool | str = False,
                 n_boot: int = 10_000, seed: int = 0,
                 period_returns=None, block: int = 6, stationary: bool = False,
                 alpha: float = 0.05) -> str:
@@ -642,8 +642,7 @@ def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
     fig.update_xaxes(gridcolor=grid, zerolinecolor=grid)
     fig.update_yaxes(gridcolor=grid, zerolinecolor=grid)
     fig.update_annotations(font=dict(color="#8b949e"))  # subplot titles
-    html = fig.to_html(full_html=False,
-                       include_plotlyjs=(True if include_plotlyjs else "cdn"))
+    html = _embed(fig, include_plotlyjs)
     # Optional block-bootstrap panel: honest CI for a time-clustered pooled book,
     # rendered below the 2×2 grid only when the caller supplies a period series. Its
     # plotly.js is never re-inlined — the main fragment (or the host page) carries it.
@@ -675,18 +674,31 @@ _EXIT_LABELS = {
 }
 
 
-def _embed(fig, include_plotlyjs: bool) -> str:
-    """Emit a figure as an embeddable fragment, exactly like edge_panels: the
-    default (``include_plotlyjs=False``) loads plotly.js from the CDN so a lone
-    fragment still renders; ``True`` inlines the ~3.5MB library for an offline file.
-    A host that composes several panels on one page loads the library once and the
-    per-fragment CDN ``<script>`` is deduped by the browser."""
+def _plotlyjs_arg(include_plotlyjs):
+    """Translate crucible's ``include_plotlyjs`` into plotly's ``to_html`` value.
+
+    * ``False`` (default)  → ``"cdn"`` — a lone fragment still renders (unchanged).
+    * ``True``             → ``True`` — inline the ~3.5MB library for an offline file.
+    * ``"bare"``           → ``False`` — a **script-less** div: no plotly.js at all,
+      so a host that loads the library once itself (e.g. inlined in the page ``<head>``)
+      can drop many panels on one page without re-loading it, and without the CDN
+      ``<script>`` a strict artifact CSP would block. Any other string (``"cdn"``,
+      ``"directory"``, …) is passed straight through to plotly."""
+    if include_plotlyjs is True or include_plotlyjs is False:
+        return True if include_plotlyjs else "cdn"
+    return False if include_plotlyjs == "bare" else include_plotlyjs
+
+
+def _embed(fig, include_plotlyjs) -> str:
+    """Emit a figure as an embeddable fragment in the shared panel treatment. See
+    :func:`_plotlyjs_arg` for the ``include_plotlyjs`` modes (``False`` CDN default,
+    ``True`` inline, ``"bare"`` script-less for a host that carries plotly.js itself)."""
     return fig.to_html(full_html=False,
-                       include_plotlyjs=(True if include_plotlyjs else "cdn"))
+                       include_plotlyjs=_plotlyjs_arg(include_plotlyjs))
 
 
 def equity_drawdown(trades: TradeLog, *, test_start=None,
-                    include_plotlyjs: bool = False) -> str:
+                    include_plotlyjs: bool | str = False) -> str:
     """Cumulative-R curve (equal risk per trade) with an underwater drawdown panel
     beneath. Trades are ordered by exit date (entry date, or given order, as
     fallbacks); the top panel is running ΣR, the bottom is ΣR minus its running peak
@@ -733,7 +745,7 @@ def equity_drawdown(trades: TradeLog, *, test_start=None,
     return _embed(fig, include_plotlyjs)
 
 
-def exit_reason_breakdown(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+def exit_reason_breakdown(trades: TradeLog, *, include_plotlyjs: bool | str = False) -> str:
     """Per exit-reason attribution: for each exit reason (tp / stop / timeout / …) how
     much R it contributes (ΣR, colored by sign) and how many trades it accounts for,
     as two shared-y bar panels. Needs an ``exit_reason`` column (a barrier/rules log
@@ -781,7 +793,7 @@ def exit_reason_breakdown(trades: TradeLog, *, include_plotlyjs: bool = False) -
     return _embed(fig, include_plotlyjs)
 
 
-def holding_vs_r(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+def holding_vs_r(trades: TradeLog, *, include_plotlyjs: bool | str = False) -> str:
     """Scatter of realized R vs bars held, colored win/loss, with each side's median
     hold marked — the time structure of the edge (are the winners the long rides?).
     Needs a ``bars_held`` column; returns '' when it is absent or empty."""
@@ -818,7 +830,7 @@ def holding_vs_r(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
     return _embed(fig, include_plotlyjs)
 
 
-def exit_efficiency_dist(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+def exit_efficiency_dist(trades: TradeLog, *, include_plotlyjs: bool | str = False) -> str:
     """Distribution of exit efficiency (realized R ÷ MFE, clipped to [-1, 1]) — how
     much of each trade's favorable excursion the exit captured (1.0 = sold the exact
     high; <0 = gave the whole move back). The shape behind the exit-efficiency scalar.
@@ -848,7 +860,7 @@ def exit_efficiency_dist(trades: TradeLog, *, include_plotlyjs: bool = False) ->
     return _embed(fig, include_plotlyjs)
 
 
-def edge_ratio_curve(horizons, eratio, *, include_plotlyjs: bool = False) -> str:
+def edge_ratio_curve(horizons, eratio, *, include_plotlyjs: bool | str = False) -> str:
     """Exit-independent Edge-Ratio (mean MFE_k / mean |MAE_k| over a fixed k bars from
     each entry) vs the look-ahead horizon k, with the edge=1.0 reference and the peak
     marked — the horizon where the raw entry signal is strongest, before any exit rule.
@@ -884,7 +896,7 @@ def edge_ratio_curve(horizons, eratio, *, include_plotlyjs: bool = False) -> str
 
 
 def gross_net_equity(trades: TradeLog, *, cost=None,
-                     include_plotlyjs: bool = False) -> str:
+                     include_plotlyjs: bool | str = False) -> str:
     """Gross vs net cumulative R with the cost-drag haircut annotated. Net is the log's
     own ``r``; gross is net + the per-trade cost, so this needs a cost series in R.
     Provide it as ``cost`` — an array aligned to the trades, or the name of a column —
@@ -942,7 +954,7 @@ def gross_net_equity(trades: TradeLog, *, cost=None,
 
 
 def concurrency_timeline(trades: TradeLog, *, cap=None,
-                         include_plotlyjs: bool = False) -> str:
+                         include_plotlyjs: bool | str = False) -> str:
     """Concurrent open positions over time — a step area built from entry/exit events,
     with the peak marked and an optional ``cap`` drawn as a reference line. The
     cross-position concurrency that drives a book's drawdown. Needs ``entry_date`` and
@@ -1001,51 +1013,128 @@ def _as_segments(segments, by):
     return dict(segments)
 
 
-def segment_forest(segments, *, by=None, alpha: float = 0.10, n_boot: int = 2_000,
-                   seed: int = 0, include_plotlyjs: bool = False) -> str:
-    """Forest plot of per-segment expectancy, one bootstrap-CI whisker per row — the
-    generic form of a per-class expectancy table. Each row is a caller-supplied
-    segment: the marker is its expectancy (R), the whisker its ``1 - alpha`` bootstrap
-    CI, the color the HELD / FRAGILE / FAIL reality-check verdict, and the marker size
-    scales with √n. Rows whose whisker clears the dotted zero line are the ones
-    carrying the edge.
+_FOREST_MUTED = "#8b949e"     # no-verdict / empty marker
 
-    ``segments`` is either a mapping ``{label: TradeLog}`` (drawn top-to-bottom in the
-    given order) or a single TradeLog plus ``by`` — the name of a column to split it
-    on. Segments with no trades are dropped; returns '' when none remain."""
-    go, _ = _plotly()
-    from crucible.edge.stats import bootstrap_ci
-    segs = _as_segments(segments, by)
-    xs, ys, elo, ehi, colors, sizes, hover = [], [], [], [], [], [], []
-    for lab, tl in segs.items():
-        if tl is None or tl.n == 0:
-            continue
-        e = float(expectancy(tl.r))
-        ci = bootstrap_ci(tl, expectancy, n_boot=n_boot, alpha=alpha, seed=seed)
-        lo = e if not np.isfinite(ci.low) else float(ci.low)     # thin n -> collapse whisker
+
+def _forest_point(cell, *, alpha, n_boot, seed):
+    """Normalize one forest cell into ``(e, lo, hi, n, verdict)``, or ``None`` if empty.
+
+    ``cell`` is either a :class:`TradeLog` (expectancy + a ``1 - alpha`` bootstrap CI are
+    computed here) or a mapping of **precomputed** stats — an expectancy under any of
+    ``e`` / ``expectancy`` / ``exp_R``; optional ``ci_low`` / ``ci_high`` (``None``/NaN
+    collapses the whisker); ``n``; and a verdict given either explicitly as ``verdict``
+    ('HELD'/'FRAGILE'/'FAIL') or as a ``held`` bool. ``None`` (or ``n == 0``) → ``None``,
+    so a caller can leave a cell empty."""
+    if cell is None:
+        return None
+    if isinstance(cell, TradeLog):
+        if cell.n == 0:
+            return None
+        from crucible.edge.stats import bootstrap_ci
+        e = float(expectancy(cell.r))
+        ci = bootstrap_ci(cell, expectancy, n_boot=n_boot, alpha=alpha, seed=seed)
+        lo = e if not np.isfinite(ci.low) else float(ci.low)
         hi = e if not np.isfinite(ci.high) else float(ci.high)
-        xs.append(e); ys.append(str(lab))
-        elo.append(max(e - lo, 0.0)); ehi.append(max(hi - e, 0.0))
-        colors.append(_VERDICT_COLOR.get(_forest_verdict(e, lo), "#8b949e"))
-        sizes.append(min(8.0 + 2.2 * tl.n ** 0.5, 26.0))
-        hover.append(f"<b>{lab}</b><br>E {e:+.2f}R &nbsp;(n={tl.n})<br>"
-                     f"{(1 - alpha) * 100:.0f}% CI [{lo:+.2f}, {hi:+.2f}]")
-    if not xs:
+        return (e, lo, hi, cell.n, _forest_verdict(e, lo))
+    n = int(cell.get("n") or 0)
+    if not n:
+        return None
+    e = next((float(cell[k]) for k in ("e", "expectancy", "exp_R") if cell.get(k) is not None), None)
+    if e is None:
+        return None
+    lo, hi = cell.get("ci_low"), cell.get("ci_high")
+    lo = e if lo is None or lo != lo else float(lo)     # None / NaN -> collapse whisker
+    hi = e if hi is None or hi != hi else float(hi)
+    v = cell.get("verdict")
+    if v is None:
+        v = ("HELD" if cell["held"] else ("FRAGILE" if e > 0 else "FAIL")) \
+            if "held" in cell else _forest_verdict(e, lo)
+    return (e, lo, hi, n, str(v).upper())
+
+
+def segment_forest(segments, *, by=None, columns=None, emphasis=None,
+                   alpha: float = 0.10, n_boot: int = 2_000, seed: int = 0,
+                   include_plotlyjs: bool | str = False) -> str:
+    """Forest plot of per-segment expectancy, one CI whisker per row — the generic form
+    of a per-class expectancy table. Each row is a caller-supplied segment: the marker
+    is its expectancy (R), the whisker its ``1 - alpha`` CI, the color the HELD / FRAGILE
+    / FAIL verdict, and the marker size scales with √n. Rows whose whisker clears the
+    dotted zero line are the ones carrying the edge.
+
+    Each **cell** is a :class:`TradeLog` (expectancy + bootstrap CI computed here) *or* a
+    mapping of precomputed ``{e, ci_low, ci_high, n, verdict|held}`` stats — so a host
+    that already scored its segments (e.g. a holdout evaluation) can render the picture
+    against the very same numbers as its tables, instead of a second, possibly-divergent
+    bootstrap. See :func:`_forest_point`.
+
+    Shapes:
+
+    * ``segments={label: cell}`` — one column, drawn top-to-bottom in order.
+    * ``segments=TradeLog, by="col"`` — one column, split on a TradeLog column.
+    * ``segments={label: {col: cell}}, columns=[...]`` — the columns side-by-side on a
+      shared y axis (e.g. ``columns=["long", "short"]``), a cell missing from a column
+      simply left blank.
+
+    ``emphasis`` (a label or iterable) draws those rows as diamonds — an OVERALL anchor.
+    Empty cells are dropped; returns '' when nothing remains to plot."""
+    go, make_subplots = _plotly()
+    emphasis = {emphasis} if isinstance(emphasis, str) else set(emphasis or ())
+
+    if columns is None:
+        segs = _as_segments(segments, by)                       # {label: cell}
+        ordered = list(segs.keys())
+        col_cells = [(None, segs)]
+    else:
+        if by is not None:
+            raise ValueError("segment_forest: `by` and `columns` are mutually exclusive.")
+        ordered = list(segments.keys())
+        col_cells = [(c, {lab: segments[lab].get(c) for lab in ordered}) for c in columns]
+
+    per_col = [{str(lab): p for lab in ordered
+                for p in (_forest_point(mapping.get(lab), alpha=alpha, n_boot=n_boot, seed=seed),)
+                if p is not None}
+               for _, mapping in col_cells]
+    labels = [str(lab) for lab in ordered if any(str(lab) in pts for pts in per_col)]
+    if not labels:
         return ""
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers",
-        marker=dict(color=colors, size=sizes, line=dict(width=1, color="rgba(0,0,0,0.35)")),
-        error_x=dict(type="data", symmetric=False, array=ehi, arrayminus=elo,
-                     color="rgba(148,163,184,0.55)", thickness=1.4, width=4),
-        hoverinfo="text", hovertext=hover, showlegend=False))
-    fig.add_vline(x=0, line_dash="dot", line_color="rgba(148,163,184,0.55)")
-    fig.update_layout(height=max(220, 66 + 30 * len(ys)),
-        margin=dict(l=110, r=24, t=24, b=45), showlegend=False,
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
-        xaxis_title=f"Segment expectancy (R), {(1 - alpha) * 100:.0f}% CI")
-    fig.update_xaxes(gridcolor=_GRID, zeroline=False)
+
+    ncols = len(col_cells)
+    titles = None if columns is None else [str(c) for c, _ in col_cells]
+    fig = make_subplots(rows=1, cols=ncols, shared_yaxes=True,
+                        horizontal_spacing=0.06, subplot_titles=titles)
+
+    for k, ((colname, _), pts) in enumerate(zip(col_cells, per_col), start=1):
+        xs, ys, elo, ehi, colors, sizes, symbols, hover = ([] for _ in range(8))
+        for lab in labels:
+            p = pts.get(lab)
+            if p is None:
+                continue
+            e, lo, hi, n, verdict = p
+            suffix = f" · {colname}" if colname is not None else ""
+            xs.append(e); ys.append(lab)
+            elo.append(max(e - lo, 0.0)); ehi.append(max(hi - e, 0.0))
+            colors.append(_VERDICT_COLOR.get(verdict, _FOREST_MUTED))
+            sizes.append(min(8.0 + 2.2 * n ** 0.5, 26.0))
+            symbols.append("diamond" if lab in emphasis else "circle")
+            hover.append(f"<b>{lab}</b>{suffix}<br>E {e:+.2f}R &nbsp;(n={n})<br>"
+                         f"{(1 - alpha) * 100:.0f}% CI [{lo:+.2f}, {hi:+.2f}]")
+        fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers",
+            marker=dict(color=colors, size=sizes, symbol=symbols,
+                        line=dict(width=1, color="rgba(0,0,0,0.35)")),
+            error_x=dict(type="data", symmetric=False, array=ehi, arrayminus=elo,
+                         color="rgba(148,163,184,0.55)", thickness=1.4, width=4),
+            hoverinfo="text", hovertext=hover, showlegend=False), row=1, col=k)
+        fig.add_vline(x=0, line_dash="dot", line_color="rgba(148,163,184,0.55)", row=1, col=k)
+        xtitle = "Expectancy (R)" if columns is not None \
+            else f"Segment expectancy (R), {(1 - alpha) * 100:.0f}% CI"
+        fig.update_xaxes(title_text=xtitle, gridcolor=_GRID, zeroline=False, row=1, col=k)
+
+    fig.update_layout(height=max(220, 66 + 30 * len(labels)),
+        margin=dict(l=110, r=24, t=40 if titles else 24, b=45), showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"))
     # first label on top: plotly stacks the first y category at the bottom, so reverse
-    fig.update_yaxes(gridcolor=_GRID, categoryorder="array", categoryarray=list(reversed(ys)))
+    fig.update_yaxes(gridcolor=_GRID, categoryorder="array", categoryarray=list(reversed(labels)))
+    fig.update_annotations(font=dict(color="#8b949e"))   # column titles
     return _embed(fig, include_plotlyjs)
 
 
@@ -1152,7 +1241,7 @@ _BULLET_LABEL = {
 }
 
 
-def pillar_bullets(gauntlet, *, include_plotlyjs: bool = False) -> str:
+def pillar_bullets(gauntlet, *, include_plotlyjs: bool | str = False) -> str:
     """The four pillars as bullet plots — each pillar's headline (first hard) check as a
     bar measured against its threshold (the dashed line), so *how far* it clears or
     misses reads at a glance: the margin the ✓/✗ chips hide (REAL crushing the bar vs
