@@ -7,6 +7,8 @@ site and PDF use. Run it when a worked example changes or a diagram needs an edi
 Rendered from ``crucible.report`` blocks, so they never drift from the numbers:
   gauntlet_hero/scope/gates/cumr/bootstrap.png  the §12 Donchian run (and §11 scope)
   ml_decay.png / ml_verdict.png                 the §13 ML take/skip example
+  panel_*.png                                   the visualization-catalog gallery,
+                                                one per crucible.report panel
 
 Hand-authored HTML/SVG explainers, kept below as the editable source of truth:
   triple_barrier.png  the triple-barrier labeling method (§1, §7)
@@ -329,6 +331,70 @@ def ml_sheets() -> dict[str, str]:
     return {"ml_decay": _sheet(decay, 720, css), "ml_verdict": _sheet(verdict, 720, css)}
 
 
+def panel_sheets() -> dict[str, str]:
+    """The visualization-catalog gallery (docs/img/panel_*.png): one figure per
+    crucible.report panel, all drawn from the §12 Donchian stitched OOS log so the
+    gallery never drifts from real output. A few panels need inputs the Donchian
+    log doesn't provide — a cost series (gross_net_equity), the exit-independent
+    edge-ratio curve, labelled segments (segment_forest), and an overlapping book
+    (concurrency_timeline — the Donchian run is near-serial, so it draws nothing) —
+    synthesized here purely to show the shape."""
+    import numpy as np
+    import pandas as pd
+    spec = importlib.util.spec_from_file_location("dg", REPO / "examples" / "donchian_gauntlet.py")
+    dg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dg)
+    from crucible.edge import TradeLog
+    from crucible.validation import walk_forward
+    from crucible.report import (
+        metrics_table, equity_drawdown, exit_reason_breakdown, holding_vs_r,
+        exit_efficiency_dist, edge_ratio_curve, gross_net_equity,
+        concurrency_timeline, segment_forest, report_css)
+
+    px = dg.synthetic_prices()
+    wf = walk_forward(px, dg.donchian, param_grid={"lookback": [20, 40]},
+                      is_days=365 * 3, oos_days=365, tp=2.5, sl=1.0, timeout=30)
+    tl = wf.stitched
+    css = report_css()
+    W = 820
+    P = dict(include_plotlyjs=True)   # standalone capture → inline plotly.js per sheet
+
+    f = tl.frame
+    entry = pd.to_datetime(f["entry_date"])
+    test_start = entry.quantile(0.6)                 # shade the late span in equity_drawdown
+    # segment_forest: three equal-time eras — a balanced, honest slice of the same log
+    era = pd.qcut(entry.rank(method="first"), 3, labels=["Early", "Mid", "Late"])
+    segs = {lab: TradeLog(f[(era == lab).to_numpy()].reset_index(drop=True))
+            for lab in ("Early", "Mid", "Late")}
+    cost = np.full(tl.n, 0.03)                        # flat 0.03R round-trip cost (illustrative)
+    # an illustrative exit-independent edge-ratio curve (rises, peaks near k=8, fades)
+    horizons = [1, 2, 3, 5, 8, 10, 13, 16, 20, 25, 30, 40]
+    eratio = [0.9, 1.1, 1.28, 1.5, 1.62, 1.58, 1.45, 1.33, 1.24, 1.16, 1.1, 1.04]
+    # concurrency needs a book that actually overlaps — the Donchian run is near-serial
+    # (0/1 open), which draws nothing. A synthetic overlapping book shows the shape.
+    rng = np.random.default_rng(1)
+    cn = 120
+    c_entry = pd.Timestamp("2020-01-01") + pd.to_timedelta(np.sort(rng.integers(0, 900, cn)), unit="D")
+    c_book = TradeLog(pd.DataFrame({"r": rng.normal(0.1, 1, cn), "entry_date": c_entry,
+                                    "exit_date": c_entry + pd.to_timedelta(rng.integers(15, 80, cn), unit="D")}))
+
+    panels = {
+        "panel_metrics_table": metrics_table(tl),
+        "panel_equity_drawdown": equity_drawdown(tl, test_start=test_start, **P),
+        "panel_segment_forest": segment_forest(segs, **P),
+        "panel_exit_reason_breakdown": exit_reason_breakdown(tl, **P),
+        "panel_holding_vs_r": holding_vs_r(tl, **P),
+        "panel_exit_efficiency_dist": exit_efficiency_dist(tl, **P),
+        "panel_edge_ratio_curve": edge_ratio_curve(horizons, eratio, **P),
+        "panel_gross_net_equity": gross_net_equity(tl, cost=cost, **P),
+        "panel_concurrency_timeline": concurrency_timeline(c_book, cap=4, **P),
+    }
+    missing = [n for n, h in panels.items() if not h]
+    if missing:
+        raise RuntimeError(f"panel(s) rendered empty (missing data?): {missing}")
+    return {name: _sheet(html, W, css) for name, html in panels.items()}
+
+
 def render_png(html: str, out: Path, pad: int = 22) -> None:
     """Headless-render HTML to a 2x PNG, then autocrop the page background."""
     from PIL import Image, ImageChops
@@ -338,6 +404,9 @@ def render_png(html: str, out: Path, pad: int = 22) -> None:
     raw = out.with_suffix(".raw.png")
     subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                     "--force-device-scale-factor=2", "--window-size=880,1500",
+                    # give async chart libraries (plotly) time to paint before capture,
+                    # else a slow figure lands as a blank page
+                    "--virtual-time-budget=8000", "--run-all-compositor-stages-before-draw",
                     f"--screenshot={raw}", f"file://{src}"],
                    check=True, capture_output=True)
     im = Image.open(raw).convert("RGB")
@@ -392,6 +461,7 @@ def main() -> None:
     IMG.mkdir(exist_ok=True)
     sheets = dict(report_sheets())
     sheets.update(ml_sheets())
+    sheets.update(panel_sheets())          # the visualization-catalog gallery
     sheets["triple_barrier"] = TRIPLE_BARRIER_HTML
     sheets["gate_ladder"] = GATE_LADDER_HTML
     sheets["meta_label"] = META_LABEL_HTML
