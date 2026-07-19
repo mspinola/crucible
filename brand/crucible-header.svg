@@ -49,6 +49,9 @@
   <line x1="626" y1="271" x2="644" y2="271" stroke="#565c66" stroke-width="2"/>
   <text x="658" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DURABLE</text>
   <polyline points="768,272 773,278 783,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="798" y1="271" x2="816" y2="271" stroke="#565c66" stroke-width="2"/>
+  <text x="830" y="276" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">GENERAL</text>
+  <polyline points="940,272 945,278 955,264" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- subtitle -->
   <text x="66" y="332" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="25" font-weight="400" fill="#9aa0aa">The quantitative gauntlet for evaluating trading strategy expectancy.</text>

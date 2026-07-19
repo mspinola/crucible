@@ -32,20 +32,23 @@
   <text x="600" y="476" text-anchor="middle" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="500" letter-spacing="11" fill="#f2b62c">FROM TRADE LOG TO VERDICT</text>
 
   <!-- gauntlet stage row, centered (drawn green checks) -->
-  <text x="242" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DECLARE</text>
-  <polyline points="352,520 357,526 367,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="382" y1="519" x2="400" y2="519" stroke="#565c66" stroke-width="2"/>
-  <text x="414" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">CLEAN</text>
-  <polyline points="492,520 497,526 507,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="522" y1="519" x2="540" y2="519" stroke="#565c66" stroke-width="2"/>
-  <text x="554" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">REAL</text>
-  <polyline points="614,520 619,526 629,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="644" y1="519" x2="662" y2="519" stroke="#565c66" stroke-width="2"/>
-  <text x="676" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">STRONG</text>
-  <polyline points="772,520 777,526 787,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="802" y1="519" x2="820" y2="519" stroke="#565c66" stroke-width="2"/>
-  <text x="834" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DURABLE</text>
-  <polyline points="944,520 949,526 959,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="156" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DECLARE</text>
+  <polyline points="266,520 271,526 281,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="296" y1="519" x2="314" y2="519" stroke="#565c66" stroke-width="2"/>
+  <text x="328" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">CLEAN</text>
+  <polyline points="406,520 411,526 421,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="436" y1="519" x2="454" y2="519" stroke="#565c66" stroke-width="2"/>
+  <text x="468" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">REAL</text>
+  <polyline points="528,520 533,526 543,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="558" y1="519" x2="576" y2="519" stroke="#565c66" stroke-width="2"/>
+  <text x="590" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">STRONG</text>
+  <polyline points="686,520 691,526 701,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="716" y1="519" x2="734" y2="519" stroke="#565c66" stroke-width="2"/>
+  <text x="748" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">DURABLE</text>
+  <polyline points="858,520 863,526 873,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="888" y1="519" x2="906" y2="519" stroke="#565c66" stroke-width="2"/>
+  <text x="920" y="524" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" letter-spacing="1.5" fill="#c7ccd4">GENERAL</text>
+  <polyline points="1030,520 1035,526 1045,512" fill="none" stroke="#35b45b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 
   <text x="600" y="576" text-anchor="middle" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="25" font-weight="400" fill="#9aa0aa">The quantitative gauntlet for evaluating trading strategy expectancy.</text>
 </svg>
