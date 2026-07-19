@@ -31,6 +31,9 @@ from crucible.report.tearsheet import (
     holding_vs_r,
     exit_efficiency_dist,
     edge_ratio_curve,
+    gross_net_equity,
+    concurrency_timeline,
+    segment_forest,
 )
 
 __all__ = [
@@ -52,4 +55,7 @@ __all__ = [
     "holding_vs_r",
     "exit_efficiency_dist",
     "edge_ratio_curve",
+    "gross_net_equity",
+    "concurrency_timeline",
+    "segment_forest",
 ]
