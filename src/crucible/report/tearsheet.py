@@ -653,6 +653,236 @@ def edge_panels(trades: TradeLog, *, include_plotlyjs: bool = False,
     return html
 
 
+# --------------------------------------------------------------------------- #
+# Extra capital-free panels (composable, like edge_panels)
+#
+# Each returns an embeddable Plotly fragment in the exact edge_panels treatment —
+# transparent paper/plot backgrounds so the chart inherits the host page (light or
+# dark), #8b949e font, rgba(128,128,128,0.18) gridlines. A panel that needs a column
+# the TradeLog may not carry (mfe, bars_held, exit_reason, entry/exit dates, cost)
+# degrades to '' so a caller can just drop the absent section — the idiom crucible's
+# own optional panels use.
+# --------------------------------------------------------------------------- #
+_GRID = "rgba(128,128,128,0.18)"        # gridlines legible on light or dark
+_POS, _NEG = "#1a7f37", "#b42318"       # win / loss, the edge_panels palette
+
+# Friendly labels for the raw exit_reason codes a barrier/rules simulator emits; an
+# unmapped code falls through to itself so new exit types still render.
+_EXIT_LABELS = {
+    "tp": "take-profit", "stop": "stop-out", "hard": "hard stop",
+    "timeout": "timeout", "neutral": "ride to neutral", "maxhold": "max hold",
+    "reject": "rejection exit", "eod": "end of data",
+}
+
+
+def _embed(fig, include_plotlyjs: bool) -> str:
+    """Emit a figure as an embeddable fragment, exactly like edge_panels: the
+    default (``include_plotlyjs=False``) loads plotly.js from the CDN so a lone
+    fragment still renders; ``True`` inlines the ~3.5MB library for an offline file.
+    A host that composes several panels on one page loads the library once and the
+    per-fragment CDN ``<script>`` is deduped by the browser."""
+    return fig.to_html(full_html=False,
+                       include_plotlyjs=(True if include_plotlyjs else "cdn"))
+
+
+def equity_drawdown(trades: TradeLog, *, test_start=None,
+                    include_plotlyjs: bool = False) -> str:
+    """Cumulative-R curve (equal risk per trade) with an underwater drawdown panel
+    beneath. Trades are ordered by exit date (entry date, or given order, as
+    fallbacks); the top panel is running ΣR, the bottom is ΣR minus its running peak
+    (≤ 0, in R). Capital-free — summed R and drawdown-in-R, never a currency equity
+    curve. With ``test_start`` (a date) the out-of-sample span is shaded and marked.
+    Returns '' for an empty log."""
+    go, make_subplots = _plotly()
+    cr = cumulative_r(trades)
+    if len(cr) == 0:
+        return ""
+    x, eq = cr.index, cr.to_numpy()
+    dd = eq - np.maximum.accumulate(eq)
+    dated = isinstance(x, pd.DatetimeIndex)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+                        row_heights=[0.68, 0.32])
+    fig.add_trace(go.Scatter(x=x, y=eq, mode="lines", line=dict(color=_POS, width=2),
+                             name="Cumulative R",
+                             hovertemplate="%{x}<br>ΣR %{y:+.1f}<extra></extra>"), row=1, col=1)
+    fig.add_hline(y=0, line_dash="dot", line_color="rgba(128,128,128,0.5)", row=1, col=1)
+    fig.add_trace(go.Scatter(x=x, y=dd, mode="lines", line=dict(color=_NEG, width=1),
+                             fill="tozeroy", fillcolor="rgba(180,35,24,0.22)", name="Drawdown",
+                             hovertemplate="%{x}<br>DD %{y:.1f} R<extra></extra>"), row=2, col=1)
+    i_mdd = int(np.argmin(dd))
+    fig.add_annotation(x=x[i_mdd], y=float(dd[i_mdd]), text=f"max DD {dd[i_mdd]:.1f}R",
+                       showarrow=True, arrowhead=0, ax=0, ay=-16,
+                       font=dict(color=_NEG, size=11), row=2, col=1)
+    if test_start is not None and dated:
+        ts, xmax = pd.Timestamp(test_start), x.max()
+        if ts < xmax:
+            for rr in (1, 2):
+                fig.add_vrect(x0=ts, x1=xmax, fillcolor="rgba(56,189,248,0.07)",
+                              line_width=0, row=rr, col=1)
+            fig.add_vline(x=ts, line_dash="dash", line_color="rgba(56,189,248,0.6)", row=1, col=1)
+            fig.add_annotation(x=ts, y=1, yref="y domain", yshift=7, text="OOS ▶", showarrow=False,
+                               font=dict(color="#38bdf8", size=11), xanchor="left", row=1, col=1)
+    fig.update_layout(height=430, margin=dict(l=58, r=24, t=26, b=42), showlegend=False,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#8b949e"))
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(title_text="Cumulative R", row=1, col=1)
+    fig.update_yaxes(title_text="Drawdown (R)", row=2, col=1)
+    fig.update_xaxes(title_text="Exit date" if dated else "Trade #", row=2, col=1)
+    return _embed(fig, include_plotlyjs)
+
+
+def exit_reason_breakdown(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+    """Per exit-reason attribution: for each exit reason (tp / stop / timeout / …) how
+    much R it contributes (ΣR, colored by sign) and how many trades it accounts for,
+    as two shared-y bar panels. Needs an ``exit_reason`` column (a barrier/rules log
+    carries it); returns '' when it is absent or the log is empty."""
+    go, make_subplots = _plotly()
+    er = trades.col("exit_reason")
+    if er is None or trades.n == 0:
+        return ""
+    d = pd.DataFrame({"r": trades.r, "exit_reason": er}).dropna(subset=["r"])
+    if d.empty:
+        return ""
+    g = d.groupby("exit_reason")["r"].agg(
+        sumR="sum", n="count", avgR="mean", win=lambda s: float((s > 0).mean()))
+    g = g.sort_values("sumR")            # most-negative first -> bottom; profit engine on top
+    reasons = list(g.index)
+    disp = [_EXIT_LABELS.get(r, str(r)) for r in reasons]   # friendly axis/hover labels
+    sumR, n, avgR, win = (g["sumR"].to_numpy(), g["n"].to_numpy(),
+                          g["avgR"].to_numpy(), g["win"].to_numpy())
+    grey = "rgba(128,128,128,0.5)"
+    colors = [_POS if v >= 0 else _NEG for v in sumR]
+    hoverR = [f"<b>{r}</b><br>ΣR {s:+.1f}<br>n={int(c)} &nbsp; avg {a:+.2f}R &nbsp; win {w*100:.0f}%"
+              for r, s, c, a, w in zip(disp, sumR, n, avgR, win)]
+    ntot = n.sum()
+    hoverN = [f"<b>{r}</b><br>{int(c)} trades ({c/ntot*100:.0f}%)<br>ΣR {s:+.1f} &nbsp; avg {a:+.2f}R"
+              for r, s, c, a in zip(disp, sumR, n, avgR)]
+    fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.06,
+                        subplot_titles=("P&L contribution (ΣR)", "Trade count"))
+    fig.add_trace(go.Bar(x=sumR, y=disp, orientation="h", marker_color=colors,
+                         text=[f"{s:+.1f}" for s in sumR], textposition="auto",
+                         hoverinfo="text", hovertext=hoverR), row=1, col=1)
+    fig.add_vline(x=0, line_dash="dot", line_color="rgba(128,128,128,0.55)", row=1, col=1)
+    fig.add_trace(go.Bar(x=n, y=disp, orientation="h", marker_color=grey,
+                         text=[str(int(c)) for c in n], textposition="auto",
+                         hoverinfo="text", hovertext=hoverN), row=1, col=2)
+    fig.update_layout(height=max(220, 80 + 36 * len(reasons)),
+                      margin=dict(l=92, r=18, t=42, b=42), showlegend=False,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#8b949e"))
+    fig.update_yaxes(categoryorder="array", categoryarray=disp)
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID)
+    fig.update_annotations(font=dict(color="#8b949e"))
+    fig.update_xaxes(title_text="Σ R-multiples", row=1, col=1)
+    fig.update_xaxes(title_text="trades", row=1, col=2)
+    return _embed(fig, include_plotlyjs)
+
+
+def holding_vs_r(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+    """Scatter of realized R vs bars held, colored win/loss, with each side's median
+    hold marked — the time structure of the edge (are the winners the long rides?).
+    Needs a ``bars_held`` column; returns '' when it is absent or empty."""
+    go, _ = _plotly()
+    bh = trades.col("bars_held")
+    if bh is None or trades.n == 0:
+        return ""
+    d = pd.DataFrame({"r": trades.r, "bars_held": bh}).dropna(subset=["r", "bars_held"])
+    if d.empty:
+        return ""
+    win = d["r"] > 0
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=d.loc[win, "bars_held"], y=d.loc[win, "r"], mode="markers",
+        marker=dict(color=_POS, size=6, opacity=0.5), name="win",
+        hovertemplate="held %{x} bars<br>%{y:+.2f}R<extra>win</extra>"))
+    fig.add_trace(go.Scatter(x=d.loc[~win, "bars_held"], y=d.loc[~win, "r"], mode="markers",
+        marker=dict(color=_NEG, size=6, opacity=0.5), name="loss",
+        hovertemplate="held %{x} bars<br>%{y:+.2f}R<extra>loss</extra>"))
+    fig.add_hline(y=0, line_dash="dot", line_color="rgba(128,128,128,0.5)")
+    mw = float(d.loc[win, "bars_held"].median()) if win.any() else float("nan")
+    ml = float(d.loc[~win, "bars_held"].median()) if (~win).any() else float("nan")
+    if mw == mw:
+        fig.add_vline(x=mw, line_dash="dash", line_color=_POS, opacity=0.6)
+    if ml == ml:
+        fig.add_vline(x=ml, line_dash="dash", line_color=_NEG, opacity=0.6)
+    fig.add_annotation(xref="paper", yref="paper", x=0.99, y=0.02, xanchor="right", showarrow=False,
+        text=f"median hold <span style='color:{_POS}'>win {mw:.0f}</span> vs "
+             f"<span style='color:{_NEG}'>loss {ml:.0f}</span> bars", font=dict(size=11, color="#8b949e"))
+    fig.update_layout(height=380, margin=dict(l=55, r=20, t=20, b=45), showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title="Bars held", yaxis_title="Realized R")
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    return _embed(fig, include_plotlyjs)
+
+
+def exit_efficiency_dist(trades: TradeLog, *, include_plotlyjs: bool = False) -> str:
+    """Distribution of exit efficiency (realized R ÷ MFE, clipped to [-1, 1]) — how
+    much of each trade's favorable excursion the exit captured (1.0 = sold the exact
+    high; <0 = gave the whole move back). The shape behind the exit-efficiency scalar.
+    Needs an ``mfe`` column; returns '' when it is absent or nothing has positive MFE."""
+    go, _ = _plotly()
+    mfe = trades.col("mfe")
+    if mfe is None or trades.n == 0:
+        return ""
+    d = pd.DataFrame({"r": trades.r, "mfe": mfe}).dropna(subset=["r", "mfe"])
+    d = d[d["mfe"] > 1e-9]
+    if d.empty:
+        return ""
+    eff = (d["r"] / d["mfe"]).clip(lower=-1.0, upper=1.0)
+    med = float(eff.median())
+    fig = go.Figure(go.Histogram(x=eff, nbinsx=40, marker_color="#2e7d5b"))
+    fig.add_vline(x=med, line_dash="dash", line_color="#8b949e")
+    fig.add_vline(x=1.0, line_dash="dot", line_color="rgba(26,127,55,0.7)")
+    fig.add_vline(x=0.0, line_dash="dot", line_color="rgba(128,128,128,0.5)")
+    fig.add_annotation(xref="paper", yref="paper", x=0.02, y=0.96, xanchor="left", showarrow=False,
+        text=f"median capture <b>{med*100:.0f}%</b> of MFE (n={len(eff)})",
+        font=dict(size=12, color="#8b949e"))
+    fig.update_layout(height=340, margin=dict(l=50, r=20, t=20, b=45),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title="Exit efficiency (realized R ÷ MFE)", yaxis_title="count")
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    return _embed(fig, include_plotlyjs)
+
+
+def edge_ratio_curve(horizons, eratio, *, include_plotlyjs: bool = False) -> str:
+    """Exit-independent Edge-Ratio (mean MFE_k / mean |MAE_k| over a fixed k bars from
+    each entry) vs the look-ahead horizon k, with the edge=1.0 reference and the peak
+    marked — the horizon where the raw entry signal is strongest, before any exit rule.
+
+    This curve is intrinsically exit-independent: it needs the per-bar excursion paths
+    measured from each entry, not the closed-trade MFE/MAE scalars a TradeLog carries,
+    so it takes the precomputed ``horizons`` and ``eratio`` sequences directly (e.g.
+    from a pooled edge-ratio-curve builder). Returns '' when they are empty or
+    length-mismatched."""
+    go, _ = _plotly()
+    h, e = list(horizons or []), list(eratio or [])
+    if not h or not e or len(h) != len(e):
+        return ""
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=h, y=[1.0] * len(h), mode="lines", line=dict(width=0),
+                             hoverinfo="skip", showlegend=False))
+    fig.add_trace(go.Scatter(x=h, y=e, mode="lines+markers", line=dict(color=_POS, width=2),
+        marker=dict(size=5), fill="tonexty", fillcolor="rgba(26,127,55,0.10)",
+        hovertemplate="%{x} bars<br>E-ratio %{y:.2f}<extra></extra>"))
+    fig.add_hline(y=1.0, line_dash="dash", line_color="rgba(128,128,128,0.7)",
+        annotation_text="edge = 1.0", annotation_position="bottom right",
+        annotation_font=dict(color="#8b949e", size=11))
+    ip = int(np.argmax(e))
+    fig.add_annotation(x=h[ip], y=e[ip], text=f"peak {e[ip]:.2f} @ {h[ip]} bars", showarrow=True,
+                       arrowhead=0, ax=0, ay=-24, font=dict(color=_POS, size=11))
+    fig.update_layout(height=360, margin=dict(l=52, r=20, t=24, b=45), showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#8b949e"),
+        xaxis_title="Bars after entry (look-ahead horizon)",
+        yaxis_title="E-ratio  mean MFE / mean |MAE|")
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    return _embed(fig, include_plotlyjs)
+
+
 def _reality_banner(v) -> str:
     """The single-book reality-check verdict banner (HELD / FRAGILE / FAIL)."""
     color = _VERDICT_COLOR.get(v.label, "#888")

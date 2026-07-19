@@ -26,6 +26,11 @@ from crucible.report.tearsheet import (
     title_lockup,
     cumulative_r,
     monthly_r,
+    equity_drawdown,
+    exit_reason_breakdown,
+    holding_vs_r,
+    exit_efficiency_dist,
+    edge_ratio_curve,
 )
 
 __all__ = [
@@ -41,4 +46,10 @@ __all__ = [
     "title_lockup",
     "cumulative_r",
     "monthly_r",
+    # extra capital-free panels (composable, like edge_panels)
+    "equity_drawdown",
+    "exit_reason_breakdown",
+    "holding_vs_r",
+    "exit_efficiency_dist",
+    "edge_ratio_curve",
 ]

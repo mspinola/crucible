@@ -7,6 +7,8 @@ from crucible.strategies import ma_cross           # noqa: E402
 from crucible.report import (                      # noqa: E402
     tearsheet, cumulative_r, gauntlet_report, verdict_banner, verdict_summary,
     gate_block, edge_panels, metrics_table, report_css, monthly_r, title_lockup,
+    equity_drawdown, exit_reason_breakdown, holding_vs_r, exit_efficiency_dist,
+    edge_ratio_curve,
 )
 from crucible.validation import run_gauntlet, walk_forward  # noqa: E402
 
@@ -395,3 +397,98 @@ def test_gauntlet_report_uses_the_same_lockup(ohlc):
     tl, g = _full_gauntlet(ohlc)
     doc = gauntlet_report(g, tl, title="Book", include_plotlyjs=False)
     assert title_lockup("Book") in doc
+
+
+# --------------------------------------------------------------------------- #
+# Extra capital-free panels (promoted from npf)
+# --------------------------------------------------------------------------- #
+def _bars(ohlc):
+    """A fully-populated TradeLog (r, mfe, mae, bars_held, entry/exit dates,
+    exit_reason) — barrier_trades emits every optional column."""
+    return barrier_trades(ohlc, ma_cross(ohlc), side="long", tp=2.0, sl=1.0, timeout=20)
+
+
+def _is_embed_fragment(frag):
+    """A default panel is an embeddable div: a plotly graph, no inlined library,
+    theme-neutral (no plotly_dark template)."""
+    return (frag
+            and ("plotly-graph-div" in frag or 'class="plotly' in frag)
+            and len(frag) < 200_000          # library loaded via CDN, not inlined
+            and "plotly_dark" not in frag)
+
+
+def test_equity_drawdown_renders_curve_and_underwater(ohlc):
+    frag = equity_drawdown(_bars(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Cumulative R" in frag and "Drawdown (R)" in frag     # both panels
+    assert "max DD" in frag                                      # trough annotated
+    # inlining the library makes the fragment self-contained (and much larger)
+    assert len(equity_drawdown(_bars(ohlc), include_plotlyjs=True)) > len(frag)
+
+
+def test_equity_drawdown_shades_oos_span(ohlc):
+    import pandas as pd
+    tl = _bars(ohlc)
+    mid = pd.Series(pd.to_datetime(tl.col("exit_date"))).sort_values().iloc[len(tl) // 2]
+    frag = equity_drawdown(tl, test_start=mid)
+    assert "OOS" in frag                                         # test span marked
+
+
+def test_equity_drawdown_empty_log_is_blank():
+    from crucible.edge import TradeLog
+    assert equity_drawdown(TradeLog.from_arrays(r=[])) == ""
+
+
+def test_exit_reason_breakdown_attributes_r_and_count(ohlc):
+    frag = exit_reason_breakdown(_bars(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Trade count" in frag and "R-multiples" in frag       # both panels' titles
+    assert "timeout" in frag                                     # a friendly label
+
+
+def test_exit_reason_breakdown_degrades_without_column():
+    from crucible.edge import TradeLog
+    # a plain R log carries no exit_reason -> nothing to attribute
+    assert exit_reason_breakdown(TradeLog.from_arrays(r=[0.3, -1.0, 2.0])) == ""
+
+
+def test_holding_vs_r_scatters_and_marks_medians(ohlc):
+    frag = holding_vs_r(_bars(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Bars held" in frag and "Realized R" in frag
+    assert "median hold" in frag
+
+
+def test_holding_vs_r_degrades_without_bars_held():
+    from crucible.edge import TradeLog
+    assert holding_vs_r(TradeLog.from_arrays(r=[0.3, -1.0, 2.0])) == ""
+
+
+def test_exit_efficiency_dist_renders_capture(ohlc):
+    frag = exit_efficiency_dist(_bars(ohlc))
+    assert _is_embed_fragment(frag)
+    assert "Exit efficiency" in frag and "median capture" in frag
+
+
+def test_exit_efficiency_dist_degrades_without_mfe():
+    from crucible.edge import TradeLog
+    import numpy as np
+    # no mfe at all, and an all-NaN mfe (a rules book), both yield nothing
+    assert exit_efficiency_dist(TradeLog.from_arrays(r=[0.3, -1.0])) == ""
+    assert exit_efficiency_dist(
+        TradeLog.from_arrays(r=[0.3, -1.0], mfe=np.full(2, np.nan))) == ""
+
+
+def test_edge_ratio_curve_from_sequences(ohlc):
+    horizons = [1, 2, 5, 10, 20]
+    eratio = [0.9, 1.1, 1.4, 1.2, 1.0]
+    frag = edge_ratio_curve(horizons, eratio)
+    assert _is_embed_fragment(frag)
+    assert "E-ratio" in frag
+    assert "peak 1.40 @ 5 bars" in frag                          # argmax marked
+    assert "edge = 1.0" in frag                                  # reference line
+
+
+def test_edge_ratio_curve_guards_empty_and_mismatched():
+    assert edge_ratio_curve([], []) == ""
+    assert edge_ratio_curve([1, 2, 3], [0.9, 1.1]) == ""         # length mismatch
