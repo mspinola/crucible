@@ -45,21 +45,29 @@ even if the tests pass.
 
 ```mermaid
 flowchart TD
-    sig["a signal<br/>(boolean Series)"]:::io --> edge
-    edge["edge<br/>barrier_trades → TradeLog → reality_check"]:::pivot
+    sig["a signal<br/>(boolean Series)"]:::input --> edge
+    edge["edge<br/>barrier_trades → TradeLog → reality_check"]:::producer
     edge -->|TradeLog| val["validation<br/>holdout · walk_forward · pbo · permutation"]:::judge
-    edge -->|TradeLog| rep["report<br/>tearsheet (plotly, report extra)"]:::io
-    ss["search_space<br/>SearchSpaceLog"]:::io -->|honest N| val
-    br["breadth<br/>effective_n"]:::io -->|N_eff| val
+    edge -->|TradeLog| rep["report<br/>tearsheet (plotly, report extra)"]:::output
+    ss["search_space<br/>SearchSpaceLog"]:::input -->|honest N| val
+    br["breadth<br/>effective_n"]:::input -->|N_eff| val
     val --> gnt["run_gauntlet<br/>REAL → STRONG → DURABLE → GENERAL"]:::judge
-    gnt --> verdict["Gauntlet<br/>pass / fail"]:::out
-    ml["ml<br/>score IC · alpha_gate (parallel)"]:::io
+    gnt --> verdict["Gauntlet<br/>pass / fail"]:::output
+    ml["ml<br/>score IC · alpha_gate (parallel judge)"]:::judge
 
-    classDef pivot fill:#1D9E75,stroke:#0F6E56,color:#fff;
+    classDef producer fill:#1D9E75,stroke:#0F6E56,color:#fff;
     classDef judge fill:#7F77DD,stroke:#534AB7,color:#fff;
-    classDef io fill:#D3D1C7,stroke:#5F5E5A,color:#2C2C2A;
-    classDef out fill:#97C459,stroke:#3B6D11,color:#173404;
+    classDef input fill:#D3D1C7,stroke:#5F5E5A,color:#2C2C2A;
+    classDef output fill:#D85A30,stroke:#993C1D,color:#fff;
 ```
+
+**Colour encodes role.** <span style="color:#0F6E56">■</span> **producer** (teal) — makes the
+`TradeLog`. <span style="color:#534AB7">■</span> **judges** (purple) — assess it:
+`validation`, the gauntlet, and `ml` (which judges model *scores*). <span
+style="color:#5F5E5A">■</span> **inputs** (gray) — fed in: the signal, plus the honest
+`N` (from `search_space`) and `N_eff` (from `breadth`) the judges divide by. <span
+style="color:#993C1D">■</span> **outputs** (coral) — what comes out: the verdict and the
+tearsheet.
 
 | Module | Package? | Purpose | Public entry points |
 |---|---|---|---|
