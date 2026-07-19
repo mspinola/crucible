@@ -35,6 +35,10 @@ class Thresholds:
     min_wfe_sqn: float = 0.5               # hard: mean OOS/IS SQN ratio > this
     wfe_sqn_anomaly: float = 2.0          # soft: a ratio far above 1 is suspect
 
+    # ── SELECT — did the ACT OF SEARCHING overfit the winner? ────────────────
+    max_pbo: float = 0.5                    # hard: CSCV overfit probability <= this
+    min_deflated_sharpe: float = 0.95       # hard: deflated Sharpe (multiple-testing corrected) >= this
+
     # ── resampling budgets / determinism ────────────────────────────────────
     n_boot: int = 10_000                    # bootstrap draws
     n_perm: int = 5_000                     # permutation / reality-check draws
