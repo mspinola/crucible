@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("plotly")   # the tearsheet needs the report extra
 
-from crucible.ml import decay_tearsheet
+from crucible.ml import decay_tearsheet, score_by_outcome
 
 
 def _preds(n=500, seed=1):
@@ -38,3 +38,34 @@ def test_tearsheet_custom_columns():
 def test_tearsheet_raises_on_too_few_rows():
     with pytest.raises(ValueError):
         decay_tearsheet(pd.DataFrame({"score": [0.1, 0.2, 0.3], "label": [1, -1, 1]}), q=5)
+
+
+# ── the extracted winners-vs-losers violin panel ──────────────────────────────
+
+def test_score_by_outcome_is_an_embeddable_panel():
+    html = score_by_outcome(_preds())
+    assert isinstance(html, str) and html
+    assert "<!doctype" not in html.lower()          # a fragment, not a full page
+    assert "violin" in html.lower()                  # the winners/losers violin traces
+    assert "winners" in html and "losers" in html
+
+
+def test_score_by_outcome_include_plotlyjs_modes():
+    p = _preds()
+    assert "cdn.plot" in score_by_outcome(p, include_plotlyjs="cdn")   # standalone
+    assert "cdn.plot" not in score_by_outcome(p)                        # default script-less
+
+
+def test_decay_tearsheet_embeds_the_panel():
+    # the tearsheet is now a consumer of the extracted panel — its violins still render
+    html = decay_tearsheet(_preds())
+    assert "winners" in html and "losers" in html
+
+
+def test_score_by_outcome_custom_columns_and_empty():
+    df = _preds().rename(columns={"score": "prob", "label": "y"})
+    assert score_by_outcome(df, score="prob", label="y")
+    empty = pd.DataFrame({"score": [np.nan, np.inf], "label": [1, -1]})
+    assert score_by_outcome(empty) == ""
+    with pytest.raises(ValueError, match="columns"):
+        score_by_outcome(pd.DataFrame({"x": [1]}))

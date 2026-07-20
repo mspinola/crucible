@@ -63,6 +63,41 @@ def quantile_decay(preds: pd.DataFrame, *, score: str = "score",
     return DecayTable(table=table, monotonic=monotonic, q=q)
 
 
+def score_by_outcome(preds: pd.DataFrame, *, score: str = "score", label: str = "label",
+                     title: str = "Score distribution — winners vs losers",
+                     include_plotlyjs: bool | str = False) -> str:
+    """Violin distributions of ``score`` split by realized outcome — winners
+    (``label > 0``) vs losers (``label <= 0``). The visual companion to the IC and
+    quantile-decay numbers: a score that ranks outcomes shows the winners' violin
+    sitting above the losers'. Capital-free and model-agnostic like the rest of
+    crucible.ml — any ``(score, label)`` predictions frame.
+
+    Returns an embeddable Plotly div (``include_plotlyjs`` passes straight to plotly's
+    ``to_html``: ``False`` = script-less for a page that already loads plotly.js,
+    ``"cdn"`` / ``True`` for a lone fragment), or ``''`` when no valid rows survive.
+    Needs plotly (the ``report`` extra).
+    """
+    try:
+        import plotly.graph_objects as go
+    except ModuleNotFoundError as e:                      # pragma: no cover
+        raise ModuleNotFoundError(
+            'score_by_outcome needs plotly — install the report extra: '
+            'pip install "crucible-quant[report]"') from e
+    if score not in preds.columns or label not in preds.columns:
+        raise ValueError(f"preds needs '{score}' and '{label}' columns")
+    df = preds[[score, label]].replace([np.inf, -np.inf], np.nan).dropna()
+    if df.empty:
+        return ""
+    fig = go.Figure()
+    fig.add_trace(go.Violin(y=df.loc[df[label] > 0, score], name="winners",
+                            box_visible=True, meanline_visible=True))
+    fig.add_trace(go.Violin(y=df.loc[df[label] <= 0, score], name="losers",
+                            box_visible=True, meanline_visible=True))
+    fig.update_layout(title=title, yaxis_title="score", height=380,
+                      margin=dict(l=40, r=40, t=60, b=40))
+    return fig.to_html(full_html=False, include_plotlyjs=include_plotlyjs)
+
+
 def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "label",
                     q: int = 5, title: str = "Signal decay by score quantile",
                     out_path: str | None = None) -> str:
@@ -83,7 +118,6 @@ def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "
 
     decay = quantile_decay(preds, score=score, label=label, q=q)
     stats = decay.table
-    df = preds[[score, label]].replace([np.inf, -np.inf], np.nan).dropna()
 
     bars = go.Figure()
     bars.add_hline(y=0.5, line_dash="dash", line_color="rgba(128,128,128,0.4)",
@@ -97,14 +131,7 @@ def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "
                        xaxis_title="score quantile", height=380,
                        margin=dict(l=40, r=40, t=60, b=40))
 
-    dist = go.Figure()
-    dist.add_trace(go.Violin(y=df.loc[df[label] > 0, score], name="winners",
-                             box_visible=True, meanline_visible=True))
-    dist.add_trace(go.Violin(y=df.loc[df[label] <= 0, score], name="losers",
-                             box_visible=True, meanline_visible=True))
-    dist.update_layout(title="Score distribution — winners vs losers",
-                       yaxis_title="score", height=380,
-                       margin=dict(l=40, r=40, t=60, b=40))
+    dist_html = score_by_outcome(preds, score=score, label=label, include_plotlyjs=False)
 
     verdict = "monotonic ✓" if decay.monotonic else "not monotonic"
     pretty = stats.assign(win_rate=(stats["win_rate"] * 100).round(1))
@@ -115,7 +142,7 @@ def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "
         f"<p>N = {int(stats['count'].sum())} &middot; quantiles = {decay.q} &middot; "
         f"spread (top &minus; bottom) = {decay.spread * 100:.1f}pp &middot; {verdict}</p>"
         + bars.to_html(full_html=False, include_plotlyjs="cdn")
-        + dist.to_html(full_html=False, include_plotlyjs=False)
+        + dist_html
         + pretty.to_html(index=False)
         + "</body></html>"
     )
