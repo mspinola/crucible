@@ -6,6 +6,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Distribution renamed from `crucible-quant` to `crucible`.** The import name is
+  unchanged, `import crucible` works exactly as before, so no code changes are needed.
+  Installers move from `pip install crucible-quant` to `pip install crucible`.
+- Version bumped to 0.2.0. The `crucible` project on PyPI already holds a 0.1.0 from an
+  unrelated 2011 package, and PyPI does not allow a version to be reused, so releases
+  under the new name start at 0.2.0.
+
 ## [0.1.0] — 2026-07-14
 
 Initial release — the capital-free trading-edge evaluation core.

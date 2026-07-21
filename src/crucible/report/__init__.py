@@ -1,7 +1,7 @@
 """
 crucible.report — a self-contained HTML tearsheet for a TradeLog.
 
-Requires the [report] extra (plotly):  pip install "crucible-quant[report]"
+Requires the [report] extra (plotly):  pip install "crucible[report]"
 
 True to the rest of crucible, these blocks visualize the EDGE, not an account:
 the R-multiple distribution, cumulative R, MFE/MAE excursion, and the bootstrap

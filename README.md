@@ -2,7 +2,7 @@
   <img src="brand/crucible-header.png" alt="crucible: capital-free edge validation" width="900">
 </p>
 
-[![PyPI](https://img.shields.io/pypi/v/crucible-quant)](https://pypi.org/project/crucible-quant/)
+[![PyPI](https://img.shields.io/pypi/v/crucible)](https://pypi.org/project/crucible/)
 [![CI](https://github.com/mspinola/crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/mspinola/crucible/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -16,11 +16,9 @@ the edge is real. No account, no position sizing, no equity curve. It's the thin
 you run *before* a backtester.
 
 ```bash
-pip install crucible-quant              # core: metrics + stats + simulator (numpy/pandas only)
-pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on real data
+pip install crucible              # core: metrics + stats + simulator (numpy/pandas only)
+pip install "crucible[examples]"  # + yfinance, to run the demo below on real data
 ```
-
-> Installed as **`crucible-quant`**, imported as **`crucible`** (`import crucible`).
 
 > 📖 **[Read the tutorial →](https://mspinola.github.io/crucible/tutorial/)**, *From Trade Log to
 > Verdict: the statistics of a significant edge*, every technique worked end to end on a
@@ -86,7 +84,7 @@ would have shown you as a rising equity curve is, at this sample size,
 > Runnable versions live in [`examples/`](examples): `quickstart.py`,
 > `validation.py`, and `breadth.py` use synthetic data (no network).
 > `real_data_yfinance.py` pulls
-> real prices from Yahoo Finance (`pip install "crucible-quant[examples]"`) and runs the
+> real prices from Yahoo Finance (`pip install "crucible[examples]"`) and runs the
 > full pipeline. Try `python examples/real_data_yfinance.py --ticker QQQ`.
 
 ## What's in the box
@@ -181,7 +179,7 @@ overridable `Thresholds`. Full write-up in [`docs/edge_gate.md`](docs/edge_gate.
 ## A shareable tearsheet: `crucible.report`
 
 ```bash
-pip install "crucible-quant[report]"
+pip install "crucible[report]"
 ```
 
 ```python
@@ -380,12 +378,13 @@ no API tokens are stored anywhere). Changes are tracked in
 1. Create two GitHub environments (repo **Settings → Environments**) named
    `pypi` and `testpypi`. (Add a required-reviewer rule on `pypi` for a manual
    approval gate, if you want one.)
-2. Register a **pending Trusted Publisher** at
+2. Register a **Trusted Publisher** on the `crucible` project at
    <https://pypi.org/manage/account/publishing/>:
-   PyPI project `crucible-quant`, owner `mspinola`, repo `crucible`, workflow
+   PyPI project `crucible`, owner `mspinola`, repo `crucible`, workflow
    `release.yml`, environment `pypi`. Repeat on
    <https://test.pypi.org/manage/account/publishing/> with environment
-   `testpypi` for dry runs.
+   `testpypi` for dry runs. (The publisher registered against the old
+   `crucible-quant` project does not carry over.)
 
 **Cutting a release:**
 
@@ -394,9 +393,14 @@ no API tokens are stored anywhere). Changes are tracked in
 2. (Optional dry run) **Actions → Release → Run workflow → `testpypi`**.
 3. Tag and push. The tag **must** match the `pyproject` version or the run fails:
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0     # builds, twine-checks, publishes to PyPI
+   git tag v0.2.0
+   git push origin v0.2.0     # builds, twine-checks, publishes to PyPI
    ```
+
+> **Version floor.** The `crucible` project on PyPI already carries a 0.1.0 from an
+> unrelated 2011 package, and PyPI never allows a version to be reused. Releases under
+> this name therefore start at **0.2.0**. Versions 0.1.0 and below are the historical
+> `crucible-quant` line.
 
 ## License
 

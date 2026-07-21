@@ -45,7 +45,7 @@ def _plotly():
     except ImportError as e:  # pragma: no cover
         raise ImportError(
             'crucible.report needs plotly — install the extra:\n'
-            '    pip install "crucible-quant[report]"'
+            '    pip install "crucible[report]"'
         ) from e
 
 

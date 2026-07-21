@@ -1,7 +1,7 @@
 """Generate a self-contained HTML tearsheet for a signal. Synthetic data by
 default (no network); requires the [report] extra for plotly.
 
-    pip install "crucible-quant[report]"
+    pip install "crucible[report]"
     python examples/tearsheet.py                       # -> tearsheet.html (synthetic)
     python examples/tearsheet.py --ticker SPY --out spy.html   # real data, needs [examples]
 """

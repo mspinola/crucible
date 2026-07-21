@@ -21,7 +21,7 @@ Plus the crucible mark in two colorways (crucible_logo{,_white}.png).
 Requirements (all outside the docs build): the ``[report]`` extra (plotly),
 Pillow, and Google Chrome for headless HTML→PNG. Usage::
 
-    pip install "crucible-quant[report]" pillow
+    pip install "crucible[report]" pillow
     python docs/gen_figures.py            # -> docs/img/*.png (light theme, 2x)
 """
 from __future__ import annotations

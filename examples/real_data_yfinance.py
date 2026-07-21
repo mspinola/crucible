@@ -2,7 +2,7 @@
 
 Requires the [examples] extra:
 
-    pip install "crucible-quant[examples]"
+    pip install "crucible[examples]"
     python examples/real_data_yfinance.py                 # SPY, 20/50 MA cross
     python examples/real_data_yfinance.py --ticker QQQ --fast 10 --slow 30
 
@@ -28,7 +28,7 @@ def load_ohlc(ticker: str, start: str) -> pd.DataFrame:
     try:
         import yfinance as yf
     except ImportError:
-        sys.exit('yfinance not installed — run:  pip install "crucible-quant[examples]"')
+        sys.exit('yfinance not installed — run:  pip install "crucible[examples]"')
 
     df = yf.download(ticker, start=start, auto_adjust=True, progress=False)
     if df is None or df.empty:
