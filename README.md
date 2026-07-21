@@ -375,9 +375,8 @@ no API tokens are stored anywhere). Changes are tracked in
 
 **One-time setup** (maintainer, before the first publish):
 
-1. Create two GitHub environments (repo **Settings → Environments**) named
-   `pypi` and `testpypi`. (Add a required-reviewer rule on `pypi` for a manual
-   approval gate, if you want one.)
+1. Create a GitHub environment (repo **Settings → Environments**) named `pypi`.
+   (Add a required-reviewer rule on it for a manual approval gate, if you want one.)
 2. Register a **Trusted Publisher** from the project's own publishing settings,
    <https://pypi.org/manage/project/crucible/settings/publishing/>: owner
    `mspinola`, repo `crucible`, workflow `release.yml`, environment `pypi`.
@@ -388,17 +387,17 @@ no API tokens are stored anywhere). Changes are tracked in
    "this project already exists". The publisher registered against the old
    `crucible-quant` project does not carry over either.
 
-   **TestPyPI dry runs are not available under this name.** `crucible` on
-   TestPyPI belongs to an unrelated project by another author, so the
-   `testpypi` path in `release.yml` cannot publish. Verify a build locally with
-   `python -m build && twine check dist/*` instead.
+   **There is no TestPyPI dry run.** `crucible` on TestPyPI belongs to an
+   unrelated project by another author, so nothing can be uploaded there under
+   this name. `release.yml` has no TestPyPI path for that reason.
 
 **Cutting a release:**
 
 1. Bump `version` in `pyproject.toml` and move the `CHANGELOG.md` entry from
    *Unreleased* to the new version.
-2. (Optional dry run) Build and check locally, `python -m build && twine check dist/*`.
-   The workflow's `testpypi` path is unusable under this name, see the setup note above.
+2. (Optional dry run) Either **Actions → Release → Run workflow**, which builds and
+   twine-checks without publishing, or the same thing locally with
+   `python -m build && twine check dist/*`.
 3. Tag and push. The tag **must** match the `pyproject` version or the run fails:
    ```bash
    git tag v0.2.0
