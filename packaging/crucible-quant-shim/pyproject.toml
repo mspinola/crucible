@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# Redirect-only release. This distribution was renamed to `crucible`, which is both
+# the import name and now the distribution name. 0.1.1 ships no source of its own,
+# it exists so that `pip install -U crucible-quant` pulls in the real package and so
+# that the PyPI page says where the project went.
+name = "crucible-quant"
+version = "0.1.1"
+description = "Deprecated, renamed to `crucible`. Install `crucible` instead, the import name is unchanged."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Matt Spinola" }]
+keywords = ["deprecated", "renamed", "crucible", "trading", "quant"]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    # The real package. >=0.2 because 0.1.0 on the `crucible` project is an
+    # unrelated 2011 package, not this project.
+    "crucible>=0.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/mspinola/crucible"
+Source = "https://github.com/mspinola/crucible"
+Documentation = "https://mspinola.github.io/crucible/"
+"Renamed to" = "https://pypi.org/project/crucible/"
+
+[tool.hatch.build.targets.wheel]
+# No modules to ship. The wheel is metadata only, its whole job is the dependency
+# on `crucible`.
+bypass-selection = true

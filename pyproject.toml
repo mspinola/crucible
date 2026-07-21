@@ -46,5 +46,11 @@ Source = "https://github.com/mspinola/crucible"
 [tool.hatch.build.targets.wheel]
 packages = ["src/crucible"]
 
+[tool.hatch.build.targets.sdist]
+# `packaging/` holds a separate distribution (the crucible-quant redirect, see
+# packaging/crucible-quant-shim/PUBLISHING.md). It is not part of this package, and its
+# nested pyproject.toml must not ship inside this sdist.
+exclude = ["packaging/"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
