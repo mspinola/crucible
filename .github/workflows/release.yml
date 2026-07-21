@@ -1,20 +1,17 @@
 name: Release
 
-# Tag-triggered publish to PyPI via Trusted Publishing (OIDC — no stored tokens).
+# Tag-triggered publish to PyPI via Trusted Publishing (OIDC, no stored tokens).
 # Push a tag that matches the pyproject version, e.g.:
-#     git tag v0.1.0 && git push origin v0.1.0
-# Or run manually (workflow_dispatch) to publish the current build to TestPyPI.
+#     git tag v0.2.0 && git push origin v0.2.0
+# A manual run (workflow_dispatch) builds and twine-checks without publishing.
+#
+# There is no TestPyPI path. The `crucible` name on TestPyPI belongs to an
+# unrelated project, so a dry-run upload under this name is not possible.
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      target:
-        description: "Where to publish a manual run"
-        default: testpypi
-        type: choice
-        options: [testpypi, pypi]
 
 permissions:
   contents: read
@@ -46,8 +43,8 @@ jobs:
 
   publish-pypi:
     needs: build
-    # tag push -> PyPI; manual run -> PyPI only if explicitly chosen
-    if: github.event_name == 'push' || inputs.target == 'pypi'
+    # tag push -> PyPI. A manual run stops after build, as a dry run.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -58,19 +55,3 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
-
-  publish-testpypi:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
-    runs-on: ubuntu-latest
-    environment: testpypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
