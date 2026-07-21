@@ -30,11 +30,11 @@ thing you run *before* a backtester.
 ## Quickstart
 
 ```bash
-pip install crucible-quant              # core: metrics + stats + simulator (numpy/pandas only)
-pip install "crucible-quant[examples]"  # + yfinance, to run the demo below on real data
+pip install crucible              # core: metrics + stats + simulator (numpy/pandas only)
+pip install "crucible[examples]"  # + yfinance, to run the demo below on real data
 ```
 
-> Installed as **`crucible-quant`**, imported as **`crucible`** (`import crucible`).
+> Installed as **`crucible`**, imported as **`crucible`** (`import crucible`).
 
 ## The 30-second example
 
@@ -223,4 +223,4 @@ trades.
 
 Open source under the [MIT license](https://github.com/mspinola/crucible/blob/main/LICENSE)
 · [Changelog](https://github.com/mspinola/crucible/blob/main/CHANGELOG.md)
-· [PyPI](https://pypi.org/project/crucible-quant/)
+· [PyPI](https://pypi.org/project/crucible/)

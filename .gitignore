@@ -18,6 +18,7 @@ env/
 .DS_Store
 .idea/
 .vscode/
+.claude/
 
 # MkDocs build output
 site/

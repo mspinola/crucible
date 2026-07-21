@@ -82,7 +82,7 @@ def score_by_outcome(preds: pd.DataFrame, *, score: str = "score", label: str = 
     except ModuleNotFoundError as e:                      # pragma: no cover
         raise ModuleNotFoundError(
             'score_by_outcome needs plotly — install the report extra: '
-            'pip install "crucible-quant[report]"') from e
+            'pip install "crucible[report]"') from e
     if score not in preds.columns or label not in preds.columns:
         raise ValueError(f"preds needs '{score}' and '{label}' columns")
     df = preds[[score, label]].replace([np.inf, -np.inf], np.nan).dropna()
@@ -107,14 +107,14 @@ def decay_tearsheet(preds: pd.DataFrame, *, score: str = "score", label: str = "
     a real edge climbs monotonically), and a winners-vs-losers distribution of the
     score. Writes the HTML to ``out_path`` as well when given.
 
-    Needs plotly (the ``report`` extra): ``pip install "crucible-quant[report]"``.
+    Needs plotly (the ``report`` extra): ``pip install "crucible[report]"``.
     """
     try:
         import plotly.graph_objects as go
     except ModuleNotFoundError as e:                      # pragma: no cover
         raise ModuleNotFoundError(
             'decay_tearsheet needs plotly — install the report extra: '
-            'pip install "crucible-quant[report]"') from e
+            'pip install "crucible[report]"') from e
 
     decay = quantile_decay(preds, score=score, label=label, q=q)
     stats = decay.table
