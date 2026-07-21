@@ -378,19 +378,27 @@ no API tokens are stored anywhere). Changes are tracked in
 1. Create two GitHub environments (repo **Settings → Environments**) named
    `pypi` and `testpypi`. (Add a required-reviewer rule on `pypi` for a manual
    approval gate, if you want one.)
-2. Register a **Trusted Publisher** on the `crucible` project at
-   <https://pypi.org/manage/account/publishing/>:
-   PyPI project `crucible`, owner `mspinola`, repo `crucible`, workflow
-   `release.yml`, environment `pypi`. Repeat on
-   <https://test.pypi.org/manage/account/publishing/> with environment
-   `testpypi` for dry runs. (The publisher registered against the old
-   `crucible-quant` project does not carry over.)
+2. Register a **Trusted Publisher** from the project's own publishing settings,
+   <https://pypi.org/manage/project/crucible/settings/publishing/>: owner
+   `mspinola`, repo `crucible`, workflow `release.yml`, environment `pypi`.
+
+   Use that page, not the *pending publisher* form under
+   <https://pypi.org/manage/account/publishing/>. The pending form is only for
+   reserving a name that does not exist yet, and it rejects `crucible` with
+   "this project already exists". The publisher registered against the old
+   `crucible-quant` project does not carry over either.
+
+   **TestPyPI dry runs are not available under this name.** `crucible` on
+   TestPyPI belongs to an unrelated project by another author, so the
+   `testpypi` path in `release.yml` cannot publish. Verify a build locally with
+   `python -m build && twine check dist/*` instead.
 
 **Cutting a release:**
 
 1. Bump `version` in `pyproject.toml` and move the `CHANGELOG.md` entry from
    *Unreleased* to the new version.
-2. (Optional dry run) **Actions → Release → Run workflow → `testpypi`**.
+2. (Optional dry run) Build and check locally, `python -m build && twine check dist/*`.
+   The workflow's `testpypi` path is unusable under this name, see the setup note above.
 3. Tag and push. The tag **must** match the `pyproject` version or the run fails:
    ```bash
    git tag v0.2.0
