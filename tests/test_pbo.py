@@ -90,3 +90,56 @@ def test_deflated_sharpe_needs_enough_trials_and_obs():
         deflated_sharpe([0.1], returns=np.random.default_rng(5).normal(size=100))
     with pytest.raises(ValueError):
         deflated_sharpe([0.1, 0.2, 0.3], returns=[0.5])
+
+
+# ── n_trials: how many you TRIED vs how many you SCORED ──────────────────────
+
+def _trials_and_returns(seed=0, k=3):
+    rng = np.random.default_rng(seed)
+    return rng.normal(0.01, 0.09, k), rng.normal(0.02, 0.1, 240)
+
+
+def test_n_trials_defaults_to_the_number_of_trial_sharpes():
+    tr, r = _trials_and_returns()
+    assert deflated_sharpe(tr, returns=r).n_trials == len(tr)
+    assert (deflated_sharpe(tr, returns=r).deflated_sharpe
+            == deflated_sharpe(tr, returns=r, n_trials=len(tr)).deflated_sharpe)
+
+
+def test_a_bigger_search_raises_the_bar_and_lowers_the_verdict():
+    """The whole point: grow the search and the winner must clear more."""
+    tr, r = _trials_and_returns()
+    small = deflated_sharpe(tr, returns=r, n_trials=3)
+    large = deflated_sharpe(tr, returns=r, n_trials=141)
+    assert large.sr0_threshold > small.sr0_threshold
+    assert large.deflated_sharpe <= small.deflated_sharpe
+    assert large.n_trials == 141        # recorded, so the correction is auditable
+
+
+def test_the_variance_estimate_still_comes_from_the_scored_trials():
+    """n_trials moves the bar; it must not silently change the dispersion estimate."""
+    tr, r = _trials_and_returns()
+    wide = np.concatenate([tr, [0.5, -0.5]])
+    assert (deflated_sharpe(wide, returns=r, n_trials=141).sr0_threshold
+            > deflated_sharpe(tr, returns=r, n_trials=141).sr0_threshold)
+
+
+def test_a_search_space_log_can_be_passed_directly():
+    from crucible.validation import SearchSpaceLog
+    log = SearchSpaceLog(scope="scan")
+    for i in range(20):
+        log.record({"i": i}, status="tried")
+    tr, r = _trials_and_returns()
+    assert deflated_sharpe(tr, returns=r, n_trials=log).n_trials == 20
+
+
+def test_claiming_fewer_trials_than_were_scored_is_refused():
+    tr, r = _trials_and_returns(k=5)
+    with pytest.raises(ValueError, match="cannot have tried fewer configs than it scored"):
+        deflated_sharpe(tr, returns=r, n_trials=2)
+
+
+def test_too_few_scored_trials_still_names_the_variance_problem():
+    _, r = _trials_and_returns()
+    with pytest.raises(ValueError, match="estimate the search's variance"):
+        deflated_sharpe([0.1], returns=r, n_trials=100)

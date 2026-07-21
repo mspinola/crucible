@@ -29,7 +29,7 @@ from __future__ import annotations
 import itertools
 from dataclasses import dataclass
 from statistics import NormalDist
-from typing import Callable, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -236,10 +236,11 @@ def _psr(sr: float, sr_star: float, n: int, skew: float, kurt: float) -> float:
     return float(_NORM.cdf(z))
 
 
-def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns) -> DeflatedSharpe:
+def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns,
+                    n_trials: Optional[object] = None) -> DeflatedSharpe:
     """Deflated Sharpe Ratio for the winning config out of a search.
 
-    `trial_sharpes` is the per-period Sharpe of EVERY config you tried (its spread
+    `trial_sharpes` is the per-period Sharpe of every config you SCORED (its spread
     sets how high a Sharpe the search could hit by luck); `returns` is the winning
     config's own per-period return series (its Sharpe is the observed number, its
     skew/kurtosis correct the significance test for non-normality).
@@ -247,17 +248,36 @@ def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns) -> DeflatedShar
     The deflation threshold SR0 is the expected MAXIMUM Sharpe of N independent
     noise trials — grow the search and the bar rises. DSR = PSR evaluated at SR0:
     the probability the winner's true Sharpe actually clears that bar. Read ">= 95%"
-    the way you'd read a passed significance test."""
+    the way you'd read a passed significance test.
+
+    **`n_trials` separates how many configs you TRIED from how many you SCORED.** By
+    default N is the number of trial Sharpes supplied, which is right only when every
+    config produced a scoreable result. It is wrong whenever a config errored or was
+    too thin to score, and badly wrong when one search spans several sweeps — scanning
+    45 markets and keeping the best is a search over 45 markets, not over the three
+    configs of whichever one won. Pass the search's true size (an int, or a
+    `SearchSpaceLog`, whose `session_n_variants` is read) and the bar rises to match.
+    Supplying the scored count when more were tried silently undercounts the search
+    and flatters the winner — the exact failure the ledger exists to prevent."""
     sr_trials = np.asarray(trial_sharpes, dtype=float)
     sr_trials = sr_trials[np.isfinite(sr_trials)]
     r = np.asarray(returns, dtype=float)
     r = r[np.isfinite(r)]
-    N = len(sr_trials)
+    scored = len(sr_trials)
     n = len(r)
-    if N < 2:
-        raise ValueError(f"need >= 2 trial Sharpes to estimate the search's variance, got {N}")
+    if scored < 2:
+        raise ValueError(
+            f"need >= 2 trial Sharpes to estimate the search's variance, got {scored}")
     if n < 2:
         raise ValueError(f"need >= 2 returns to compute the winning Sharpe, got {n}")
+
+    # a SearchSpaceLog is accepted directly; duck-typed to avoid coupling the modules
+    ledger_n = getattr(n_trials, "session_n_variants", None)
+    N = scored if n_trials is None else int(ledger_n if ledger_n is not None else n_trials)
+    if N < scored:
+        raise ValueError(
+            f"n_trials={N} is fewer than the {scored} trial Sharpes supplied; a search "
+            "cannot have tried fewer configs than it scored")
 
     sd = r.std(ddof=1)
     sr_obs = float(r.mean() / sd) if sd > 0 else 0.0
