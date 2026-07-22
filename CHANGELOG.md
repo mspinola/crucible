@@ -6,6 +6,46 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-22
+
+The honest-N release. 0.2.0 introduced `SearchSpaceLog` as the ledger of every variant a
+search actually tried, and then never handed that number to the corrections that needed it.
+`deflated_sharpe` derived N from the number of configs it was given scores for, which is
+the count you remember rather than the count you ran. This release closes that gap.
+
+The practical effect is that corrections get stronger, and results that passed may stop
+passing. In the strategy repo that consumes this library, pricing a 45-market scan against
+its full 129-variant search space moved two apparent survivors from 98% and 99% deflated
+Sharpe to 0% and 2%, and took the number of books clearing the gate from two to zero. That
+is the correction working, not a regression.
+
+### Added
+- **`deflated_sharpe(..., n_trials=)`**, so the honest denominator can be supplied rather
+  than inferred. Accepts an `int` or a `SearchSpaceLog` directly. Omitted, it falls back to
+  the previous behaviour of counting the scores it was given, so existing calls are
+  unaffected.
+- **`variant_count(n_variants)`**, the small public helper both corrections now route
+  through. Takes an `int` or a `SearchSpaceLog` and returns the count, so a caller cannot
+  drift from the ledger by retyping a number.
+- Import-boundary tests in CI. `crucible.edge` and `crucible.validation` are held to
+  numpy/pandas, with no vectorbt, no orchestration or state, and no dependency on any
+  strategy package. The packaging surface is checked against `pyproject.toml` in the same
+  pass, so a new module cannot quietly widen what ships.
+
+### Changed
+- **`sidak_correction(p_raw, n_variants)`** and **`run_gauntlet(..., n_variants=)`** now
+  accept a `SearchSpaceLog` as well as an `int`. Prefer passing the ledger: it counts every
+  variant tried, including the ones that errored or scored nothing, which is the honest
+  denominator and the one a caller is least motivated to inflate.
+- Separated *how many configs were tried* from *how many were scored* inside
+  `deflated_sharpe`. Those were the same variable and are not the same quantity, which is
+  what made the ledger decorative.
+
+### Notes
+- Backward compatible. Every new parameter is optional and defaults to the 0.2.0 behaviour.
+- The `crucible-quant` redirect shim under `packaging/` points the old distribution name at
+  this one. It is a separate distribution and is excluded from this package's sdist.
+
 ## [0.2.0] — 2026-07-21
 
 The gauntlet release. 0.1.0 could describe an edge and test whether it was real. 0.2.0
@@ -115,6 +155,7 @@ Initial release — the capital-free trading-edge evaluation core.
   network), and `real_data_yfinance.py` (real prices via the `[examples]` extra).
 - CI across Python 3.9–3.12; tag-triggered PyPI release via Trusted Publishing.
 
-[Unreleased]: https://github.com/mspinola/crucible/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mspinola/crucible/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mspinola/crucible/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mspinola/crucible/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mspinola/crucible/releases/tag/v0.1.0
