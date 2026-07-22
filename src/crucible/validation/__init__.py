@@ -32,7 +32,8 @@ from crucible.validation.windows import (
     windowed_segments, WindowedSegments, WindowCell,
 )
 from crucible.validation.permutation import (
-    sign_permutation_pvalue, sidak_correction, whites_reality_check, spa_test,
+    sign_permutation_pvalue, sidak_correction, variant_count,
+    whites_reality_check, spa_test,
 )
 from crucible.validation.pbo import (
     pbo_cscv, PBOResult, deflated_sharpe, DeflatedSharpe,
@@ -50,7 +51,8 @@ __all__ = [
     "segmented_holdout", "SegmentedHoldout", "full_sample",
     "walk_forward", "WalkForwardResult", "Fold",
     "windowed_segments", "WindowedSegments", "WindowCell",
-    "sign_permutation_pvalue", "sidak_correction", "whites_reality_check", "spa_test",
+    "sign_permutation_pvalue", "sidak_correction", "variant_count",
+    "whites_reality_check", "spa_test",
     "pbo_cscv", "PBOResult", "deflated_sharpe", "DeflatedSharpe",
     "SearchSpaceLog",
     "Gate", "GateCheck", "Gauntlet",

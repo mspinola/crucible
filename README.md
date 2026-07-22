@@ -158,17 +158,27 @@ ordered set of hard gates and returns a single audited pass/fail, the honest
 scorecard, capital-free:
 
 ```python
-from crucible.validation import run_gauntlet
+from crucible.validation import run_gauntlet, SearchSpaceLog
+
+log = SearchSpaceLog(scope="ES:ma_cross_grid")     # record EVERY variant as you try it
+for params in grid:
+    log.record(params, status="tried")             # before it runs, so failures still count
+    ...
 
 gauntlet = run_gauntlet(
     wf.stitched,        # the honest log, stitched out-of-sample
     prices=px,          # enables REAL's random-timing null
     wf=wf,              # adds the DURABLE gate
-    n_variants=4,       # size of your search -> REAL's Šidák correction
+    n_variants=log,     # the LEDGER -> REAL's Šidák correction (a bare int also works)
 )
 print(gauntlet.audit_report())
 print(gauntlet.passed)  # True only if every gate that ran passed
 ```
+
+**Hand `n_variants` the ledger, not a number.** A count you type in is a
+self-attestation, and the honest figure is the one you are least motivated to inflate —
+it has to include the variants that errored or scored nothing, because those cost you a
+look at the data too. `SearchSpaceLog` counts them; memory does not.
 
 The gates, **REAL** (not noise, corrected for the search) → **STRONG** (real at the
 CI lower bound) → **DURABLE** (holds out-of-sample) → **GENERAL** (travels across
