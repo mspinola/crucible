@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 # `crucible-quant`; note that 0.1.0 is unavailable on the `crucible` project (an
 # unrelated 2011 package holds it), so releases here start at 0.2.0.
 name = "crucible"
-version = "0.2.0"
+version = "0.3.0"
 description = "Measure the raw mathematical edge of a trading signal — capital-free, with confidence intervals and a reality check."
 readme = "README.md"
 requires-python = ">=3.9"
