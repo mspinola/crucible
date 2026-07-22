@@ -44,12 +44,29 @@ def sign_permutation_pvalue(returns: Returns, n_permutations: int = 5000,
     return float((np.sum(permuted >= observed) + 1) / (n_permutations + 1))
 
 
-def sidak_correction(p_raw: float, n_variants: int) -> float:
+def variant_count(n_variants) -> int:
+    """Resolve a search size from an int or a `SearchSpaceLog`.
+
+    Duck-typed on `session_n_variants` so the correction functions never import the
+    ledger — the point is that a caller can hand over the ledger itself instead of
+    self-reporting a number, which is the difference between a measurement and an
+    attestation. See ADR-0002.
+    """
+    ledger_n = getattr(n_variants, "session_n_variants", None)
+    return int(n_variants if ledger_n is None else ledger_n)
+
+
+def sidak_correction(p_raw: float, n_variants) -> float:
     """Šidák: probability the best of `n_variants` independent searches would
     produce a p-value this small by chance. corrected = 1 - (1 - p_raw)^n.
 
     The conservative fallback when you only know the COUNT of variants tried;
-    with full return series available, `whites_reality_check` is less punishing."""
+    with full return series available, `whites_reality_check` is less punishing.
+
+    `n_variants` accepts an int or a `SearchSpaceLog`. Prefer the ledger: it counts
+    every variant tried including the ones that errored or scored nothing, which is
+    the honest denominator and the one a caller is least motivated to inflate."""
+    n_variants = variant_count(n_variants)
     if n_variants < 1:
         raise ValueError(f"n_variants must be >= 1, got {n_variants}")
     p_raw = min(max(p_raw, 0.0), 1.0)

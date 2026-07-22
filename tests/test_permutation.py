@@ -65,3 +65,48 @@ def test_spa_more_powerful_than_wrc_with_junk():
 def test_spa_empty_guard():
     res = spa_test({}, n_permutations=100)
     assert res["best_variant"] is None and res["corrected_pvalue"] == 1.0
+
+
+# ── n_variants accepts the ledger, not just a self-reported count (ADR-0002) ──
+
+def _ledger(n, scope="scan"):
+    from crucible.validation import SearchSpaceLog
+    log = SearchSpaceLog(scope=scope)
+    for i in range(n):
+        log.record({"i": i}, status="tried")
+    return log
+
+
+def test_variant_count_resolves_an_int_or_a_ledger():
+    from crucible.validation import variant_count
+    assert variant_count(7) == 7
+    assert variant_count(_ledger(12)) == 12
+
+
+def test_sidak_accepts_a_ledger_and_agrees_with_the_equivalent_int():
+    from crucible.validation import sidak_correction
+    assert sidak_correction(0.01, _ledger(12)) == pytest.approx(sidak_correction(0.01, 12))
+
+
+def test_the_ledger_counts_variants_that_scored_nothing():
+    """The whole point: a config that errored still cost you a look at the data, so it
+    must raise the bar. A hand-typed count is the number you are least motivated to inflate."""
+    from crucible.validation import sidak_correction
+    log = _ledger(3)
+    log.record({"i": "boom"}, status="discarded")      # tried, produced no score
+    assert sidak_correction(0.01, log) == pytest.approx(sidak_correction(0.01, 4))
+    assert sidak_correction(0.01, log) > sidak_correction(0.01, 3)
+
+
+def test_run_gauntlet_takes_a_ledger_for_the_sidak_correction():
+    import numpy as np
+    from crucible.edge import TradeLog
+    from crucible.validation import run_gauntlet
+    rng = np.random.default_rng(0)
+    trades = TradeLog.from_arrays(r=rng.normal(0.15, 1.0, 260))
+    small = run_gauntlet(trades, n_variants=_ledger(2))
+    large = run_gauntlet(trades, n_variants=_ledger(80))
+    both = [g for g in (small, large)]
+    assert all(g is not None for g in both)
+    # a larger recorded search must not make the verdict easier
+    assert not (large.passed and not small.passed)

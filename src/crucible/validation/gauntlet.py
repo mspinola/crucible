@@ -30,7 +30,7 @@ from crucible.edge import (
     bootstrap_metric_cis, random_entry_null, detrended_timing_null,
 )
 from crucible.validation.permutation import (
-    sign_permutation_pvalue, sidak_correction, whites_reality_check,
+    sign_permutation_pvalue, sidak_correction, variant_count, whites_reality_check,
 )
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.gate import Gate, Gauntlet
@@ -54,7 +54,7 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
               tp: float = 2.0, sl: float = 1.0,
               null: str = "random_entry", directions=None,
               variant_returns: Optional[Dict[str, object]] = None,
-              n_variants: Optional[int] = None,
+              n_variants: Optional[object] = None,   # int or SearchSpaceLog
               thr: Thresholds = Thresholds()) -> Gate:
     """REAL — is the edge distinguishable from noise, corrected for the search?
 
@@ -86,10 +86,11 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                      f"(best: {rc['best_variant']})")
     else:
         p_raw = sign_permutation_pvalue(trades, n_permutations=thr.n_perm, seed=thr.seed)
-        if n_variants and n_variants > 1:
-            p = sidak_correction(p_raw, n_variants)
+        n_searched = variant_count(n_variants) if n_variants is not None else 0
+        if n_searched > 1:
+            p = sidak_correction(p_raw, n_searched)
             g.add("corrected_pvalue", p < thr.alpha, value=p, threshold=thr.alpha,
-                  detail=f"sign-permutation p={p_raw:.4f}, Šidák-corrected for {n_variants} variants")
+                  detail=f"sign-permutation p={p_raw:.4f}, Šidák-corrected for {n_searched} variants")
         else:
             p = p_raw
             g.add("permutation_pvalue", p < thr.alpha, value=p, threshold=thr.alpha,
@@ -252,7 +253,7 @@ def run_gauntlet(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                  tp: float = 2.0, sl: float = 1.0,
                  null: str = "random_entry", directions=None, wfe: str = "return",
                  variant_returns: Optional[Dict[str, object]] = None,
-                 n_variants: Optional[int] = None,
+                 n_variants: Optional[object] = None,   # int or SearchSpaceLog
                  thr: Thresholds = Thresholds()) -> Gauntlet:
     """Run the gauntlet on a trade log. REAL and STRONG always run; DURABLE runs
     when a `WalkForwardResult` is supplied, GENERAL when a {market: TradeLog} map
