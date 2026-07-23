@@ -38,6 +38,7 @@ nav:
   - Visualizations: visualizations.md
   - The gauntlet (design): edge_gate.md
   - Architecture: architecture.md
+  - Python support: python_support.md
 
 markdown_extensions:
   - admonition
