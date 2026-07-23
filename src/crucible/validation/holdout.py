@@ -17,9 +17,9 @@ from typing import Dict, Tuple, Union
 
 import pandas as pd
 
-from crucible.edge.trade_log import TradeLog
 from crucible.edge.metrics import expectancy
-from crucible.edge.stats import reality_check, Verdict, Metric
+from crucible.edge.stats import Metric, Verdict, reality_check
+from crucible.edge.trade_log import TradeLog
 
 DateLike = Union[str, pd.Timestamp]
 

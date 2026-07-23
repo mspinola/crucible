@@ -3,7 +3,10 @@ import pytest
 
 from crucible.edge import TradeLog
 from crucible.validation import (
-    sign_permutation_pvalue, sidak_correction, whites_reality_check,
+    sidak_correction,
+    sign_permutation_pvalue,
+    spa_test,
+    whites_reality_check,
 )
 
 
@@ -36,7 +39,6 @@ def test_whites_reality_check_picks_best_and_corrects():
 
 # --- SPA (Hansen) — WRC's more powerful successor ---------------------------
 
-from crucible.validation import spa_test
 
 
 def test_spa_finds_real_edge_low_p():
@@ -100,6 +102,7 @@ def test_the_ledger_counts_variants_that_scored_nothing():
 
 def test_run_gauntlet_takes_a_ledger_for_the_sidak_correction():
     import numpy as np
+
     from crucible.edge import TradeLog
     from crucible.validation import run_gauntlet
     rng = np.random.default_rng(0)

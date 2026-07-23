@@ -23,9 +23,9 @@ from typing import Callable, Dict, List, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from crucible.edge.trade_log import TradeLog
-from crucible.edge.simulator import barrier_trades
 from crucible.edge.metrics import expectancy
+from crucible.edge.simulator import barrier_trades
+from crucible.edge.trade_log import TradeLog
 
 Strategy = Callable[..., pd.Series]
 Score = Callable[[TradeLog], float]

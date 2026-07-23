@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
-from crucible.validation import pbo_cscv, deflated_sharpe
+from crucible.validation import deflated_sharpe, pbo_cscv
 from crucible.validation.pbo import _sharpe_cols
-
 
 # --------------------------------------------------------------------------- #
 #  pbo_cscv

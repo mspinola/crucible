@@ -11,10 +11,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from examples.ml_meta_label import synthetic_meta_book, main  # noqa: E402
-from crucible.ml import information_coefficient, quantile_decay  # noqa: E402
 from crucible.edge import TradeLog  # noqa: E402
+from crucible.ml import information_coefficient, quantile_decay  # noqa: E402
 from crucible.validation import run_gauntlet  # noqa: E402
+from examples.ml_meta_label import main, synthetic_meta_book  # noqa: E402
 
 
 def _gate(g, name):

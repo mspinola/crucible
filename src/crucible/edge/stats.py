@@ -11,8 +11,8 @@ from typing import Callable
 
 import numpy as np
 
-from crucible.edge.trade_log import TradeLog
 from crucible.edge.metrics import expectancy, profit_factor, sqn, win_rate
+from crucible.edge.trade_log import TradeLog
 
 Metric = Callable[[np.ndarray], float]
 

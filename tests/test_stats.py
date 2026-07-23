@@ -1,8 +1,19 @@
 import numpy as np
 
 from crucible.edge import (
-    TradeLog, bootstrap_ci, bootstrap_metric_cis, p_value_positive, reality_check,
-    random_entry_null, barrier_trades, expectancy, profit_factor, sqn, win_rate,
+    TradeLog,
+    barrier_trades,
+    block_bootstrap_ci,
+    block_bootstrap_pvalue,
+    bootstrap_ci,
+    bootstrap_metric_cis,
+    expectancy,
+    p_value_positive,
+    profit_factor,
+    random_entry_null,
+    reality_check,
+    sqn,
+    win_rate,
 )
 from crucible.strategies import ma_cross
 
@@ -78,7 +89,6 @@ def test_random_entry_null_runs(ohlc):
 
 # --- block bootstrap (significance under serial dependence) ------------------
 
-from crucible.edge import block_bootstrap_pvalue, block_bootstrap_ci
 
 
 def _ci_width(ci):
@@ -103,7 +113,8 @@ def test_block_absorbs_positive_autocorrelation():
     # higher p and a wider CI. This is the whole point vs the trade-level bootstrap.
     rng = np.random.default_rng(2)
     n, rho = 500, 0.85
-    x = np.empty(n); x[0] = 0.0
+    x = np.empty(n)
+    x[0] = 0.0
     for t in range(1, n):
         x[t] = rho * x[t - 1] + rng.normal(0.0, 1.0)
     x = x - x.mean() + 0.25            # pin a positive sample mean; keep the AR(1) structure

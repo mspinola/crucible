@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from crucible.edge import TradeLog, expectancy, detrended_timing_null
-from crucible.validation import gate_real, Thresholds
+from crucible.edge import TradeLog, detrended_timing_null, expectancy
+from crucible.validation import Thresholds, gate_real
 
 
 def _ohlc(n=800, drift=0.0003, seed=0):

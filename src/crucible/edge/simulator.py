@@ -47,7 +47,7 @@ def barrier_trades(df: pd.DataFrame, entries, side: str = "long", *,
         df[atr_col] = atr(df)
 
     entries = pd.Series(entries).reindex(df.index, fill_value=False).to_numpy(dtype=bool)
-    o, h, l, c = (df[x].to_numpy(dtype=float) for x in _OHLC)
+    o, h, low, c = (df[x].to_numpy(dtype=float) for x in _OHLC)
     unit_arr = df[atr_col].to_numpy(dtype=float) if risk_unit == "atr" else np.ones(len(df))
     dates = df.index.to_numpy()
     s = 1 if side == "long" else -1
@@ -73,21 +73,26 @@ def barrier_trades(df: pd.DataFrame, entries, side: str = "long", *,
         xp = xr = None
         j = ei
         while j < n:
-            fav = s * (h[j] - ep) if s > 0 else s * (l[j] - ep)
-            adv = s * (l[j] - ep) if s > 0 else s * (h[j] - ep)
+            fav = s * (h[j] - ep) if s > 0 else s * (low[j] - ep)
+            adv = s * (low[j] - ep) if s > 0 else s * (h[j] - ep)
             mfe, mae = max(mfe, fav), min(mae, adv)
             if s > 0:
-                if l[j] <= sl_px:
-                    xp, xr = sl_px, "SL"; break
+                if low[j] <= sl_px:
+                    xp, xr = sl_px, "SL"
+                    break
                 if h[j] >= tp_px:
-                    xp, xr = tp_px, "TP"; break
+                    xp, xr = tp_px, "TP"
+                    break
             else:
                 if h[j] >= sl_px:
-                    xp, xr = sl_px, "SL"; break
-                if l[j] <= tp_px:
-                    xp, xr = tp_px, "TP"; break
+                    xp, xr = sl_px, "SL"
+                    break
+                if low[j] <= tp_px:
+                    xp, xr = tp_px, "TP"
+                    break
             if j - ei >= timeout:
-                xp, xr = c[j], "timeout"; break
+                xp, xr = c[j], "timeout"
+                break
             j += 1
         if xp is None:
             xp, xr, j = c[-1], "eod", n - 1

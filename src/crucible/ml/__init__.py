@@ -18,12 +18,15 @@ Landed so far:
 ``decay_tearsheet`` needs plotly (the ``report`` extra); everything else is
 numpy/pandas only.
 """
-from crucible.ml.ic import AlphaGateError, alpha_gate, information_coefficient
 from crucible.ml.decay import DecayTable, decay_tearsheet, quantile_decay, score_by_outcome
-from crucible.ml.redundancy import (
-    RedundancyReport, cramers_v, fold_ic, redundancy_droplist,
-)
+from crucible.ml.ic import AlphaGateError, alpha_gate, information_coefficient
 from crucible.ml.pit import asof_window, window_before
+from crucible.ml.redundancy import (
+    RedundancyReport,
+    cramers_v,
+    fold_ic,
+    redundancy_droplist,
+)
 
 __all__ = [
     "information_coefficient", "alpha_gate", "AlphaGateError",

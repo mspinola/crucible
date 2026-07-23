@@ -5,7 +5,10 @@ import pytest
 from crucible.edge import TradeLog
 from crucible.edge.stats import reality_check
 from crucible.validation import (
-    holdout, split_train_test, segmented_holdout, full_sample,
+    full_sample,
+    holdout,
+    segmented_holdout,
+    split_train_test,
 )
 
 

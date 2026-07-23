@@ -26,14 +26,22 @@ import numpy as np
 import pandas as pd
 
 from crucible.edge import (
-    TradeLog, edge_report, expectancy, sqn,
-    bootstrap_metric_cis, random_entry_null, detrended_timing_null,
-)
-from crucible.validation.permutation import (
-    sign_permutation_pvalue, sidak_correction, variant_count, whites_reality_check,
+    TradeLog,
+    bootstrap_metric_cis,
+    detrended_timing_null,
+    edge_report,
+    expectancy,
+    random_entry_null,
+    sqn,
 )
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.gate import Gate, Gauntlet
+from crucible.validation.permutation import (
+    sidak_correction,
+    sign_permutation_pvalue,
+    variant_count,
+    whites_reality_check,
+)
 from crucible.validation.thresholds import Thresholds
 
 
