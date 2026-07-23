@@ -10,7 +10,7 @@ name = "crucible"
 version = "0.3.0"
 description = "Measure the raw mathematical edge of a trading signal — capital-free, with confidence intervals and a reality check."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Matt Spinola" }]
 keywords = [
@@ -57,7 +57,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
