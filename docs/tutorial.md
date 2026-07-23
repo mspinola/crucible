@@ -6,6 +6,12 @@ example system, with references to the source literature.**
 
 📄 [**Download this tutorial as a PDF**](https://mspinola.github.io/crucible/tutorial.pdf)
 
+> **Running the code.** Everything on this page runs on `pip install crucible`. The two
+> end-to-end scripts (§12, §13) live in the repo under
+> [`examples/`](https://github.com/mspinola/crucible/tree/main/examples) and use reproducible
+> synthetic data, so `python examples/donchian_gauntlet.py` reproduces the exact numbers you
+> see here, with no network and no data of your own.
+
 ---
 
 ## 0. What "statistically significant trade log" actually means
