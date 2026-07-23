@@ -37,7 +37,7 @@ examples = ["yfinance>=0.2"]   # run the README demo on real data
 data = ["cotdata>=0.1"]         # futures/COT data layer (import cotdata) — sibling package
 report = ["plotly>=5"]          # tearsheets (crucible.report, later)
 ml = ["scikit-learn>=1.2", "xgboost>=1.7"]  # walk-forward ML path (later)
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/mspinola/crucible"
@@ -54,3 +54,11 @@ exclude = ["packaging/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
