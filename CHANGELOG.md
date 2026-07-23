@@ -6,6 +6,13 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-23
+
+### Changed
+- Raised the minimum Python to 3.10 (`requires-python = ">=3.10"`), matching the fleet
+  library-tier floor policy. See `docs/python_support.md`. NumPy/pandas already require
+  3.10+; no code changes.
+
 ## [0.3.0] — 2026-07-22
 
 The honest-N release. 0.2.0 introduced `SearchSpaceLog` as the ledger of every variant a
@@ -155,7 +162,8 @@ Initial release — the capital-free trading-edge evaluation core.
   network), and `real_data_yfinance.py` (real prices via the `[examples]` extra).
 - CI across Python 3.9–3.12; tag-triggered PyPI release via Trusted Publishing.
 
-[Unreleased]: https://github.com/mspinola/crucible/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mspinola/crucible/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mspinola/crucible/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mspinola/crucible/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/mspinola/crucible/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mspinola/crucible/releases/tag/v0.1.0
