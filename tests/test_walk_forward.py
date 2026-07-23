@@ -1,6 +1,6 @@
 from crucible.edge import TradeLog
-from crucible.validation import walk_forward, WalkForwardResult
 from crucible.strategies import ma_cross
+from crucible.validation import WalkForwardResult, walk_forward
 
 
 def test_walk_forward_runs_and_stitches(ohlc):

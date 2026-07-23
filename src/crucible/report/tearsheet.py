@@ -19,9 +19,9 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from crucible.edge.trade_log import TradeLog
 from crucible.edge.metrics import edge_report, expectancy
 from crucible.edge.stats import reality_check
+from crucible.edge.trade_log import TradeLog
 
 # Reality-check verdict (single book).
 _VERDICT_COLOR = {"HELD": "#1a7f37", "FRAGILE": "#9a6700", "FAIL": "#b42318"}
@@ -509,6 +509,7 @@ def _block_bootstrap_panel(returns, *, block: int = 6, stationary: bool = False,
     embeddable Plotly div (plotly.js never inlined here — the page already ships it), or
     ``''`` when the series has fewer than two periods (no block bootstrap possible)."""
     import plotly.graph_objects as go
+
     from crucible.edge.stats import block_bootstrap_ci, block_bootstrap_pvalue
 
     r = np.asarray(getattr(returns, "values", returns), dtype=float)
@@ -1111,8 +1112,10 @@ def segment_forest(segments, *, by=None, columns=None, emphasis=None,
                 continue
             e, lo, hi, n, verdict = p
             suffix = f" · {colname}" if colname is not None else ""
-            xs.append(e); ys.append(lab)
-            elo.append(max(e - lo, 0.0)); ehi.append(max(hi - e, 0.0))
+            xs.append(e)
+            ys.append(lab)
+            elo.append(max(e - lo, 0.0))
+            ehi.append(max(hi - e, 0.0))
             colors.append(_VERDICT_COLOR.get(verdict, _FOREST_MUTED))
             sizes.append(min(8.0 + 2.2 * n ** 0.5, 26.0))
             symbols.append("diamond" if lab in emphasis else "circle")
@@ -1178,6 +1181,7 @@ def _strong_whisker(gate, trades: TradeLog, *, n_boot: int = 10_000,
     ``''`` when the gate or trade log can't supply the three CI checks."""
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+
     from crucible.validation.gauntlet import bootstrap_metric_cis
 
     r = getattr(trades, "r", None)

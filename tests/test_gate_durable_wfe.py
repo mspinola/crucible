@@ -1,7 +1,7 @@
 import numpy as np
 
 from crucible.edge import TradeLog
-from crucible.validation import gate_durable, Thresholds
+from crucible.validation import Thresholds, gate_durable
 
 
 class _Fold:

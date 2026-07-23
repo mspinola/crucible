@@ -5,7 +5,12 @@ import numpy as np
 from crucible.edge import TradeLog, barrier_trades
 from crucible.strategies import ma_cross
 from crucible.validation import (
-    Thresholds, run_gauntlet, gate_real, gate_strong, gate_durable, gate_general,
+    Thresholds,
+    gate_durable,
+    gate_general,
+    gate_real,
+    gate_strong,
+    run_gauntlet,
 )
 
 # small resampling budgets so the suite stays fast

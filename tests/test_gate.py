@@ -1,4 +1,3 @@
-import pytest
 
 from crucible.validation import Gate, GateCheck, Gauntlet
 
@@ -50,14 +49,17 @@ def test_to_dict_and_audit_report():
 
 
 def test_gauntlet_passes_only_if_every_gate_passes():
-    a = Gate("REAL"); a.add("x", True)
-    b = Gate("STRONG"); b.add("y", True)
+    a = Gate("REAL")
+    a.add("x", True)
+    b = Gate("STRONG")
+    b.add("y", True)
     gauntlet = Gauntlet()
     gauntlet.add(a)
     gauntlet.add(b)
     assert gauntlet.passed is True
 
-    c = Gate("DURABLE"); c.add("z", False)
+    c = Gate("DURABLE")
+    c.add("z", False)
     gauntlet.add(c)
     assert gauntlet.passed is False
     assert [g.name for g in gauntlet.failed_gates] == ["DURABLE"]

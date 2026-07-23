@@ -2,14 +2,29 @@ import pytest
 
 pytest.importorskip("plotly")  # report is behind the [report] extra
 
-from crucible.edge import barrier_trades          # noqa: E402
-from crucible.strategies import ma_cross           # noqa: E402
-from crucible.report import (                      # noqa: E402
-    tearsheet, cumulative_r, gauntlet_report, verdict_banner, verdict_summary,
-    gate_block, edge_panels, metrics_table, report_css, monthly_r, title_lockup,
-    equity_drawdown, exit_reason_breakdown, holding_vs_r, exit_efficiency_dist,
-    edge_ratio_curve, gross_net_equity, concurrency_timeline, segment_forest,
+from crucible.edge import barrier_trades  # noqa: E402
+from crucible.report import (  # noqa: E402
+    concurrency_timeline,
+    cumulative_r,
+    edge_panels,
+    edge_ratio_curve,
+    equity_drawdown,
+    exit_efficiency_dist,
+    exit_reason_breakdown,
+    gate_block,
+    gauntlet_report,
+    gross_net_equity,
+    holding_vs_r,
+    metrics_table,
+    monthly_r,
+    report_css,
+    segment_forest,
+    tearsheet,
+    title_lockup,
+    verdict_banner,
+    verdict_summary,
 )
+from crucible.strategies import ma_cross  # noqa: E402
 from crucible.validation import run_gauntlet, walk_forward  # noqa: E402
 
 
@@ -109,8 +124,9 @@ def test_pillar_bullets_render_and_direction_inference(ohlc):
 
 
 def test_check_bullet_svg_colors_by_result_and_skips_non_numeric():
-    from crucible.report.tearsheet import _check_bullet_svg
     from types import SimpleNamespace as NS
+
+    from crucible.report.tearsheet import _check_bullet_svg
     # passing hard → green; failing hard → red; failing soft → amber
     assert "var(--cr-pass)" in _check_bullet_svg(NS(name="wfe", value=1.47, threshold=0.5, hard=True, passed=True))
     assert "var(--cr-fail)" in _check_bullet_svg(NS(name="p", value=0.10, threshold=0.05, hard=True, passed=False))
@@ -129,8 +145,9 @@ def test_gate_block_embeds_per_check_bullets(ohlc):
 
 
 def test_pillar_bullets_empty_without_checks():
-    from crucible.report import pillar_bullets
     from types import SimpleNamespace
+
+    from crucible.report import pillar_bullets
     # a gate whose checks lack numeric value/threshold → nothing to plot
     g = SimpleNamespace(gates=[SimpleNamespace(name="REAL", checks=[])])
     assert pillar_bullets(g) == ""
@@ -160,8 +177,9 @@ def test_verdict_summary_pass_and_fail(ohlc):
 
 
 def test_metrics_table_skips_nan_excursion():
-    from crucible.edge import TradeLog
     import numpy as np
+
+    from crucible.edge import TradeLog
     # A rules book carries NaN mfe/mae (excursion is not defined for it) — the
     # excursion / exit-efficiency rows must be omitted, never rendered as "nan".
     tl = TradeLog.from_arrays(r=np.random.default_rng(0).normal(0.1, 1, 60),
@@ -188,7 +206,6 @@ def test_monthly_r_is_gap_free_and_preserves_total(ohlc):
     assert len(mr) >= 2
     assert mr.index.to_period("M").nunique() == len(mr)      # no missing months
     # summing periods must reconstruct the trade-log total R (empty months add 0)
-    import numpy as np
     assert float(mr.sum()) == pytest.approx(float(tl.r.sum()))
 
 
@@ -214,6 +231,7 @@ def test_block_bootstrap_panel_widens_ci_on_autocorrelation():
     # A positively autocorrelated period series: the block CI must be WIDER than the
     # i.i.d. one — the whole reason the panel exists. Assert on the numbers behind it.
     import numpy as np
+
     from crucible.edge.stats import block_bootstrap_ci
     from crucible.report.tearsheet import _block_bootstrap_panel
     rng = np.random.default_rng(1)
@@ -376,8 +394,8 @@ def test_strong_whisker_draws_ci_panels(ohlc):
 
 
 def test_strong_whisker_guards(ohlc):
-    from crucible.report.tearsheet import _strong_whisker
     from crucible.edge import TradeLog
+    from crucible.report.tearsheet import _strong_whisker
     tl, g = _full_gauntlet(ohlc)
     strong = next(gt for gt in g.gates if gt.name == "STRONG")
     assert _strong_whisker(None, tl) == ""                        # no gate
@@ -471,8 +489,9 @@ def test_exit_efficiency_dist_renders_capture(ohlc):
 
 
 def test_exit_efficiency_dist_degrades_without_mfe():
-    from crucible.edge import TradeLog
     import numpy as np
+
+    from crucible.edge import TradeLog
     # no mfe at all, and an all-NaN mfe (a rules book), both yield nothing
     assert exit_efficiency_dist(TradeLog.from_arrays(r=[0.3, -1.0])) == ""
     assert exit_efficiency_dist(
@@ -557,8 +576,9 @@ def test_segment_forest_splits_on_group_column(ohlc):
 
 
 def test_segment_forest_guards():
-    from crucible.edge import TradeLog
     import pytest as _pytest
+
+    from crucible.edge import TradeLog
     # empty mapping / all-empty segments -> nothing to plot
     assert segment_forest({}) == ""
     assert segment_forest({"a": TradeLog.from_arrays(r=[])}) == ""

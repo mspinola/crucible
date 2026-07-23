@@ -1,6 +1,6 @@
 import numpy as np
 
-from crucible.edge import barrier_trades, random_entries, TradeLog
+from crucible.edge import TradeLog, barrier_trades, random_entries
 from crucible.strategies import ma_cross, macd_cross
 
 

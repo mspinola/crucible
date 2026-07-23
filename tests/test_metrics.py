@@ -1,8 +1,13 @@
 import numpy as np
 
 from crucible.edge import (
-    TradeLog, edge_report, expectancy, profit_factor, payoff_ratio,
-    win_rate, sqn,
+    TradeLog,
+    edge_report,
+    expectancy,
+    payoff_ratio,
+    profit_factor,
+    sqn,
+    win_rate,
 )
 
 

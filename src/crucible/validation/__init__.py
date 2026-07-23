@@ -21,29 +21,47 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
   gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
                  DURABLE / GENERAL gates + run_gauntlet, gated by Thresholds
 """
+from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
+from crucible.validation.gate import Gate, GateCheck, Gauntlet
+from crucible.validation.gauntlet import (
+    gate_durable,
+    gate_general,
+    gate_real,
+    gate_strong,
+    run_gauntlet,
+)
 from crucible.validation.holdout import (
-    holdout, split_train_test, HoldoutResult,
-    segmented_holdout, SegmentedHoldout, full_sample,
-)
-from crucible.validation.walk_forward import (
-    walk_forward, WalkForwardResult, Fold,
-)
-from crucible.validation.windows import (
-    windowed_segments, WindowedSegments, WindowCell,
-)
-from crucible.validation.permutation import (
-    sign_permutation_pvalue, sidak_correction, variant_count,
-    whites_reality_check, spa_test,
+    HoldoutResult,
+    SegmentedHoldout,
+    full_sample,
+    holdout,
+    segmented_holdout,
+    split_train_test,
 )
 from crucible.validation.pbo import (
-    pbo_cscv, PBOResult, deflated_sharpe, DeflatedSharpe,
+    DeflatedSharpe,
+    PBOResult,
+    deflated_sharpe,
+    pbo_cscv,
+)
+from crucible.validation.permutation import (
+    sidak_correction,
+    sign_permutation_pvalue,
+    spa_test,
+    variant_count,
+    whites_reality_check,
 )
 from crucible.validation.search_space import SearchSpaceLog
-from crucible.validation.gate import Gate, GateCheck, Gauntlet
-from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.thresholds import Thresholds
-from crucible.validation.gauntlet import (
-    run_gauntlet, gate_real, gate_strong, gate_durable, gate_general,
+from crucible.validation.walk_forward import (
+    Fold,
+    WalkForwardResult,
+    walk_forward,
+)
+from crucible.validation.windows import (
+    WindowCell,
+    WindowedSegments,
+    windowed_segments,
 )
 
 __all__ = [

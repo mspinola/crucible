@@ -3,9 +3,11 @@ import pandas as pd
 import pytest
 
 from crucible.ml import (
-    AlphaGateError, alpha_gate, information_coefficient, quantile_decay,
+    AlphaGateError,
+    alpha_gate,
+    information_coefficient,
+    quantile_decay,
 )
-
 
 # --- information_coefficient ---------------------------------------------------
 

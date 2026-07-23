@@ -4,7 +4,6 @@ import pytest
 
 from crucible.ml import RedundancyReport, cramers_v, fold_ic, redundancy_droplist
 
-
 # --- cramers_v -----------------------------------------------------------------
 
 def test_cramers_v_identical_is_one():
