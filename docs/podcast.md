@@ -6,28 +6,25 @@ the question.**
 
 <!--
   HOSTING: the episode is served as a GitHub Release asset, so it streams cleanly
-  (range requests / seeking work) and never bloats the repo. To publish or update:
+  (range requests / seeking work) and never bloats the repo.
 
-    1. Upload the .m4a to a GitHub release (any release), naming it exactly
-       `crucible-podcast.m4a` so the /latest/download/ URL below resolves.
-       -> https://github.com/mspinola/crucible/releases
-    2. That's it — the player and download link below already point at it.
-
-  The /releases/latest/download/<name> form always resolves to the newest release
-  that contains an asset with that name, so you don't have to edit this file on
-  each release.
+  The asset is attached to the v0.1.0 release, and the URLs below are pinned to
+  that tag on purpose — /releases/download/v0.1.0/<name> always resolves to it,
+  independent of which release is "latest". To move the episode to a different
+  release, re-upload the asset there and update the v0.1.0 URLs below.
+    -> https://github.com/mspinola/crucible/releases
 -->
 
 <audio controls preload="none" style="width:100%; margin: 0.5rem 0 1rem;">
   <source
-    src="https://github.com/mspinola/crucible/releases/latest/download/crucible-podcast.m4a"
+    src="https://github.com/mspinola/crucible/releases/download/v0.1.0/crucible-podcast.m4a"
     type="audio/mp4">
   Your browser can't play this audio inline —
-  <a href="https://github.com/mspinola/crucible/releases/latest/download/crucible-podcast.m4a">download the episode</a>
+  <a href="https://github.com/mspinola/crucible/releases/download/v0.1.0/crucible-podcast.m4a">download the episode</a>
   instead.
 </audio>
 
-⬇️ [**Download the episode (M4A)**](https://github.com/mspinola/crucible/releases/latest/download/crucible-podcast.m4a)
+⬇️ [**Download the episode (M4A)**](https://github.com/mspinola/crucible/releases/download/v0.1.0/crucible-podcast.m4a)
 · 📖 [Read the full tutorial](tutorial.md)
 · 📄 [Tutorial as a PDF](https://mspinola.github.io/crucible/tutorial.pdf)
 
