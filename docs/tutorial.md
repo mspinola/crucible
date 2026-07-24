@@ -5,6 +5,7 @@ contributes to declaring a trade log statistically significant, worked end to en
 example system, with references to the source literature.**
 
 📄 [**Download this tutorial as a PDF**](https://mspinola.github.io/crucible/tutorial.pdf)
+· 🎧 [**Prefer to listen? The podcast companion →**](podcast.md)
 
 > **Running the code.** Everything on this page runs on `pip install crucible`. The two
 > end-to-end scripts (§12, §13) live in the repo under
