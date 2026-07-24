@@ -7,6 +7,47 @@ who likes the strategy, and a strong later gate can't redeem an early failure. I
 entirely **capital-free**: the gauntlet reasons over trade-log statistics, never over
 an equity curve.
 
+The gauntlet at a glance — a trade log enters, you supply the two preambles, and it runs
+the core gates in order before the optional generalization gate, ending in one of three
+verdicts:
+
+```mermaid
+flowchart TD
+    IN["Trading strategy R-multiples"]
+    DECLARE["Declare (you bring this)<br/>Mechanical rule + variant count (N)"]
+    CLEAN["Clean (you bring this)<br/>Leakage-free: purge and embargo"]
+    REAL["1 · Real<br/>Search-corrected significance<br/>permutation + Šidák vs random-entry null"]
+    STRONG["2 · Strong<br/>Expectancy, profit factor, SQN<br/>at the 95% CI lower bound"]
+    DURABLE["3 · Durable<br/>Walk-forward efficiency + fold dispersion"]
+    GENERAL["4 · General (optional)<br/>Cross-market reality check"]
+    PASS["Gauntlet pass<br/>every gate that ran passed,<br/>including the optional general gate"]
+    AMBER["Edge validated — scope-limited<br/>core gates pass, general fails<br/>real, but only for the proven markets"]
+    FAIL["Gauntlet fail<br/>any core gate fails — stop here<br/>likely an artifact of noise or overfitting"]
+
+    IN --> DECLARE --> CLEAN --> REAL --> STRONG --> DURABLE --> GENERAL
+    GENERAL -->|all gates pass| PASS
+    GENERAL -->|general fails| AMBER
+    REAL -.->|any core gate fails| FAIL
+    STRONG -.-> FAIL
+    DURABLE -.-> FAIL
+
+    classDef pre fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+    classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+    classDef opt fill:#EEEDFE,stroke:#534AB7,color:#26215C;
+    classDef pass fill:#EAF3DE,stroke:#3B6D11,color:#173404;
+    classDef amber fill:#FAEEDA,stroke:#854F0B,color:#412402;
+    classDef fail fill:#FCEBEB,stroke:#A32D2D,color:#501313;
+
+    class IN,DECLARE,CLEAN pre;
+    class REAL,STRONG,DURABLE core;
+    class GENERAL opt;
+    class PASS pass;
+    class AMBER amber;
+    class FAIL fail;
+```
+
+The same ladder in terse form:
+
 ```
 DECLARE   preamble  : a mechanical rule + a log of every variant you tried
 CLEAN     preamble  : leakage-controlled construction (use holdout / walk_forward)

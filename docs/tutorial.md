@@ -974,6 +974,44 @@ full runnable version is in [`examples/donchian_gauntlet.py`](https://github.com
 it uses reproducible synthetic prices, so you can run it with no network and get these exact
 numbers.
 
+The whole pipeline you're about to run, at a glance — from the trade log through the gates
+to one of three verdicts:
+
+```mermaid
+flowchart TD
+    IN["Trading strategy R-multiples"]
+    DECLARE["Declare (you bring this)<br/>Mechanical rule + variant count (N)"]
+    CLEAN["Clean (you bring this)<br/>Leakage-free: purge and embargo"]
+    REAL["1 · Real<br/>Search-corrected significance<br/>permutation + Šidák vs random-entry null"]
+    STRONG["2 · Strong<br/>Expectancy, profit factor, SQN<br/>at the 95% CI lower bound"]
+    DURABLE["3 · Durable<br/>Walk-forward efficiency + fold dispersion"]
+    GENERAL["4 · General (optional)<br/>Cross-market reality check"]
+    PASS["Gauntlet pass<br/>every gate that ran passed,<br/>including the optional general gate"]
+    AMBER["Edge validated — scope-limited<br/>core gates pass, general fails<br/>real, but only for the proven markets"]
+    FAIL["Gauntlet fail<br/>any core gate fails — stop here<br/>likely an artifact of noise or overfitting"]
+
+    IN --> DECLARE --> CLEAN --> REAL --> STRONG --> DURABLE --> GENERAL
+    GENERAL -->|all gates pass| PASS
+    GENERAL -->|general fails| AMBER
+    REAL -.->|any core gate fails| FAIL
+    STRONG -.-> FAIL
+    DURABLE -.-> FAIL
+
+    classDef pre fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
+    classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
+    classDef opt fill:#EEEDFE,stroke:#534AB7,color:#26215C;
+    classDef pass fill:#EAF3DE,stroke:#3B6D11,color:#173404;
+    classDef amber fill:#FAEEDA,stroke:#854F0B,color:#412402;
+    classDef fail fill:#FCEBEB,stroke:#A32D2D,color:#501313;
+
+    class IN,DECLARE,CLEAN pre;
+    class REAL,STRONG,DURABLE core;
+    class GENERAL opt;
+    class PASS pass;
+    class AMBER amber;
+    class FAIL fail;
+```
+
 ```python
 from crucible.edge import barrier_trades, edge_report, reality_check
 from crucible.validation import walk_forward, run_gauntlet
