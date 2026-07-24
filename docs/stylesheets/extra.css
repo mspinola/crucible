@@ -44,6 +44,38 @@
   color: #5dcaa5;
 }
 
+/* ── Mermaid diagrams (the gauntlet flow) ─────────────────────────────────
+   The diagram's classDef fills are fixed light stops in BOTH colour schemes,
+   so they stay legible on the page. In dark mode, though, Material recolours
+   Mermaid's label text to a light value that then vanishes on those light
+   fills. Because every node fill here is light, we force the label text dark
+   in the slate scheme. The blanket `.node` rule guarantees readability even if
+   the per-class hooks don't match; the per-class rules restore the ramp tint. */
+[data-md-color-scheme="slate"] .mermaid .node .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .node .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .node text {
+  color: #1a1a1a !important;
+  fill: #1a1a1a !important;
+}
+[data-md-color-scheme="slate"] .mermaid .pre .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .pre .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .pre text { color: #2C2C2A !important; fill: #2C2C2A !important; }
+[data-md-color-scheme="slate"] .mermaid .core .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .core .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .core text { color: #04342C !important; fill: #04342C !important; }
+[data-md-color-scheme="slate"] .mermaid .opt .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .opt .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .opt text { color: #26215C !important; fill: #26215C !important; }
+[data-md-color-scheme="slate"] .mermaid .pass .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .pass .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .pass text { color: #173404 !important; fill: #173404 !important; }
+[data-md-color-scheme="slate"] .mermaid .amber .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .amber .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .amber text { color: #412402 !important; fill: #412402 !important; }
+[data-md-color-scheme="slate"] .mermaid .fail .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .fail .nodeLabel *,
+[data-md-color-scheme="slate"] .mermaid .fail text { color: #501313 !important; fill: #501313 !important; }
+
 /* Legend swatches for the Architecture module map (colour = role). */
 .md-typeset .sw {
   display: inline-block;
