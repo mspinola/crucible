@@ -997,12 +997,12 @@ flowchart TD
     STRONG -.-> FAIL
     DURABLE -.-> FAIL
 
-    classDef pre fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A;
-    classDef core fill:#E1F5EE,stroke:#0F6E56,color:#04342C;
-    classDef opt fill:#EEEDFE,stroke:#534AB7,color:#26215C;
-    classDef pass fill:#EAF3DE,stroke:#3B6D11,color:#173404;
-    classDef amber fill:#FAEEDA,stroke:#854F0B,color:#412402;
-    classDef fail fill:#FCEBEB,stroke:#A32D2D,color:#501313;
+    classDef pre stroke:#888780,stroke-width:1.5px;
+    classDef core stroke:#1D9E75,stroke-width:2px;
+    classDef opt stroke:#7F77DD,stroke-width:2px;
+    classDef pass stroke:#639922,stroke-width:2px;
+    classDef amber stroke:#BA7517,stroke-width:2px;
+    classDef fail stroke:#E24B4A,stroke-width:2px;
 
     class IN,DECLARE,CLEAN pre;
     class REAL,STRONG,DURABLE core;
