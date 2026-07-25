@@ -197,7 +197,7 @@ variants you discarded. This records them.
 ## Running the tests, building the docs, releasing
 
 - **Tests:** `pip install -e ".[dev]"` then `pytest`. CI runs the suite on Python
-  3.9–3.12 plus a quickstart smoke test (`.github/workflows/ci.yml`). The `[dev]` extra
+  3.10–3.12 plus a quickstart smoke test (`.github/workflows/ci.yml`). The `[dev]` extra
   deliberately excludes the `ml`/`report` heavy deps so the core test run stays pure.
 - **Docs:** `pip install -r requirements-docs.txt` then `mkdocs serve` (this site is
   MkDocs Material). `docs/gen_figures.py` regenerates the tutorial's PNGs (needs the

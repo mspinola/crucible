@@ -4,7 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/crucible)](https://pypi.org/project/crucible/)
 [![CI](https://github.com/mspinola/crucible/actions/workflows/ci.yml/badge.svg)](https://github.com/mspinola/crucible/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.9%E2%80%933.12-blue)](pyproject.toml)
+[![Python](https://img.shields.io/badge/python-3.10%E2%80%933.12-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tutorial](https://img.shields.io/badge/docs-tutorial-1c6b73)](https://mspinola.github.io/crucible/tutorial/)
 
