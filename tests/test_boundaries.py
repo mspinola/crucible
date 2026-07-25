@@ -98,6 +98,19 @@ def test_core_modules_import_only_numpy_and_pandas(path):
         "extra. A new dependency here is a change to what crucible is.")
 
 
+def test_package_version_matches_pyproject():
+    """The other packaging twin: `crucible.__version__` drifted to a stale 0.1.0 once
+    because only pyproject gets bumped at release time. Release tags are checked against
+    pyproject, so this pins the third copy to the same number."""
+    import crucible
+
+    text = (SRC.parent.parent / "pyproject.toml").read_text()
+    declared = text.split("\nversion = ", 1)[1].splitlines()[0].strip().strip('"\'')
+    assert crucible.__version__ == declared, (
+        f"crucible.__version__ is {crucible.__version__!r} but pyproject declares "
+        f"{declared!r}; bump both together when cutting a release.")
+
+
 def test_declared_dependencies_match_the_enforced_ones():
     """The packaging twin: catches a dependency added to pyproject before it is imported."""
     text = (SRC.parent.parent / "pyproject.toml").read_text()
