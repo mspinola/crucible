@@ -42,6 +42,34 @@ def test_detrended_null_matches_the_primitive():
     assert "detrended" in chk.detail
 
 
+def test_null_scale_denominates_the_bar_in_r():
+    # passing null_scale (entry/risk per trade) must denominate the detrended bar in
+    # the log's R unit: gate_real's threshold equals the primitive called with the
+    # same scale, and is orders larger than the unscaled (fractional) bar it replaces.
+    rng = np.random.default_rng(4)
+    n = 100
+    r = rng.normal(0.3, 1.0, n)           # R-multiples
+    holds = rng.integers(5, 25, n)
+    dirs = np.ones(n)
+    scale = rng.uniform(30, 100, n)       # entry/risk, tens-to-hundreds
+    tl = TradeLog.from_arrays(r=r, bars_held=holds)
+    ohlc = _ohlc()
+    thr = Thresholds(n_random_sims=300, seed=7)
+
+    g = gate_real(tl, prices=ohlc, null="detrended", directions=dirs,
+                  null_scale=scale, n_variants=1, thr=thr)
+    bar = _check(g, "beats_random_timing").threshold
+    expected = detrended_timing_null(ohlc["Close"], holds, directions=dirs,
+                                     scale=scale, n_samples=300, seed=7)
+    assert bar == pytest.approx(float(np.percentile(expected, 95)))
+    assert "R units" in _check(g, "beats_random_timing").detail
+
+    unscaled = _check(gate_real(tl, prices=ohlc, null="detrended", directions=dirs,
+                                n_variants=1, thr=thr),
+                      "beats_random_timing").threshold
+    assert bar > unscaled * 5             # the R bar dwarfs the old fractional one
+
+
 def test_detrended_and_random_entry_are_different_nulls():
     rng = np.random.default_rng(2)
     tl = TradeLog.from_arrays(r=rng.normal(0.008, 0.02, 100),

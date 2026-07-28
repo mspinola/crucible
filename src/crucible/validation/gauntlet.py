@@ -60,7 +60,7 @@ def _infer_hold(trades: TradeLog, default: int = 20) -> int:
 def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
               side: str = "long", hold: Optional[int] = None,
               tp: float = 2.0, sl: float = 1.0,
-              null: str = "random_entry", directions=None,
+              null: str = "random_entry", directions=None, null_scale=None,
               variant_returns: Optional[Dict[str, object]] = None,
               n_variants: Optional[object] = None,   # int or SearchSpaceLog
               thr: Thresholds = Thresholds()) -> Gate:
@@ -81,8 +81,16 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                       each trade's holding period and direction. The right null for
                       a mixed long/short book on a drift-bearing asset — pass
                       per-trade ``directions`` (+1/-1); it falls back to `side` for
-                      all trades when omitted. It's a return-space test, so use it
-                      when the log's `r` is in return units.
+                      all trades when omitted.
+
+    ``null_scale`` (detrended null only): per-trade multipliers that put the null in
+    the same unit as ``trades.r``. The null draws are simple returns, so a
+    simple-return log needs nothing (leave ``None``). An **R-denominated** log
+    (`r = (exit-entry)/risk`) is a different unit; pass ``entry / risk`` per trade so
+    the null is in R too. Skipping it on an R book is a units error: the observed
+    expectancy (R) is then compared against a fractional-return bar tens-to-hundreds
+    of times too small, and the hard check passes almost any positive book. See
+    :func:`crucible.edge.detrended_timing_null`.
     """
     g = Gate("REAL")
 
@@ -115,8 +123,11 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
             dirs = (np.asarray(directions, dtype=float) if directions is not None
                     else np.full(trades.n, 1.0 if side == "long" else -1.0))
             null_dist = detrended_timing_null(close, holds, directions=dirs,
+                                              scale=null_scale,
                                               n_samples=thr.n_random_sims, seed=thr.seed)
-            method = "detrended random-timing books (matched holds/directions)"
+            unit = "R" if null_scale is not None else "return"
+            method = (f"detrended random-timing books (matched holds/directions, "
+                      f"null in {unit} units)")
         else:
             h = hold if hold is not None else _infer_hold(trades)
             null_dist = random_entry_null(prices, side=side, n_entries=trades.n, hold=h,
@@ -259,18 +270,20 @@ def run_gauntlet(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
                  wf=None, trade_logs: Optional[Dict[str, TradeLog]] = None,
                  side: str = "long", hold: Optional[int] = None,
                  tp: float = 2.0, sl: float = 1.0,
-                 null: str = "random_entry", directions=None, wfe: str = "return",
+                 null: str = "random_entry", directions=None, null_scale=None,
+                 wfe: str = "return",
                  variant_returns: Optional[Dict[str, object]] = None,
                  n_variants: Optional[object] = None,   # int or SearchSpaceLog
                  thr: Thresholds = Thresholds()) -> Gauntlet:
     """Run the gauntlet on a trade log. REAL and STRONG always run; DURABLE runs
     when a `WalkForwardResult` is supplied, GENERAL when a {market: TradeLog} map
     is. The gauntlet passes only if every gate it ran passes. See `gate_real` for
-    the `null` / `directions` options (use `null="detrended"` for a mixed
-    long/short book on a drift-bearing asset)."""
+    the `null` / `directions` / `null_scale` options (use `null="detrended"` for a
+    mixed long/short book on a drift-bearing asset, and pass `null_scale=entry/risk`
+    when the log is R-denominated)."""
     gauntlet = Gauntlet()
     gauntlet.add(gate_real(trades, prices=prices, side=side, hold=hold, tp=tp, sl=sl,
-                           null=null, directions=directions,
+                           null=null, directions=directions, null_scale=null_scale,
                            variant_returns=variant_returns, n_variants=n_variants, thr=thr))
     gauntlet.add(gate_strong(trades, thr=thr))
     if wf is not None:

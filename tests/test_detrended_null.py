@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from crucible.edge import detrended_timing_null
 
@@ -50,3 +51,28 @@ def test_accepts_array_and_handles_nan_holds():
     px = _prices().to_numpy()
     null = detrended_timing_null(px, holds=[np.nan, 5, 3], n_samples=100, seed=0)
     assert null.shape == (100,) and np.all(np.isfinite(null))
+
+
+def test_scale_none_is_unchanged():
+    # scale=None (a simple-return log) must be identical to the pre-scale behavior.
+    px = _prices(n=600)
+    holds = [7] * 30
+    a = detrended_timing_null(px, holds, n_samples=250, seed=9)
+    b = detrended_timing_null(px, holds, scale=None, n_samples=250, seed=9)
+    assert np.array_equal(a, b)
+
+
+def test_scale_denominates_the_null_linearly():
+    # a constant per-trade scale multiplies every draw by that constant, so the whole
+    # null scales linearly — this is the exact fractional->R conversion when the scale
+    # is entry/risk (R = fractional_return * entry/risk).
+    px = _prices(n=600, drift=0.001)
+    holds = [8] * 40
+    base = detrended_timing_null(px, holds, n_samples=300, seed=5)
+    scaled = detrended_timing_null(px, holds, scale=[3.0] * 40, n_samples=300, seed=5)
+    assert np.allclose(scaled, 3.0 * base)
+
+
+def test_scale_length_must_match_trades():
+    with pytest.raises(ValueError):
+        detrended_timing_null(_prices(), holds=[5] * 10, scale=[1.0] * 9)
