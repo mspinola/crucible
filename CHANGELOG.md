@@ -6,6 +6,23 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-28
+
+### Added
+- `detrended_timing_null(..., scale=...)` and `gate_real(..., null_scale=...)` /
+  `run_gauntlet(..., null_scale=...)`: per-trade multipliers that denominate the detrended
+  timing null in the trade log's own return unit. The null draws simple (fractional)
+  returns; a log denominated in R (1R = entry-to-stop risk) is a different unit, and since
+  `R = fractional_return * (entry / risk)` exactly, passing `scale = entry / risk` puts the
+  null in R. Backward compatible: `scale=None` (the default) is the previous behaviour,
+  correct for a simple-return log.
+
+### Fixed
+- The detrended `beats_random_timing` check was comparing an observed expectancy in R
+  against a null in fractional returns, off by the ~`entry/risk` factor (tens to hundreds),
+  so it passed almost any positive-expectancy book. Callers with an R-denominated log should
+  now pass `null_scale`. See the npf finding `docs/methodology/detrended_null_r_units.md`.
+
 ## [0.3.1] — 2026-07-23
 
 ### Changed

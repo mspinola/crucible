@@ -183,9 +183,10 @@ def random_entry_null(prices, side: str, n_entries: int, hold: int, *,
     return out
 
 
-def detrended_timing_null(prices, holds, *, directions=None, n_samples: int = 2_000,
+def detrended_timing_null(prices, holds, *, directions=None, scale=None,
+                          n_samples: int = 2_000,
                           detrend: bool = True, seed: int = 42) -> np.ndarray:
-    """Null per-trade-mean returns from random-*timing* trades matched to a
+    """Null per-trade-mean outcomes from random-*timing* trades matched to a
     strategy's holding periods and directions, on drift-removed price returns.
 
     Complements `random_entry_null` (which draws barrier-exit books on OHLC): this
@@ -197,9 +198,22 @@ def detrended_timing_null(prices, holds, *, directions=None, n_samples: int = 2_
 
     ``prices``: a price series (or 1-D array) covering the period. ``holds``:
     per-trade holding periods in bars. ``directions``: per-trade +1/-1 (all long
-    when None). Returns an array of ``n_samples`` null per-trade-mean returns —
-    compare your strategy's mean per-trade return against its percentiles. Empty
-    array if there aren't enough price bars.
+    when None).
+
+    ``scale``: **per-trade multipliers that put the null in the same unit as your
+    trade log's return column.** The raw draws are simple (fractional) returns; a
+    log whose return column is a *simple return* (e.g. a rebalancing book) needs no
+    scaling, so leave ``scale=None``. A log denominated in **R** (1R = entry->stop
+    risk, `r = (exit-entry)/risk`) is a different unit: since
+    `R = fractional_return * (entry / risk)` exactly, pass ``scale = entry / risk``
+    per trade and the null comes back in R, matched to the observed statistic.
+    Omitting it there is the classic units bug — comparing an expectancy in R against
+    a null in fractional returns, off by the ~entry/risk factor (tens to hundreds),
+    which lets almost any positive book clear the bar. Length must equal ``holds``.
+
+    Returns an array of ``n_samples`` null per-trade-mean outcomes (in the scaled
+    unit) — compare your strategy's mean per-trade return against its percentiles.
+    Empty array if there aren't enough price bars.
     """
     px = np.asarray(getattr(prices, "values", prices), dtype=float)
     bar_returns = px[1:] / px[:-1] - 1.0
@@ -213,17 +227,25 @@ def detrended_timing_null(prices, holds, *, directions=None, n_samples: int = 2_
     holds = np.clip(holds, 1, None).astype(int)
     directions = (np.ones(len(holds)) if directions is None
                   else np.nan_to_num(np.asarray(directions, dtype=float), nan=1.0))
+    if scale is None:
+        scale = np.ones(len(holds))
+    else:
+        scale = np.nan_to_num(np.asarray(scale, dtype=float), nan=1.0)
+        if len(scale) != len(holds):
+            raise ValueError(
+                f"scale has length {len(scale)} but there are {len(holds)} trades; "
+                "pass one entry/risk multiplier per trade (or None for a simple-return log)")
 
     rng = np.random.default_rng(seed)
     n_bars = len(bar_returns)
     null = np.empty(n_samples)
     for i in range(n_samples):
         sim = np.empty(len(holds))
-        for j, (h, d) in enumerate(zip(holds, directions)):
+        for j, (h, d, s) in enumerate(zip(holds, directions, scale)):
             h = min(int(h), n_bars)
             start = rng.integers(0, n_bars - h + 1)
             segment = bar_returns[start:start + h]
-            sim[j] = d * (np.prod(1 + segment) - 1)
+            sim[j] = s * d * (np.prod(1 + segment) - 1)
         null[i] = sim.mean()
     return null
 
