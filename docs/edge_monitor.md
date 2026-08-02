@@ -1,19 +1,21 @@
 # The Edge Monitor: has a validated edge decayed?
 
-!!! note "Status: spiked. `crucible.validation.monitor` exists and is tested."
-    The module, its five `Thresholds` entries, and 31 tests are in the tree. What is
-    **not** settled is the seam question in [Open questions](#open-questions-for-a-maintainer):
-    whether a monitor belongs in crucible at all. Treat the code as an argument made
-    concrete, not as a decision already taken.
+!!! note "Status: shipped. `crucible.validation.monitor`, merged in #109."
+    The module, its five `Thresholds` entries, and 31 tests are on `main`. This page
+    began as a pre-build proposal and is now a living description of what exists; the
+    reasoning is kept because the *why* outlived the decision, but read
+    [Still open](#still-open) rather than this page's history for what is missing.
 
-    Two claims in the first draft of this page were wrong and are corrected below,
-    both found by measuring rather than reasoning: the Gaussian ARL approximation
-    survives skewed trade returns far better than predicted, and the reference
-    implementation's detection latency is a **median** against a **mean**.
+    Two claims in the first draft were wrong and are corrected below, both caught by
+    measuring rather than reasoning: the Gaussian ARL approximation survives skewed
+    trade returns far better than predicted, and the reference implementation's
+    detection latency is a **median** quoted against a **mean**. Those corrections are
+    left in place deliberately. A design note that quietly edits out its own errors is
+    less useful than one that records them.
 
 The gauntlet answers "is this edge real?" once, over a fixed log. It has nothing to
-say about the question that follows a promotion: **is it still real?** That question
-currently has no home in crucible, and only a partial one anywhere in the stack.
+say about the question that follows a promotion: **is it still real?** Until #109 that
+question had no home in crucible, and only a partial one anywhere in the stack.
 
 ## The provocation
 
@@ -42,27 +44,28 @@ midpoint `(mu_0 + mu_1)/2` for a target shift of `mu_1 = mu_0/2`. Someone did th
 CUSUM properly rather than picking a round number. The defects below are about what
 the monitor is anchored to and what it is blind to, not about its arithmetic.
 
-## What crucible already computes
+## Where each line of that output lives
 
-Roughly half of that output is `crucible.validation.holdout` under a different name.
+Roughly half of it was already `crucible.validation.holdout` under a different name,
+which is why the module that shipped is small.
 
-| Line in the reference output | Where it lives today |
-|---|---|
-| `IS n / OOS n`, IS vs OOS expectancy, difference test | [`holdout`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/holdout.py). Strictly better: a bootstrap CI and p-value per side rather than a t-stat, which matters because per-trade R is not normal and a t-statistic on it is optimistic in the tails |
-| win rate, expectancy, per-trade dispersion | `edge.metrics`, `edge.stats.reality_check` |
-| `trades/yr IS vs OOS` | nowhere, though `TradeLog` carries `entry_date` and could |
-| rolling-200-trade expectancy series | nowhere. `windowed_segments` is the nearest relative, but it buckets by calendar era, not by a rolling trade count |
-| CUSUM (k, h, ARL design) | nowhere in crucible, and nowhere in the wider stack |
-| `POLICY VERDICT: FULL SIZE` | correctly absent. Sizing is a capital decision and belongs downstream |
+| Line in the reference output | Where it lives | Pre-#109? |
+|---|---|---|
+| `IS n / OOS n`, IS vs OOS expectancy, difference test | [`holdout`](https://github.com/mspinola/crucible/blob/main/src/crucible/validation/holdout.py). Strictly better: a bootstrap CI and p-value per side rather than a t-stat, which matters because per-trade R is not normal and a t-statistic on it is optimistic in the tails | yes |
+| win rate, expectancy, per-trade dispersion | `edge.metrics`, `edge.stats.reality_check` | yes |
+| `trades/yr IS vs OOS` | `EdgeBaseline.trades_per_year`, derived from `entry_date`, and the monitor's third channel | no |
+| rolling-200-trade expectancy series | `rolling_expectancy`. (`windowed_segments` is the nearest older relative, but it buckets by calendar era rather than by a rolling trade count) | no |
+| CUSUM (k, h, ARL design) | `cusum_design`, checked against your own returns by `empirical_arl` | no |
+| `POLICY VERDICT: FULL SIZE` | still correctly absent. Sizing is a capital decision and belongs downstream | n/a |
 
-So the genuinely new machinery is small: a rolling-window expectancy series, a
+The genuinely new machinery was therefore small: a rolling-window expectancy series, a
 calibrated sequential detector, and a frequency channel.
 
 ## Why this is not `orchestrate.drift`
 
 `crucible_stack.orchestrate.drift` already monitors a live book against a frozen
-block-bootstrap envelope, and it is easy to read this proposal as a duplicate. It is
-not. The two watch different things and come apart in both directions.
+block-bootstrap envelope, and it is easy to read this module as a duplicate. It is not.
+The two watch different things and come apart in both directions.
 
 | | `orchestrate.drift` | Edge Monitor |
 |---|---|---|
@@ -138,13 +141,13 @@ entire series shifts for reasons that have nothing to do with the edge. In R the
 monitor is invariant to that, which is the whole reason `TradeLog` is denominated in R
 and the reason crucible can judge without knowing account size.
 
-## Proposed design
+## The design
 
 ### The seam
 
-Split it the way `orchestrate/drift.py` already splits itself. That module's header
+Split the way `orchestrate/drift.py` already splits itself. That module's header
 reserves its R-space core as "designed to migrate into crucible if it earns its way,"
-which is precisely the shape being proposed here.
+which is precisely the shape taken here.
 
 | Concern | Home | Why |
 |---|---|---|
@@ -223,44 +226,61 @@ whose true edge was fully intact and slightly **above** baseline, a 200-trade tr
 read still printed "59% of baseline" from noise alone. Had that rule governed sizing,
 it would have cut a healthy book.
 
-## Open questions for a maintainer
+## Settled
 
-1. **Does this belong in crucible at all?** In the chain of refusals, "is it still
-   real?" is `orchestrate`'s question, not crucible's, and crucible has so far been a
-   one-shot judge rather than a monitor. The case for crucible: a stateless CUSUM over
-   a `TradeLog` owns no clock and persists nothing, so it satisfies every invariant the
-   package enforces. This is a seam call and should be made deliberately, not inherited
-   from wherever the code happened to get written.
-2. **Label vocabulary.** `reality_check` already uses HELD / FRAGILE / FAIL. Reusing
-   HELD here would collide on meaning. HOLDING / SLIPPING / DEGRADED is proposed to
-   keep them distinguishable in a report that shows both.
-3. **Is this a fifth gauntlet gate?** Probably not. The gauntlet gates a promotion
-   decision from a fixed log, and this runs continuously afterwards. It is more likely
-   a peer of the gauntlet than a member of it.
-4. **What produces `sigma`?** The per-trade dispersion the CUSUM design needs is
-   available from the same log the baseline came from, but whether it should be frozen
-   alongside the baseline or re-estimated live is a real choice, and re-estimating it
-   is a soft form of trap 1. Currently frozen.
-5. **The firing-rate channel is uncalibrated.** It compares a ratio to a threshold, so
-   it can only ever say `SLIPPING`, which is consistent but weak. A proper arrival-process
-   test (trade arrivals are approximately Poisson) would give it a stated false-alarm
-   rate and let it stand beside the CUSUM. Unbuilt.
-6. **Nothing deflates an expectancy yet.** `deflated_expectancy` is a number you pass
-   in. `deflated_sharpe` corrects a Sharpe ratio, not a per-trade mean, so the
-   conversion is left to the caller. That is the largest remaining gap between this
-   module and the argument that motivates it.
+These were the open questions this page carried before #109. Merging answered them, so
+they are recorded here with what decided them rather than left looking live.
+
+| Question | Decision | What decided it |
+|---|---|---|
+| Does a monitor belong in crucible at all? "Is it still real?" is nominally `orchestrate`'s question. | **Yes.** | Merging #109. The case that carried it: a stateless CUSUM over a `TradeLog` owns no clock and persists nothing, so it satisfies every invariant the package enforces, and `orchestrate/drift.py` already reserved its R-space core for exactly this migration. |
+| Label vocabulary, given `reality_check` already uses HELD / FRAGILE / FAIL. | **HOLDING / SLIPPING / DEGRADED.** | Kept distinct so a report showing both verdicts cannot blur them. Reusing HELD would have collided on meaning. |
+| Is this a fifth gauntlet gate? | **No.** | Nothing is wired into `run_gauntlet`. The gauntlet judges a promotion decision from a fixed log; this runs continuously afterwards, so it is a peer rather than a member. |
+| Frozen or live `sigma`? | **Frozen**, alongside the baseline. | Re-estimating per-trade dispersion from live data is a softer form of the re-baselining trap: it lets the reference drift toward whatever is happening now. |
+
+## Still open
+
+Ordered by how much each one undercuts the argument for the module.
+
+1. **Nothing deflates an expectancy.** `deflated_expectancy` is still a number the
+   caller supplies. `deflated_sharpe` corrects a Sharpe ratio, not a per-trade mean, so
+   the conversion is unwritten. This is the largest gap: anchoring to a search-corrected
+   baseline was the whole reason to build this here rather than copy the reference
+   implementation, and until it exists that advantage is a docstring rather than a
+   feature.
+2. **Nothing calls it.** The monitor needs a caller to freeze an `EdgeBaseline` at the
+   moment of promotion and hold it. In this stack that is `crucible_stack.orchestrate`
+   (which owns the `DeploymentLedger` and the promotion event) or `livebook`. Neither
+   knows the module exists, so today it runs only in its own tests. Sibling-repo work,
+   not crucible's.
+3. **The firing-rate channel is uncalibrated.** It compares a ratio to a threshold, so
+   it can only ever say `SLIPPING`. Trade arrivals are approximately Poisson, so an
+   arrival-process test would give it a stated false-alarm rate and let it stand beside
+   the CUSUM.
+4. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
+   figures are design targets, not field results. The first honest test is the first
+   promoted book that genuinely degrades.
+5. **No worked example, tutorial section, or tearsheet panel.** Every other subpackage
+   has all three. `rolling_expectancy` returns a series built to be plotted and nothing
+   plots it.
 
 ## Bottom line
 
-The idea is sound and worth building, but it is not a new pillar of the gauntlet. The
-in-sample versus out-of-sample comparison at the top of the reference output is
-something crucible already does more honestly. What is genuinely missing is a rolling
-expectancy series, a calibrated sequential alarm, and a frequency channel, which is a
-modest amount of code.
+This is not a new pillar of the gauntlet, and it was never meant to be. The in-sample
+versus out-of-sample comparison at the top of the reference output was something
+crucible already did more honestly; what was missing was a rolling expectancy series, a
+calibrated sequential alarm, and a frequency channel, which turned out to be a modest
+amount of code.
 
-The improvement crucible can offer over the reference version is not the detector. It
-is what the detector is anchored to: a search-corrected expectancy instead of the
-optimized in-sample one, denominated in R instead of percent of account, watched
-alongside the opportunity set rather than in isolation. The 2020 dip in the reference
-output is the uncalibrated alarm firing while the calibrated one stayed silent, which
-is not evidence that the monitor works.
+The improvement over the reference version is not the detector. It is what the detector
+is anchored to: a search-corrected expectancy instead of the optimized in-sample one,
+denominated in R instead of percent of account, watched alongside the opportunity set
+rather than in isolation. Two of those three are built. The first is not, which is why
+it sits at the top of [Still open](#still-open).
+
+The 2020 dip in the reference output is the uncalibrated alarm firing while the
+calibrated one stayed silent. That is not evidence the monitor works, and the same
+pattern showed up here in testing: on a book whose true edge was intact and slightly
+above baseline, a 200-trade trailing read still printed "59% of baseline" from noise
+alone. Hence the rule that only a detector with a stated false-alarm rate may escalate
+to `DEGRADED`.

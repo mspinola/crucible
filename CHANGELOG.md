@@ -36,8 +36,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   roughly a third. Measured, that assumption holds better than expected: empirical ARL0
   stays within 0.96x to 1.17x of nominal from an ordinary 43%-win-rate shape out to a
   lottery-shaped 10%-win-rate book, because the boundary sits many sigma away and the CLT
-  carries the aggregate. See [docs/edge_monitor.md](docs/edge_monitor.md), which also
-  records the open seam question: whether a monitor belongs in crucible at all.
+  carries the aggregate. See [docs/edge_monitor.md](docs/edge_monitor.md), which records
+  both what merging settled (the monitor belongs in crucible; it is a peer of the
+  gauntlet, not a fifth gate) and what is still open, chiefly that nothing yet deflates
+  an expectancy and nothing outside the tests calls the module.
 
 ## [0.4.0] - 2026-07-28
 
