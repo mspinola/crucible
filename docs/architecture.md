@@ -70,7 +70,7 @@ flowchart TD
 | Module | Package? | Purpose | Public entry points |
 |---|---|---|---|
 | **`edge`** | `edge/` (trade_log, simulator, metrics, stats) | Produce and describe the `TradeLog`; the honesty layer (CI + p-value). | `TradeLog`, `barrier_trades`, `edge_report`, `reality_check`, `bootstrap_ci`, `block_bootstrap_pvalue`, `random_entry_null` |
-| **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics) | Out-of-sample survival, data-mining corrections, and the audited gauntlet. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds` |
+| **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics, monitor) | Out-of-sample survival, data-mining corrections, the audited gauntlet, and the post-promotion decay monitor. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds`, `edge_monitor`, `EdgeBaseline` |
 | **`breadth`** | `breadth.py` (single file) | How many *independent* bets a correlated set of return streams holds. | `effective_n`, `participation_ratio`, `Breadth` |
 | **`ml`** | `ml/` (ic, decay, redundancy, pit) | The same honesty aimed at a model's scores — a predictions frame, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window` |
 | **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard` |
@@ -148,6 +148,8 @@ simulator), this is the output you must return.
 | `Fold` / `WalkForwardResult` | `validation/walk_forward.py:62,75` | dataclass | fold detail; `folds, stitched, param_grid` |
 | `HoldoutResult` | `validation/holdout.py:51` | dataclass | early/late `Verdict`s |
 | `DecayTable` / `RedundancyReport` | `ml/decay.py:16`, `ml/redundancy.py:28` | frozen | ML score-quality results |
+| `EdgeBaseline` | `validation/monitor.py:72` | frozen | what the edge promised, frozen at promotion: `expectancy`, `sigma`, `n_trades`, `trades_per_year`, `n_variants`, `deflated` |
+| `CusumDesign` / `MonitorVerdict` | `validation/monitor.py:141`, `:359` | frozen | the derived detector (`k_r`, `h_std`, `arl0`, `arl1`) and its verdict (`.label` HOLDING/SLIPPING/DEGRADED) |
 
 ### `SearchSpaceLog` (the honest-N ledger)
 
@@ -189,6 +191,7 @@ variants you discarded. This records them.
 | Add or fix an edge metric | `edge/metrics.py` | Add to `EdgeReport` if it belongs on the scorecard. |
 | Add a statistical test / correction | `validation/` (new module or `permutation.py` / `pbo.py`) | Keep it numpy/pandas-only; feed it `SearchSpaceLog`'s N. |
 | Add or retune a gauntlet gate | `validation/gauntlet.py` + `validation/thresholds.py` | New gates are `Gate`-returning factories; wire into `run_gauntlet`. Thresholds go in `Thresholds`, never inline. |
+| Change how a promoted edge is monitored | `validation/monitor.py` + `validation/thresholds.py` | Post-promotion, not a gate. Keep it stateless: no clock, no persistence. Only a detector with a stated false-alarm rate may escalate to DEGRADED. |
 | Change how trades are simulated | `edge/simulator.py` | Must still return a `TradeLog`; stay look-ahead-free. |
 | Add a demo signal | `strategies/` | Demos only — not endorsed edges. |
 | Add a tearsheet panel | `report/tearsheet.py` | Behind the `[report]` extra; never import plotly from the core. |
