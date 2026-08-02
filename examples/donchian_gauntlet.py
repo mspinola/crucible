@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from crucible.edge import barrier_trades, edge_report, reality_check
-from crucible.validation import walk_forward, run_gauntlet, Thresholds
+from crucible.validation import Thresholds, run_gauntlet, walk_forward
 
 
 def donchian(df: pd.DataFrame, lookback: int = 20, price: str = "Close") -> pd.Series:

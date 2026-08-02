@@ -19,7 +19,7 @@ import pandas as pd
 
 from crucible.edge import barrier_trades, edge_report, reality_check
 from crucible.strategies import ma_cross
-from crucible.validation import holdout, walk_forward, sign_permutation_pvalue
+from crucible.validation import holdout, sign_permutation_pvalue, walk_forward
 
 
 def load_ohlc(ticker: str, start: str) -> pd.DataFrame:

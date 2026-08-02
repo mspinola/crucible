@@ -8,7 +8,7 @@ import pandas as pd
 
 from crucible.edge import barrier_trades, reality_check
 from crucible.strategies import ma_cross
-from crucible.validation import holdout, walk_forward, sign_permutation_pvalue
+from crucible.validation import holdout, sign_permutation_pvalue, walk_forward
 
 
 def make_prices(n=2500, seed=7):

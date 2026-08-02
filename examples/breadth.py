@@ -15,7 +15,6 @@ import pandas as pd
 
 from crucible.breadth import effective_n
 
-
 # A synthetic futures book: three correlated blocs + one lone market. The book
 # lists 12 markets, but by construction it carries ~4 independent bets.
 CLASSES = {

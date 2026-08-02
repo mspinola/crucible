@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pip install -e ".[dev,report]"   # what CI installs; report extra so tearsheet tests run
-python -m ruff check src tests   # lint (ruff is pinned to 0.15.22 in the dev extra)
+python -m ruff check src tests examples   # lint (ruff is pinned to 0.15.22 in the dev extra)
 python -m pytest -q              # full suite
 python -m pytest tests/test_gauntlet.py::test_real_fails_on_no_edge -q    # one test
 python examples/quickstart.py    # CI's smoke test — synthetic data, no network

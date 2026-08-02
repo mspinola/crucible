@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 
 from crucible.edge import barrier_trades
-from crucible.strategies import ma_cross
 from crucible.report import tearsheet
+from crucible.strategies import ma_cross
 
 
 def make_prices(n=2500, seed=7):

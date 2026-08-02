@@ -22,3 +22,6 @@ env/
 
 # MkDocs build output
 site/
+
+# Example output (examples/tearsheet.py --out default)
+tearsheet.html
