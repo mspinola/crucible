@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from crucible.edge import TradeLog
-from crucible.ml import information_coefficient, alpha_gate, quantile_decay, fold_ic
+from crucible.ml import alpha_gate, fold_ic, information_coefficient, quantile_decay
 from crucible.ml.ic import AlphaGateError
 from crucible.validation import run_gauntlet
 
@@ -67,7 +67,7 @@ def main() -> None:
     print(f"[1] information coefficient  IC = {ic:+.4f}")
     try:
         alpha_gate(ic, min_ic=0.03)
-        print(f"    alpha_gate(min_ic=0.03): PASS")
+        print("    alpha_gate(min_ic=0.03): PASS")
     except AlphaGateError as e:
         print(f"    alpha_gate(min_ic=0.03): FAIL — {e}")
     folds = fold_ic(book.reset_index(drop=True), ["score"], target="label", n_splits=5)
@@ -78,7 +78,7 @@ def main() -> None:
 
     # 2. Does it rank outcomes? --------------------------------------------
     decay = quantile_decay(preds, q=5)
-    print(f"[2] quantile decay (win rate by score quantile):")
+    print("[2] quantile decay (win rate by score quantile):")
     for _, qr in decay.table.iterrows():
         bar = "#" * round(qr["win_rate"] * 40)
         print(f"    Q{int(qr['quantile'])}  {qr['win_rate']*100:5.1f}%  (n={int(qr['count'])})  {bar}")
@@ -91,7 +91,7 @@ def main() -> None:
         r = df["r"].to_numpy()
         pf = r[r > 0].sum() / -r[r < 0].sum()
         return f"n={len(df):4d}  win={100*(r>0).mean():4.1f}%  E={r.mean():+.3f}R  PF={pf:.2f}"
-    print(f"[3] filter takes the top 40% by score:")
+    print("[3] filter takes the top 40% by score:")
     print(f"    unfiltered   {stats(book)}")
     print(f"    filtered     {stats(take)}")
     print()

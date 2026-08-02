@@ -7,7 +7,7 @@ network or the [examples] extra. Swap the `make_prices()` call for
 import numpy as np
 import pandas as pd
 
-from crucible.edge import barrier_trades, edge_report, reality_check, random_entry_null, expectancy
+from crucible.edge import barrier_trades, edge_report, expectancy, random_entry_null, reality_check
 from crucible.strategies import ma_cross
 
 
