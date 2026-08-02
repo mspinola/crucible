@@ -746,6 +746,82 @@ def equity_drawdown(trades: TradeLog, *, test_start=None,
     return _embed(fig, include_plotlyjs)
 
 
+def monitor_panel(trades: TradeLog, baseline, *, design=None, thresholds=None,
+                  include_plotlyjs: bool | str = False) -> str:
+    """Post-promotion decay: the noisy trailing read above, the calibrated detector below.
+
+    Top row is `rolling_expectancy` against the frozen baseline and the soft SLIPPING
+    line; bottom row is `cusum_path` against its alarm boundary, with the first crossing
+    marked. The two rows are the point of the panel. The top one wanders far enough to
+    cross the soft line on a book that never decayed, which is why it may only ever say
+    SLIPPING; the bottom one carries a stated false-alarm rate and is the only channel
+    allowed to say DEGRADED.
+
+    `baseline` is a frozen `EdgeBaseline`. Capital-free, like every other panel: R and
+    sigma units throughout, never an account. Returns '' for an empty log."""
+    from crucible.validation.monitor import (
+        Thresholds,
+        cusum_design,
+        cusum_path,
+        rolling_expectancy,
+    )
+
+    go, make_subplots = _plotly()
+    th = thresholds or Thresholds()
+    if trades.n == 0:
+        return ""
+    design = design or cusum_design(baseline, thresholds=th)
+
+    path = cusum_path(trades, baseline, design=design, thresholds=th)
+    x = np.arange(1, trades.n + 1)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+                        row_heights=[0.5, 0.5])
+
+    if trades.n >= th.monitor_window:
+        roll = rolling_expectancy(trades, th.monitor_window)
+        fig.add_trace(go.Scatter(x=x, y=roll.to_numpy(), mode="lines",
+                                 line=dict(color="#8b949e", width=1.5),
+                                 name=f"trailing {th.monitor_window}-trade E",
+                                 hovertemplate="trade %{x}<br>E %{y:+.3f}R<extra></extra>"),
+                      row=1, col=1)
+    fig.add_hline(y=baseline.expectancy, line_dash="dash", line_color=_POS, row=1, col=1,
+                  annotation_text=f"baseline {baseline.expectancy:+.3f}R",
+                  annotation_font=dict(color=_POS, size=11))
+    fig.add_hline(y=baseline.expectancy * th.monitor_slip_ratio, line_dash="dot",
+                  line_color="#BA7517", row=1, col=1,
+                  annotation_text=f"SLIPPING at {th.monitor_slip_ratio:.0%}",
+                  annotation_font=dict(color="#BA7517", size=11))
+
+    fig.add_trace(go.Scatter(x=x, y=path.to_numpy(), mode="lines",
+                             line=dict(color="#7F77DD", width=1.8), name="CUSUM",
+                             fill="tozeroy", fillcolor="rgba(127,119,221,0.18)",
+                             hovertemplate="trade %{x}<br>CUSUM %{y:.2f}σ<extra></extra>"),
+                  row=2, col=1)
+    fig.add_hline(y=design.h_std, line_dash="dash", line_color=_NEG, row=2, col=1,
+                  annotation_text=f"alarm h={design.h_std:.1f}σ",
+                  annotation_font=dict(color=_NEG, size=11))
+    crossed = np.flatnonzero(path.to_numpy() > design.h_std)
+    if crossed.size:
+        i = int(crossed[0])
+        fig.add_annotation(x=x[i], y=float(path.iloc[i]), text=f"ALARM at trade {i + 1}",
+                           showarrow=True, arrowhead=0, ax=0, ay=-18,
+                           font=dict(color=_NEG, size=11), row=2, col=1)
+
+    fig.update_layout(height=470, margin=dict(l=58, r=24, t=26, b=42), showlegend=False,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#8b949e"))
+    fig.update_xaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(gridcolor=_GRID, zerolinecolor=_GRID)
+    fig.update_yaxes(title_text="Trailing E (R)", row=1, col=1)
+    # Keep the alarm boundary in frame even when the statistic stays far below it.
+    # Autoscaling to the data alone hides h on exactly the healthy books where the
+    # useful reading is "how much room is left".
+    fig.update_yaxes(title_text="CUSUM (σ)", row=2, col=1,
+                     range=[0, max(float(design.h_std), float(path.max())) * 1.12])
+    fig.update_xaxes(title_text="Live trade #", row=2, col=1)
+    return _embed(fig, include_plotlyjs)
+
+
 def exit_reason_breakdown(trades: TradeLog, *, include_plotlyjs: bool | str = False) -> str:
     """Per exit-reason attribution: for each exit reason (tp / stop / timeout / …) how
     much R it contributes (ΣR, colored by sign) and how many trades it accounts for,

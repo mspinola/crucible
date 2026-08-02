@@ -338,6 +338,33 @@ def empirical_arl(design: CusumDesign, r_baseline: Sequence[float], *,
 # The descriptive series
 # ─────────────────────────────────────────────────────────────────────────────────────
 
+def _cusum_series(r: np.ndarray, design: CusumDesign) -> np.ndarray:
+    """The running one-sided lower CUSUM, standardized. One value per trade."""
+    inc = (design.k_r - r) / design.sigma
+    out = np.empty(inc.size, dtype=float)
+    s = 0.0
+    for i, step in enumerate(inc):
+        s = max(0.0, s + float(step))
+        out[i] = s
+    return out
+
+
+def cusum_path(trades: TradeLog, baseline: EdgeBaseline, *,
+               design: Optional[CusumDesign] = None,
+               thresholds: Thresholds = Thresholds()) -> pd.Series:
+    """The detector's running statistic, one value per live trade, in sigma units.
+
+    The series `edge_monitor` reduces to a verdict. Alarm is the first crossing of
+    `design.h_std`, so plotting this against that constant shows how much room the book
+    has left. Descriptive: reading it does not change what the monitor decides.
+
+    Like `edge_monitor`, this takes a frozen `EdgeBaseline` and has no parameter from
+    which one could be rebuilt.
+    """
+    design = design or cusum_design(baseline, thresholds=thresholds)
+    return pd.Series(_cusum_series(trades.r, design), name="cusum")
+
+
 def rolling_expectancy(trades: TradeLog, window: int) -> pd.Series:
     """Trailing mean R over a fixed number of TRADES (not calendar time).
 
@@ -443,13 +470,10 @@ def edge_monitor(trades: TradeLog, baseline: EdgeBaseline, *,
         )
 
     # ── channel 1: the calibrated sequential detector ────────────────────────────────
-    inc = (design.k_r - r) / design.sigma
-    s, peak, alarm_index = 0.0, 0.0, None
-    for i, step in enumerate(inc, start=1):
-        s = max(0.0, s + float(step))
-        peak = max(peak, s)
-        if alarm_index is None and s > design.h_std:
-            alarm_index = i
+    path = _cusum_series(r, design)
+    s, peak = float(path[-1]), float(path.max())
+    crossed = np.flatnonzero(path > design.h_std)
+    alarm_index = int(crossed[0]) + 1 if crossed.size else None   # 1-based live trade
     cusum_alarm = alarm_index is not None
     if cusum_alarm:
         reasons.append(

@@ -46,6 +46,7 @@ from crucible.validation.monitor import (
     EmpiricalARL,
     MonitorVerdict,
     cusum_design,
+    cusum_path,
     edge_monitor,
     empirical_arl,
     rolling_expectancy,
@@ -90,5 +91,6 @@ __all__ = [
     "Thresholds",
     "run_gauntlet", "gate_real", "gate_strong", "gate_durable", "gate_general",
     "EdgeBaseline", "CusumDesign", "MonitorVerdict", "EmpiricalARL",
-    "cusum_design", "edge_monitor", "empirical_arl", "rolling_expectancy",
+    "cusum_design", "edge_monitor", "empirical_arl",
+    "rolling_expectancy", "cusum_path",
 ]

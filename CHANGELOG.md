@@ -7,6 +7,24 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `report.monitor_panel`: the decay panel. Trailing expectancy against the frozen
+  baseline and the SLIPPING line on top, the CUSUM against its alarm boundary
+  underneath, with the first crossing marked. The two rows are the point: the top one
+  wanders far enough to cross the soft line on a book that never decayed, the bottom one
+  carries a stated false-alarm rate. Behind the `[report]` extra like every other plotly
+  block, and capital-free (R and sigma units, never an account).
+- `validation.cusum_path`: the detector's running statistic as a `pd.Series`, one value
+  per live trade. The series `edge_monitor` reduces to a verdict, and what the panel
+  plots. Like `edge_monitor` it takes a frozen `EdgeBaseline` and has no parameter from
+  which one could be rebuilt. `edge_monitor` now derives its alarm index from this same
+  path rather than a second inline loop.
+
+### Fixed
+- `report.monitor_panel` pinned its CUSUM y-axis to include the alarm boundary. Letting
+  plotly autoscale to the data hid `h` on exactly the healthy books where the useful
+  reading is how much room is left: on the default design a healthy book peaks near 25
+  sigma against an `h` of 47, so the boundary fell outside the frame. Caught before
+  release by checking the plotted ranges rather than only asserting on the HTML.
 - Tutorial §14 and [`examples/edge_monitor.py`](examples/edge_monitor.py): the edge monitor
   read end to end, seeded and synthetic. Freezing a deflated baseline, designing the
   detector from a stated false-alarm budget, checking its Gaussian ARLs against the book's
