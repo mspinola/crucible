@@ -263,13 +263,9 @@ Ordered by how much each one undercuts the argument for the module.
 4. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
    figures are design targets, not field results. The first honest test is the first
    promoted book that genuinely degrades.
-5. **No tearsheet panel.** `rolling_expectancy` returns a series built to be plotted and
-   nothing plots it. (The worked example and tutorial section now exist:
-   [`examples/edge_monitor.py`](https://github.com/mspinola/crucible/blob/main/examples/edge_monitor.py)
-   and tutorial §14, with every quoted number pinned by
-   `tests/test_edge_monitor_example.py`.)
-6. **The README still does not mention the module,** though it enumerates every other
-   subpackage's API with a worked block.
+5. **The README still does not mention the module,** though it enumerates every other
+   subpackage's API with a worked block. The worked example, tutorial §14 and the
+   `report.monitor_panel` block all exist now; the README is the last documentation gap.
 
 ## Bottom line
 

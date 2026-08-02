@@ -26,6 +26,7 @@ from crucible.report.tearsheet import (
     gross_net_equity,
     holding_vs_r,
     metrics_table,
+    monitor_panel,
     monthly_r,
     pillar_bullets,
     report_css,
@@ -58,4 +59,5 @@ __all__ = [
     "gross_net_equity",
     "concurrency_timeline",
     "segment_forest",
+    "monitor_panel",
 ]

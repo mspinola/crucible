@@ -73,7 +73,7 @@ flowchart TD
 | **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics, monitor) | Out-of-sample survival, data-mining corrections, the audited gauntlet, and the post-promotion decay monitor. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds`, `edge_monitor`, `EdgeBaseline` |
 | **`breadth`** | `breadth.py` (single file) | How many *independent* bets a correlated set of return streams holds. | `effective_n`, `participation_ratio`, `Breadth` |
 | **`ml`** | `ml/` (ic, decay, redundancy, pit) | The same honesty aimed at a model's scores — a predictions frame, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window` |
-| **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard` |
+| **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard`, `monitor_panel` |
 | **`strategies`** | `strategies/` (ma_cross, macd_cross) | Demo signals for examples and tests. *Not endorsed edges.* | `ma_cross`, `macd_cross` |
 
 ## The data-flow spine (signal → verdict)
