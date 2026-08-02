@@ -6,53 +6,31 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-02
+
+The edge-monitor release. The gauntlet asks "is this edge real?" once, over a fixed log;
+this adds the question that follows a promotion, *is it still real?*
+
+Also ships everything 0.4.0 carried: **0.4.0 was version-bumped and changelogged on
+2026-07-28 but never tagged or published**, so its detrended-null units fix reaches PyPI
+here for the first time. Upgrading from 0.3.1 means reading the 0.4.0 section below as
+part of this release.
+
 ### Added
-- `report.monitor_panel`: the decay panel. Trailing expectancy against the frozen
-  baseline and the SLIPPING line on top, the CUSUM against its alarm boundary
-  underneath, with the first crossing marked. The two rows are the point: the top one
-  wanders far enough to cross the soft line on a book that never decayed, the bottom one
-  carries a stated false-alarm rate. Behind the `[report]` extra like every other plotly
-  block, and capital-free (R and sigma units, never an account).
-- `validation.cusum_path`: the detector's running statistic as a `pd.Series`, one value
-  per live trade. The series `edge_monitor` reduces to a verdict, and what the panel
-  plots. Like `edge_monitor` it takes a frozen `EdgeBaseline` and has no parameter from
-  which one could be rebuilt. `edge_monitor` now derives its alarm index from this same
-  path rather than a second inline loop.
-
-### Fixed
-- `report.monitor_panel` pinned its CUSUM y-axis to include the alarm boundary. Letting
-  plotly autoscale to the data hid `h` on exactly the healthy books where the useful
-  reading is how much room is left: on the default design a healthy book peaks near 25
-  sigma against an `h` of 47, so the boundary fell outside the frame. Caught before
-  release by checking the plotted ranges rather than only asserting on the HTML.
-- Tutorial §14 and [`examples/edge_monitor.py`](examples/edge_monitor.py): the edge monitor
-  read end to end, seeded and synthetic. Freezing a deflated baseline, designing the
-  detector from a stated false-alarm budget, checking its Gaussian ARLs against the book's
-  own returns, and three live books (edge intact / edge halved / signal drying up) against
-  one frozen baseline. Every number the tutorial quotes is pinned by
-  `tests/test_edge_monitor_example.py`, matching the §13 convention.
-
-  The example exists mainly to make one claim reproducible: on a book whose edge never
-  decayed and is a quarter *above* baseline, the 200-trade trailing read swings between
-  -31% and 240% of baseline and dips under the 50% line in 9% of windows, while the CUSUM
-  peaks at 53% of threshold and never fires. The design note previously asserted a similar
-  figure from an uncommitted scratch run; it now cites the example.
-
-- `validation.monitor`: the post-promotion counterpart to the gauntlet. The gauntlet asks
-  "is this edge real?" once, over a fixed log; this asks whether it is *still* real.
-  `EdgeBaseline` (frozen at promotion), `cusum_design`, `edge_monitor` →
-  HOLDING / SLIPPING / DEGRADED, plus `rolling_expectancy` and `empirical_arl`. Stateless
-  and capital-free like the rest of the package: it owns no clock, persists nothing, and
-  emits a verdict rather than a sizing action. Five `Thresholds` entries
-  (`monitor_detect_shift`, `monitor_arl0_trades`, `monitor_window`, `monitor_slip_ratio`,
-  `monitor_min_frequency_ratio`).
+- **`validation.monitor`**: the post-promotion counterpart to the gauntlet. `EdgeBaseline`
+  (frozen at promotion), `cusum_design`, `edge_monitor` returning
+  HOLDING / SLIPPING / DEGRADED, plus `rolling_expectancy`, `cusum_path` and
+  `empirical_arl`. Stateless and capital-free like the rest of the package: it owns no
+  clock, persists nothing, and emits a verdict rather than a sizing action. Five
+  `Thresholds` entries (`monitor_detect_shift`, `monitor_arl0_trades`, `monitor_window`,
+  `monitor_slip_ratio`, `monitor_min_frequency_ratio`).
 
   Three properties are structural rather than advisory, each with a test:
   - **Only the calibrated detector may say DEGRADED.** The CUSUM has a stated false-alarm
     rate, so it alone escalates. The rolling-window ratio and the firing-rate ratio have
-    no such calibration and cap out at SLIPPING. A trailing read printed "59% of baseline"
-    on a book whose true edge was intact and slightly *above* baseline; letting a rule
-    like that govern sizing cuts healthy books.
+    no such calibration and cap out at SLIPPING. On a book whose edge never decayed and
+    sits a quarter *above* baseline, the 200-trade trailing read still swings between
+    -31% and 240% of baseline; letting a rule like that govern sizing cuts healthy books.
   - **No re-baselining.** `edge_monitor` has no parameter from which a baseline could be
     rebuilt, since a baseline recomputed from current data re-fits onto the drifted
     reality and can never fire.
@@ -67,12 +45,34 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   roughly a third. Measured, that assumption holds better than expected: empirical ARL0
   stays within 0.96x to 1.17x of nominal from an ordinary 43%-win-rate shape out to a
   lottery-shaped 10%-win-rate book, because the boundary sits many sigma away and the CLT
-  carries the aggregate. See [docs/edge_monitor.md](docs/edge_monitor.md), which records
-  both what merging settled (the monitor belongs in crucible; it is a peer of the
-  gauntlet, not a fifth gate) and what is still open, chiefly that nothing yet deflates
-  an expectancy and nothing outside the tests calls the module.
+  carries the aggregate.
+- **`report.monitor_panel`**: the decay panel. Trailing expectancy against the frozen
+  baseline and the SLIPPING line on top, the CUSUM against its alarm boundary underneath
+  with the first crossing marked. The two rows are the point: the top one wanders far
+  enough to cross the soft line on a book that never decayed, the bottom one carries a
+  stated false-alarm rate. Behind the `[report]` extra like every other plotly block, and
+  capital-free (R and sigma units, never an account).
+- **Tutorial §14 and [`examples/edge_monitor.py`](examples/edge_monitor.py)**: the monitor
+  read end to end, seeded and synthetic. Freezing a deflated baseline, designing the
+  detector from a stated false-alarm budget, checking its Gaussian ARLs against the book's
+  own returns, and three live books (edge intact / edge halved / signal drying up) against
+  one frozen baseline. Every number the tutorial quotes is pinned by
+  `tests/test_edge_monitor_example.py`, matching the §13 convention.
+- **[docs/edge_monitor.md](docs/edge_monitor.md)**, the design note. Records what shipping
+  settled (the monitor belongs in crucible; it is a peer of the gauntlet rather than a
+  fifth gate) and what is still open, chiefly that nothing yet deflates an expectancy and
+  nothing outside the tests calls the module.
+
+### Fixed
+- `report.monitor_panel` pins its CUSUM y-axis to include the alarm boundary. Letting
+  plotly autoscale to the data hid `h` on exactly the healthy books where the useful
+  reading is how much room is left: on the default design a healthy book peaks near 25
+  sigma against an `h` of 47, so the boundary fell outside the frame.
 
 ## [0.4.0] - 2026-07-28
+
+**Never published.** Bumped in `pyproject.toml` and documented here, but no `v0.4.0` tag
+was ever pushed, so PyPI went 0.3.1 -> 0.5.0. The changes below shipped in 0.5.0.
 
 ### Added
 - `detrended_timing_null(..., scale=...)` and `gate_real(..., null_scale=...)` /
