@@ -7,6 +7,19 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Tutorial §14 and [`examples/edge_monitor.py`](examples/edge_monitor.py): the edge monitor
+  read end to end, seeded and synthetic. Freezing a deflated baseline, designing the
+  detector from a stated false-alarm budget, checking its Gaussian ARLs against the book's
+  own returns, and three live books (edge intact / edge halved / signal drying up) against
+  one frozen baseline. Every number the tutorial quotes is pinned by
+  `tests/test_edge_monitor_example.py`, matching the §13 convention.
+
+  The example exists mainly to make one claim reproducible: on a book whose edge never
+  decayed and is a quarter *above* baseline, the 200-trade trailing read swings between
+  -31% and 240% of baseline and dips under the 50% line in 9% of windows, while the CUSUM
+  peaks at 53% of threshold and never fires. The design note previously asserted a similar
+  figure from an uncommitted scratch run; it now cites the example.
+
 - `validation.monitor`: the post-promotion counterpart to the gauntlet. The gauntlet asks
   "is this edge real?" once, over a fixed log; this asks whether it is *still* real.
   `EdgeBaseline` (frozen at promotion), `cusum_design`, `edge_monitor` →

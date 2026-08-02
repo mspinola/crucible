@@ -221,10 +221,13 @@ so is not.
 
 **An uncalibrated rule governing the decision.** Only the CUSUM can return `DEGRADED`.
 The rolling ratio and the firing-rate ratio cap out at `SLIPPING`. This is the part
-worth keeping if nothing else here survives review, and the demo shows why: on a book
-whose true edge was fully intact and slightly **above** baseline, a 200-trade trailing
-read still printed "59% of baseline" from noise alone. Had that rule governed sizing,
-it would have cut a healthy book.
+worth keeping if nothing else here survives review, and
+[`examples/edge_monitor.py`](https://github.com/mspinola/crucible/blob/main/examples/edge_monitor.py)
+shows why. On a book whose true edge is fully intact and a quarter **above** baseline,
+the 200-trade trailing read ranges from -31% to 240% of baseline on noise alone and dips
+under the 50% line in 9% of windows, while the CUSUM peaks at 53% of its threshold and
+never fires. A "cut at 50% of baseline" rule would have cut a healthy book on whichever
+window you happened to read.
 
 ## Settled
 
@@ -260,9 +263,13 @@ Ordered by how much each one undercuts the argument for the module.
 4. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
    figures are design targets, not field results. The first honest test is the first
    promoted book that genuinely degrades.
-5. **No worked example, tutorial section, or tearsheet panel.** Every other subpackage
-   has all three. `rolling_expectancy` returns a series built to be plotted and nothing
-   plots it.
+5. **No tearsheet panel.** `rolling_expectancy` returns a series built to be plotted and
+   nothing plots it. (The worked example and tutorial section now exist:
+   [`examples/edge_monitor.py`](https://github.com/mspinola/crucible/blob/main/examples/edge_monitor.py)
+   and tutorial §14, with every quoted number pinned by
+   `tests/test_edge_monitor_example.py`.)
+6. **The README still does not mention the module,** though it enumerates every other
+   subpackage's API with a worked block.
 
 ## Bottom line
 
@@ -280,7 +287,6 @@ it sits at the top of [Still open](#still-open).
 
 The 2020 dip in the reference output is the uncalibrated alarm firing while the
 calibrated one stayed silent. That is not evidence the monitor works, and the same
-pattern showed up here in testing: on a book whose true edge was intact and slightly
-above baseline, a 200-trade trailing read still printed "59% of baseline" from noise
-alone. Hence the rule that only a detector with a stated false-alarm rate may escalate
-to `DEGRADED`.
+pattern reproduces here: in §14 of the tutorial, a book whose edge never decayed shows a
+trailing read swinging between -31% and 240% of baseline. Hence the rule that only a
+detector with a stated false-alarm rate may escalate to `DEGRADED`.

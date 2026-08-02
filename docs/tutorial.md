@@ -1217,6 +1217,116 @@ goes on to **DURABLE** and the rest of the ladder, same as any other edge.
 
 ---
 
+## 14. Worked example: monitoring a promoted edge for decay
+
+*Passing the gauntlet is not a permanent result. Watch an edge halve, and watch a healthy one get accused of halving.*
+
+Everything up to here judges a book **once**, before capital. §14 is the question that arrives
+afterwards: *is it still real?* That is `crucible.validation.monitor`, and it is a peer of the
+gauntlet rather than a fifth gate, because it runs continuously instead of gating a decision.
+The runnable version is
+[`examples/edge_monitor.py`](https://github.com/mspinola/crucible/blob/main/examples/edge_monitor.py),
+seeded and synthetic, so these numbers reproduce exactly.
+
+```python
+from crucible.validation import EdgeBaseline, cusum_design, edge_monitor, empirical_arl
+
+validated = synthetic_book(2000, seed=1)            # the book that passed
+base = EdgeBaseline.from_log(validated, deflated_expectancy=..., n_variants=64)
+verdict = edge_monitor(live_book, base)             # HOLDING | SLIPPING | DEGRADED
+```
+
+### Step 1: freeze the baseline, and deflate it (§5, §11)
+
+```
+in-sample mean      +0.2088R over 2000 trades
+deflated baseline   +0.1671R   deflated=True
+naive baseline      +0.2088R   deflated=False
+firing rate         150 trades/yr
+```
+
+The in-sample mean is the number the parameters were **optimized on**, so it is biased high in
+exactly the way §5 describes. Anchoring the monitor to it makes "half the baseline" mean half of
+something inflated. Here a 20% search correction moves the reference from `+0.2088R` to
+`+0.1671R`, so every ratio measured against the naive figure is flattered by **25%**.
+
+Two properties keep this honest. `EdgeBaseline` is **frozen at promotion**, and `edge_monitor`
+has *no parameter from which one could be rebuilt*, because a baseline recomputed from current
+data re-fits onto the drifted reality and can never fire. And an undeflated baseline is allowed
+but never silent: `deflated=False` rides in the verdict rather than being validated away, the
+same discipline `variant_count()` applies to a typed-in N (§5b).
+
+### Step 2: design the detector, then check its claims
+
+You state the shift worth catching and the false-alarm budget; `k` and `h` follow.
+
+```
+detects a shift to 50% of baseline
+k = +0.1253R   h = 46.98 sigma
+nominal ARL0 = 7,500 trades (mean, between false alarms)
+nominal ARL1 = 1,099 trades (mean, to detect the design shift)
+```
+
+`k` is the textbook midpoint `(mu_0 + mu_1)/2`. **ARL1 is the cost, stated up front:** on a book
+firing 150 trades a year, 1,099 trades is about seven years of running at a halved edge before
+the calibrated alarm is expected to fire. That is the price of a 7,500-trade false-alarm budget,
+and it is a number to argue with *before* deployment, not to discover afterwards.
+
+Those ARLs come from a Gaussian approximation, and trade R is emphatically not Gaussian. So
+check rather than assume, by resampling the book's own returns:
+
+```
+in control    mean 7,188 / median 5,587 trades   vs nominal mean 7,500 (0.96x)
+edge halved   mean 1,118 /   median 916 trades   vs nominal mean 1,099 (1.02x)
+```
+
+Close, and for a structural reason: the boundary sits 47 sigma out, so the CUSUM aggregates
+hundreds of increments before it can alarm and the CLT carries the skew. Note the **mean against
+the median**: they differ by roughly a quarter, because run lengths are strongly right-skewed.
+Quoting one against someone else's other misstates detection latency badly.
+
+### Step 3: three live books, one frozen baseline
+
+| Live book | Verdict | Trailing 200-trade read | Firing rate | CUSUM |
+|---|---|---|---|---|
+| edge intact | **HOLDING** | 110% of baseline | 100% | peak 53% of threshold |
+| edge halved | **DEGRADED** | -16% | 100% | alarm at live trade 1,219 |
+| signal drying up | **SLIPPING** | 88% (intact) | **33%** | peak 43%, silent |
+
+The third row is the failure mode an expectancy-only monitor cannot see. That book's per-trade
+edge is **fine** (88% of baseline, well inside noise); the signal simply stopped firing, 50
+trades a year against a baseline of 150. Annual R falls by two thirds with per-trade expectancy
+untouched. Opportunity-set decay is a distinct failure from edge decay and needs its own channel.
+
+### Step 4: why the soft channel cannot say DEGRADED
+
+The "edge intact" book was generated with the edge **fully intact**, a quarter *above* the
+deflated baseline. It never decayed. Yet:
+
+```
+trailing 200-trade read ranges -31% to 240% of baseline, on noise alone
+it dips below the 50% line in 9% of windows
+the CUSUM peaks at 53% of threshold and never fires
+```
+
+A "cut size at 50% of baseline" rule would have cut this healthy book on whichever of those
+windows you happened to read. Today's read is 110%, which looks reassuring, and that is the same
+coin landing the other way up. Both are noise.
+
+That is why the split is structural rather than advisory: **only a detector with a stated
+false-alarm rate may return `DEGRADED`.** The rolling ratio and the firing-rate ratio cap out at
+`SLIPPING`. Run both, by all means, one fast and noisy and one slow and calibrated, but decide in
+advance which governs the size decision.
+
+**The lesson.** A monitor is a statistical test run repeatedly, so it needs the same discipline
+as the gauntlet: a reference that was honest to begin with (Step 1), a stated error rate and a
+stated latency (Step 2), and a rule about which signal is allowed to act (Step 4). Get those
+wrong and you have built something that *feels* like risk management while cutting healthy books
+on noise and missing real decay for years. Note what crucible refuses to do here: it returns
+`DEGRADED`, never "cut to half size". Sizing is capital-aware, and capital lives downstream (§0).
+
+---
+
 ## Bibliography
 
 Listed in rough order of contribution to the significance machinery. Items **1–6 are the
@@ -1317,6 +1427,8 @@ Information Coefficient (§7).
 | Effective N / factor PCA | `crucible/src/crucible/breadth.py` |
 | Worked example (Donchian breakout, §12) | `crucible/examples/donchian_gauntlet.py` |
 | Worked example (ML take/skip filter, §13) | `crucible/examples/ml_meta_label.py` |
+| Post-promotion decay monitor (CUSUM + baseline) | `crucible/src/crucible/validation/monitor.py` |
+| Worked example (monitoring a promoted edge, §14) | `crucible/examples/edge_monitor.py` |
 
 ---
 
