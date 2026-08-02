@@ -20,6 +20,8 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
   diagnostics    fold-level robustness reads (dispersion, walk-forward efficiency)
   gauntlet       the capital-free edge-validation gauntlet: REAL / STRONG /
                  DURABLE / GENERAL gates + run_gauntlet, gated by Thresholds
+  monitor        AFTER promotion: has the edge decayed? A frozen EdgeBaseline +
+                 a calibrated CUSUM -> HOLDING / SLIPPING / DEGRADED
 """
 from crucible.validation.diagnostics import fold_dispersion, walk_forward_efficiency
 from crucible.validation.gate import Gate, GateCheck, Gauntlet
@@ -37,6 +39,16 @@ from crucible.validation.holdout import (
     holdout,
     segmented_holdout,
     split_train_test,
+)
+from crucible.validation.monitor import (
+    CusumDesign,
+    EdgeBaseline,
+    EmpiricalARL,
+    MonitorVerdict,
+    cusum_design,
+    edge_monitor,
+    empirical_arl,
+    rolling_expectancy,
 )
 from crucible.validation.pbo import (
     DeflatedSharpe,
@@ -77,4 +89,6 @@ __all__ = [
     "fold_dispersion", "walk_forward_efficiency",
     "Thresholds",
     "run_gauntlet", "gate_real", "gate_strong", "gate_durable", "gate_general",
+    "EdgeBaseline", "CusumDesign", "MonitorVerdict", "EmpiricalARL",
+    "cusum_design", "edge_monitor", "empirical_arl", "rolling_expectancy",
 ]

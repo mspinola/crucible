@@ -39,6 +39,15 @@ class Thresholds:
     max_pbo: float = 0.5                    # hard: CSCV overfit probability <= this
     min_deflated_sharpe: float = 0.95       # hard: deflated Sharpe (multiple-testing corrected) >= this
 
+    # ── MONITOR: has a PROMOTED edge decayed? (post-gauntlet, not a gate) ───
+    monitor_detect_shift: float = 0.5       # design point: detect a fall to half baseline
+    monitor_arl0_trades: int = 7_500        # false-alarm budget, in trades, for the CUSUM
+    monitor_window: int = 200               # rolling window for the SOFT channel
+    monitor_slip_ratio: float = 0.5         # soft: recent/baseline below this = SLIPPING
+    monitor_min_frequency_ratio: float = 0.6  # soft: firing-rate collapse = SLIPPING
+    # Only the CUSUM (the calibrated detector) may escalate to DEGRADED; the two soft
+    # ratios cap out at SLIPPING. See validation/monitor.py for why that split is fixed.
+
     # ── resampling budgets / determinism ────────────────────────────────────
     n_boot: int = 10_000                    # bootstrap draws
     n_perm: int = 5_000                     # permutation / reality-check draws

@@ -6,6 +6,39 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `validation.monitor`: the post-promotion counterpart to the gauntlet. The gauntlet asks
+  "is this edge real?" once, over a fixed log; this asks whether it is *still* real.
+  `EdgeBaseline` (frozen at promotion), `cusum_design`, `edge_monitor` →
+  HOLDING / SLIPPING / DEGRADED, plus `rolling_expectancy` and `empirical_arl`. Stateless
+  and capital-free like the rest of the package: it owns no clock, persists nothing, and
+  emits a verdict rather than a sizing action. Five `Thresholds` entries
+  (`monitor_detect_shift`, `monitor_arl0_trades`, `monitor_window`, `monitor_slip_ratio`,
+  `monitor_min_frequency_ratio`).
+
+  Three properties are structural rather than advisory, each with a test:
+  - **Only the calibrated detector may say DEGRADED.** The CUSUM has a stated false-alarm
+    rate, so it alone escalates. The rolling-window ratio and the firing-rate ratio have
+    no such calibration and cap out at SLIPPING. A trailing read printed "59% of baseline"
+    on a book whose true edge was intact and slightly *above* baseline; letting a rule
+    like that govern sizing cuts healthy books.
+  - **No re-baselining.** `edge_monitor` has no parameter from which a baseline could be
+    rebuilt, since a baseline recomputed from current data re-fits onto the drifted
+    reality and can never fire.
+  - **An undeflated baseline is allowed but never silent.** `EdgeBaseline.deflated` rides
+    in the verdict, on the same principle as `variant_count()` refusing a typed-in int.
+
+  CUSUM parameters are derived from a stated shift and a stated false-alarm budget, not
+  typed in; `arl1` reports the resulting detection latency as an up-front cost.
+  `arl0`/`arl1` are **means** of a strongly right-skewed distribution, and `empirical_arl`
+  returns mean and median alongside a resampling of your own returns, because the Gaussian
+  design assumption is checkable and quoting a median against a mean misstates latency by
+  roughly a third. Measured, that assumption holds better than expected: empirical ARL0
+  stays within 0.96x to 1.17x of nominal from an ordinary 43%-win-rate shape out to a
+  lottery-shaped 10%-win-rate book, because the boundary sits many sigma away and the CLT
+  carries the aggregate. See [docs/edge_monitor.md](docs/edge_monitor.md), which also
+  records the open seam question: whether a monitor belongs in crucible at all.
+
 ## [0.4.0] - 2026-07-28
 
 ### Added
