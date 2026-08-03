@@ -45,22 +45,26 @@ def test_step2_design_and_its_measured_arls(baseline):
     validated, base = baseline
     d = cusum_design(base)
     assert d.k_r == pytest.approx(0.1253, abs=1e-4)
-    assert d.h_std == pytest.approx(46.98, abs=0.05)
-    assert d.arl0 == pytest.approx(7_500, rel=1e-3)
-    assert d.arl1 == pytest.approx(1_099, abs=5)
+    assert d.h_std == pytest.approx(37.71, abs=0.05)
+    # the budget is calendar time: 25 years at this book's 150 trades/yr
+    assert d.arl0_basis == "years"
+    assert d.arl0 == pytest.approx(3_752, abs=5)
+    assert d.arl0 / base.trades_per_year == pytest.approx(25.0, abs=0.1)
+    assert d.arl1 == pytest.approx(806, abs=5)
+    assert d.arl1 / base.trades_per_year == pytest.approx(5.4, abs=0.1)
     # k is the textbook midpoint (mu_0 + mu_1) / 2
     assert d.k_r == pytest.approx(0.75 * base.expectancy, rel=1e-9)
 
     in_control = empirical_arl(d, validated.r, baseline_expectancy=base.expectancy,
                                n_sims=300, seed=7)
-    assert in_control.mean_run == pytest.approx(7_188, abs=60)
-    assert in_control.median_run == pytest.approx(5_587, abs=60)
-    assert in_control.inflation == pytest.approx(0.96, abs=0.01)
+    assert in_control.mean_run == pytest.approx(3_973, abs=60)
+    assert in_control.median_run == pytest.approx(2_951, abs=60)
+    assert in_control.inflation == pytest.approx(1.06, abs=0.02)
 
     halved = empirical_arl(d, validated.r, baseline_expectancy=base.expectancy,
                            shift=0.5, n_sims=300, seed=7)
-    assert halved.mean_run == pytest.approx(1_118, abs=20)
-    assert halved.median_run == pytest.approx(916, abs=20)
+    assert halved.mean_run == pytest.approx(811, abs=20)
+    assert halved.median_run == pytest.approx(686, abs=20)
     # the right skew the tutorial calls out: median well under mean
     assert halved.median_run < halved.mean_run * 0.9
 
@@ -74,11 +78,11 @@ def test_step3_three_live_books(baseline):
     intact = edge_monitor(healthy, base)
     assert intact.label == "HOLDING"
     assert intact.edge_ratio == pytest.approx(1.10, abs=0.01)
-    assert intact.cusum_peak / intact.cusum_h == pytest.approx(0.53, abs=0.01)
+    assert intact.cusum_peak / intact.cusum_h == pytest.approx(0.67, abs=0.01)
 
     decayed = edge_monitor(halved, base)
     assert decayed.label == "DEGRADED"
-    assert decayed.alarm_index == 1219
+    assert decayed.alarm_index == 1138
     assert decayed.edge_ratio == pytest.approx(-0.16, abs=0.01)
 
     thinned = edge_monitor(drying, base)

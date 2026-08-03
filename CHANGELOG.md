@@ -6,6 +6,46 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **The opportunity-set channel switched itself off for any log without `entry_date`.**
+  `_trades_per_year` read `entry_date` only, so a log built from a return column and an
+  exit date, which is an ordinary shape, produced `trades_per_year=None` on the baseline
+  and `frequency_ratio=None` in every verdict. It said so in `reasons` and nothing was
+  wrong-but-silent, yet the effect was that the one channel covering a signal that stops
+  firing was dead by default for a whole class of books. It now falls back to `exit_date`
+  (a rate is `n / span`, and either column dates the same trades closely enough), with
+  `entry_date` still preferred when both are present.
+
+### Changed
+- **The CUSUM's false-alarm budget is now stated in CALENDAR TIME.** New
+  `Thresholds.monitor_arl0_years` (default 25), converted using the baseline's own firing
+  rate; `monitor_arl0_trades` stays as the fallback when the rate is unknown.
+  `CusumDesign` reports `arl0_basis` and renders both ARLs in years.
+
+  A budget in trades silently means different things to different books. 7,500 trades is
+  about 50 years at 150 trades/yr and about 320 at 23, and the slower book was getting a
+  detector whose nominal detection latency was 24 years, which is not a monitor. Calendar
+  time is the unit the decision is actually made in, so one default now means one thing.
+
+  **Behaviour change** for any baseline that knows its firing rate: the design gets
+  tighter and detection faster. The worked example moves from a 7,500-trade budget to
+  3,752 trades (25.0 years), and its detection latency from 1,099 trades to 806 (5.4
+  years). Tutorial §14 and `tests/test_edge_monitor_example.py` are updated together.
+- **Corrected the module's claim about how far the Gaussian ARL approximation holds.** It
+  said the nominal figure stays "within 0.96x to 1.17x", generalizing from a synthetic
+  10%-win-rate book whose skew is +3. A real pooled trend-following book runs about skew
+  +5, with single trades near +39R against losses capped near -1R, and measures ~2.0x. The
+  error grows with skew and with the boundary: ~1.5x at skew +4, ~2.6x at +8, ~4.0x at
+  +11, and worse at larger `monitor_arl0_trades`.
+
+  The drift is conservative and costs nothing: measured, the inflation does NOT carry over
+  to `arl1`, which tracked nominal within a few percent at every budget tested. In control
+  the statistic hovers near zero and alarms only via a rare large excursion, exactly where
+  a fat tail bites; under a real shift it reaches the boundary by drift, where tail shape
+  barely matters. So a skewed book buys extra false-alarm margin for free. Both the
+  docstring and [docs/edge_monitor.md](docs/edge_monitor.md) now carry the graded table,
+  and two tests pin it so the claim cannot quietly drift back.
+
 ## [0.5.0] - 2026-08-02
 
 The edge-monitor release. The gauntlet asks "is this edge real?" once, over a fixed log;
