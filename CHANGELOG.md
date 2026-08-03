@@ -6,6 +6,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-03
+
+A monitoring-accuracy release. Both entries concern the firing-rate channel, and
+together they change it from a rule that could not fire into one that can, while
+recording why it still may not escalate.
+
+The channel compares the live firing rate against the baseline's. Anchoring that
+baseline to the validated log's whole span made it insensitive on any book whose rate
+has trended, which is the fix. Trying to give the same channel a calibrated detector so
+it could return DEGRADED did not work, and the measurements that killed it are written
+down so the attempt is not repeated.
+
 ### Changed
 - **`docs/edge_monitor.md` records why the firing-rate channel stays uncalibrated**, and
   drops the claim that it could be. That item sat at the top of the page's open list from
