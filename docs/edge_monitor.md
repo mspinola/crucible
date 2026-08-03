@@ -328,19 +328,83 @@ they are recorded here with what decided them rather than left looking live.
 | Label vocabulary, given `reality_check` already uses HELD / FRAGILE / FAIL. | **HOLDING / SLIPPING / DEGRADED.** | Kept distinct so a report showing both verdicts cannot blur them. Reusing HELD would have collided on meaning. |
 | Is this a fifth gauntlet gate? | **No.** | Nothing is wired into `run_gauntlet`. The gauntlet judges a promotion decision from a fixed log; this runs continuously afterwards, so it is a peer rather than a member. |
 | Frozen or live `sigma`? | **Frozen**, alongside the baseline. | Re-estimating per-trade dispersion from live data is a softer form of the re-baselining trap: it lets the reference drift toward whatever is happening now. |
+| Can the firing-rate channel be calibrated, so it may escalate to `DEGRADED` too? | **No, and it was tried.** | See [Why the firing-rate channel stays uncalibrated](#why-the-firing-rate-channel-stays-uncalibrated). Three detector families were built and measured against a real book's arrivals. All three deliver a false-alarm rate 2-3x worse than stated, and calibrating empirically leaves the delivered budget uncertain by **14.6x**. The channel stays capped at `SLIPPING`. |
+
+## Why the firing-rate channel stays uncalibrated
+
+This page carried "an arrival-process test would give it a stated false-alarm rate" at
+the top of [Still open](#still-open) for as long as it existed, on the reasoning that
+trade arrivals are approximately Poisson. **That reasoning was wrong, and the claim is
+removed rather than softened.** What follows is what measuring it actually produced, so
+nobody builds it twice.
+
+The prize was real. On a live 47-market trend book firing 33.9 trades/yr, a count-based
+detector spots a **halved firing rate in 0.6 years**, against 5.1 years for the
+expectancy CUSUM at the same budget. Roughly eight times faster, and it covers the one
+failure the other two channels cannot see. It is worth wanting.
+
+**Arrivals are not Poisson.** Dispersion index 3.43 against Poisson's 1.0, on annual
+counts over the full log. About 40% of that is a secular trend (+0.49 trades/yr per
+year, r=+0.63); the rest is genuine sub-annual clustering, with lag-1 autocorrelation of
+detrended annual counts at +0.04, so the years themselves are independent.
+
+Three detectors were built and checked against the book's own arrivals, each designed
+for a **10-year** false-alarm budget:
+
+| Detector | Delivered ARL0 | vs stated |
+|---|---|---|
+| Exponential CUSUM on inter-arrival gaps, full-span window | 3.6 yr | 0.36x |
+| ...same, 7-year window | 3.5 yr | 0.35x |
+| ...same, 5-year window | 1.8 yr | **0.18x** |
+| Poisson CUSUM on monthly counts | 3.2 yr | 0.32x |
+
+Every one fires 3x to 5x more often than advertised, and in the **dangerous** direction.
+Compare the expectancy CUSUM, where skew inflates ARL0 by 1.39x and buys free margin;
+here the error spends margin instead.
+
+Two intermediate hypotheses were tested and both failed, which is why the table above
+has more rows than the argument strictly needs:
+
+- **"A recent window will restore the Poisson model."** Annual-count dispersion does fall
+  sharply in recent windows (0.68 at 7 years, against 3.43 pooled). But a CUSUM runs on
+  individual gaps, not annual counts, and those stay non-exponential at every window. The
+  coarse-scale and fine-scale properties come apart, and the 5-year window is the worst of
+  the lot.
+- **"Then calibrate `h` empirically instead of analytically."** This is the honest fallback
+  and it is what `empirical_arl` already does for R. Solving `h` against the book's real
+  monthly counts gives 6.22 where the analytic design gives 4.26, a 1.46x correction. But
+  bootstrapping that calibration, `h` ranges 4.15 to 8.18 across replicates, and holding
+  `h` fixed the **delivered budget ranges 5.3 to 77.9 years**. A stated 10-year rate that
+  is truly somewhere in 5-78 is not a stated rate.
+
+The root cause is not the model, it is the data. A book firing 33.9 trades/yr gives 82
+monthly observations in a 7-year window, and CUSUM run length depends on the tail of the
+count distribution, which 82 samples cannot pin down. The gap detector is worse still:
+crossing its boundary requires two or three of the largest gaps back to back, so it is a
+rare-combination test over the tail of a 233-gap sample rather than a drift detector, and
+its ARL curve is visibly stepped as a result.
+
+**So the channel keeps its ratio rule and its `SLIPPING` cap.** An uncalibrated rule that
+says it is uncalibrated is more honest than a calibrated-looking one that is wrong by 3x,
+and the rule this page most wants to keep is that only a detector with a stated
+false-alarm rate may escalate. Manufacturing a stated rate to satisfy that rule would
+defeat it.
+
+What would change the answer is more arrivals, not better statistics: a book firing
+several hundred trades a year would have enough periods to calibrate. That is a property
+of the book, so the honest place to revisit this is a higher-frequency one, not a cleverer
+detector here. `tests/test_frequency_calibration.py` pins the general claim on synthetic
+data, so the limit can be re-derived without the private book.
+
 
 ## Still open
 
 Ordered by how much each one undercuts the argument for the module.
 
-1. **The firing-rate channel is uncalibrated.** It compares a ratio to a threshold, so
-   it can only ever say `SLIPPING`. Trade arrivals are approximately Poisson, so an
-   arrival-process test would give it a stated false-alarm rate and let it stand beside
-   the CUSUM.
-2. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
+1. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
    figures are design targets, not field results. The first honest test is the first
    promoted book that genuinely degrades.
-3. **The README still does not mention the module,** though it enumerates every other
+2. **The README still does not mention the module,** though it enumerates every other
    subpackage's API with a worked block. The worked example, tutorial §14 and the
    `report.monitor_panel` block all exist now; the README is the last documentation gap.
 
