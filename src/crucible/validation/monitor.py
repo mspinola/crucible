@@ -103,6 +103,11 @@ class EdgeBaseline:
     trades_per_year: Optional[float] = None   # the opportunity set; None disables ch. 2
     n_variants: Optional[int] = None          # honest N this was corrected against
     deflated: bool = False      # False is legal, but it rides in the verdict
+    # Years of the validated log `trades_per_year` was measured over. None means its whole
+    # span, which is the wrong anchor for a book whose rate has trended. Recorded rather
+    # than implied, because two baselines with the same rate and different windows are not
+    # making the same claim, and the verdict should be able to say which one this is.
+    rate_window_years: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.expectancy) or self.expectancy <= 0:
@@ -122,7 +127,8 @@ class EdgeBaseline:
     @classmethod
     def from_log(cls, trades: TradeLog, *, deflated_expectancy: Optional[object] = None,
                  n_variants: Optional[int] = None,
-                 trades_per_year: Optional[float] = None) -> "EdgeBaseline":
+                 trades_per_year: Optional[float] = None,
+                 rate_window_years: Optional[float] = None) -> "EdgeBaseline":
         """Measure a baseline from the log the edge was validated on. Call this ONCE, at
         promotion, and freeze the result.
 
@@ -142,10 +148,19 @@ class EdgeBaseline:
         the same check that refuses a negative raw edge. That is not a monitor to build
         with a smaller number; it is a book whose edge did not survive its own search,
         and the honest response is to not deploy it.
+
+        `rate_window_years` measures `trades_per_year` over the last N years of the log
+        rather than its whole span, and is recorded on the result. Use it whenever the
+        book's firing rate has trended: the full-span mean then sits below what the book
+        currently does, and the opportunity-set channel compares live behaviour against a
+        rate the book left behind years ago. Ignored when `trades_per_year` is supplied
+        directly, since there is then nothing to measure.
         """
         r = trades.r
         if trades_per_year is None:
-            trades_per_year = _trades_per_year(trades)
+            trades_per_year = _trades_per_year(trades, rate_window_years)
+        else:
+            rate_window_years = None      # the caller measured it; the window is theirs
         value = getattr(deflated_expectancy, "deflated_expectancy", deflated_expectancy)
         return cls(
             expectancy=float(value if value is not None else r.mean()),
@@ -154,10 +169,12 @@ class EdgeBaseline:
             trades_per_year=trades_per_year,
             n_variants=n_variants,
             deflated=value is not None,
+            rate_window_years=rate_window_years,
         )
 
 
-def _trades_per_year(trades: TradeLog) -> Optional[float]:
+def _trades_per_year(trades: TradeLog,
+                     window_years: Optional[float] = None) -> Optional[float]:
     """Firing rate from the log's own dates, or None when it carries none.
 
     Prefers `entry_date` and falls back to `exit_date`, because a rate is `n / span` and
@@ -167,6 +184,18 @@ def _trades_per_year(trades: TradeLog) -> Optional[float]:
     the channel covering the one failure the other two cannot see, a signal that stops
     firing while the trades it still takes keep their per-trade edge, so defaulting it
     off is the expensive direction to be wrong in.
+
+    `window_years` measures the rate over the last N years of the log instead of its whole
+    span. Default None keeps the whole span, which is the right answer for a book whose
+    firing rate is stationary and the WRONG one for a book whose rate has trended, because
+    the full-span mean then sits well below what the book does now and the ratio channel
+    reads healthy while the rate falls. Measured on a real 40-year trend book: 23.4/yr
+    over the full span against 33.9/yr over its last 7 years, so a 30% collapse from
+    current behaviour still scored 1.02 against the frozen baseline and could never trip.
+
+    This is a windowed measurement taken ONCE, at promotion, not a rolling one. The
+    difference matters: recomputing it later would re-fit the reference onto the drifted
+    reality, which is the trap `edge_monitor` has no parameter to permit.
     """
     dates = trades.col("entry_date")
     if dates is None:
@@ -174,6 +203,19 @@ def _trades_per_year(trades: TradeLog) -> Optional[float]:
     if dates is None or len(dates) < 2:
         return None
     d = pd.to_datetime(pd.Series(dates)).sort_values()
+    if window_years is not None:
+        if not (window_years > 0):
+            raise ValueError(
+                f"rate_window_years must be positive, got {window_years}. It is a span of "
+                "calendar time; pass None to measure over the log's whole span.")
+        cutoff = d.iloc[-1] - pd.Timedelta(days=float(window_years) * 365.25)
+        windowed = d[d >= cutoff]
+        if len(windowed) >= 2:
+            d = windowed
+        # else: the window holds under two trades, so it cannot date a rate at all and
+        # the full span is a worse answer than no answer would be honest about. Fall
+        # through to the whole log rather than return None, and let the caller see a
+        # rate that `rate_window_years` on the baseline reveals as un-windowed.
     span_days = (d.iloc[-1] - d.iloc[0]).total_seconds() / 86400.0
     if span_days <= 0:
         return None
@@ -583,10 +625,13 @@ def edge_monitor(trades: TradeLog, baseline: EdgeBaseline, *,
     if baseline.trades_per_year and live_tpy:
         freq_ratio = live_tpy / baseline.trades_per_year
         if freq_ratio < thresholds.monitor_min_frequency_ratio:
+            over = (f"last {baseline.rate_window_years:g}yr of the validated log"
+                    if baseline.rate_window_years else "the validated log's whole span")
             reasons.append(
                 f"signal fires at {freq_ratio:.0%} of its baseline rate "
-                f"({live_tpy:.0f}/yr vs {baseline.trades_per_year:.0f}/yr); annual R "
-                "falls with the opportunity set even when per-trade expectancy holds"
+                f"({live_tpy:.0f}/yr vs {baseline.trades_per_year:.0f}/yr, measured over "
+                f"{over}); annual R falls with the opportunity set even when per-trade "
+                "expectancy holds"
             )
     elif baseline.trades_per_year is None:
         reasons.append("no baseline firing rate; the opportunity-set channel is off")

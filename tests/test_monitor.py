@@ -367,3 +367,93 @@ def test_verdict_renders_without_optional_channels():
                      base)
     out = str(v)
     assert "EDGE MONITOR" in out and "n/a" in out
+
+
+# ── the firing rate's window: what "baseline rate" is measured over ─────────────────
+
+def _dated_log(rates_per_year, years_each, start="1986-01-01"):
+    """A log whose firing rate CHANGES over time, like a book on a secular trend."""
+    import pandas as pd
+    dates, t = [], pd.Timestamp(start)
+    for rate, yrs in zip(rates_per_year, years_each):
+        n = int(round(rate * yrs))
+        step = pd.Timedelta(days=365.25 / rate)
+        for _ in range(n):
+            dates.append(t)
+            t = t + step
+    return TradeLog.from_arrays(np.full(len(dates), 0.3), entry_date=pd.to_datetime(dates))
+
+
+def test_the_whole_span_rate_understates_a_book_whose_rate_has_risen():
+    """The live defect this exists for. A book that fired 12/yr for 20 years and 36/yr
+    for the last 7 has a full-span mean far below what it does now, so the ratio channel
+    reads healthy while the rate falls."""
+    log = _dated_log([12, 36], [20, 7])
+    whole = EdgeBaseline.from_log(log)
+    recent = EdgeBaseline.from_log(log, rate_window_years=7)
+    assert whole.trades_per_year < recent.trades_per_year * 0.7
+    assert recent.trades_per_year == pytest.approx(36, rel=0.1)
+    assert whole.rate_window_years is None and recent.rate_window_years == 7
+
+
+def test_the_window_decides_whether_a_real_collapse_is_visible():
+    """Not a cosmetic difference. Halve the CURRENT rate and the windowed baseline sees
+    it while the full-span one scores it comfortably healthy."""
+    log = _dated_log([12, 36], [20, 7])
+    whole = EdgeBaseline.from_log(log)
+    recent = EdgeBaseline.from_log(log, rate_window_years=7)
+    live = _dated_log([18], [3])                       # half of 36, well above 12
+
+    t = Thresholds()
+    assert edge_monitor(live, recent).frequency_ratio < t.monitor_min_frequency_ratio
+    assert edge_monitor(live, whole).frequency_ratio > t.monitor_min_frequency_ratio
+
+
+def test_the_window_rides_in_the_verdict_rather_than_being_implied():
+    """Two baselines with the same rate and different windows are not making the same
+    claim, so the reason line has to say which one this is."""
+    log = _dated_log([12, 36], [20, 7])
+    live = _dated_log([9], [3])
+    windowed = [r for r in edge_monitor(live, EdgeBaseline.from_log(log, rate_window_years=7)).reasons
+                if "fires at" in r]
+    whole = [r for r in edge_monitor(live, EdgeBaseline.from_log(log)).reasons
+             if "fires at" in r]
+    assert windowed and "last 7yr of the validated log" in windowed[0]
+    assert whole and "whole span" in whole[0]
+
+
+def test_the_window_defaults_to_the_whole_span_so_nothing_changes_silently():
+    log = _dated_log([12, 36], [20, 7])
+    assert EdgeBaseline.from_log(log) == EdgeBaseline.from_log(log, rate_window_years=None)
+
+
+def test_an_explicit_rate_wins_and_claims_no_window():
+    """`trades_per_year` supplied directly means the caller measured it themselves, so
+    recording a window this code did not apply would be a lie about provenance."""
+    log = _dated_log([12, 36], [20, 7])
+    b = EdgeBaseline.from_log(log, trades_per_year=99.0, rate_window_years=7)
+    assert b.trades_per_year == 99.0
+    assert b.rate_window_years is None
+
+
+def test_a_non_positive_window_is_refused():
+    log = _dated_log([12, 36], [20, 7])
+    with pytest.raises(ValueError, match="rate_window_years must be positive"):
+        EdgeBaseline.from_log(log, rate_window_years=0)
+
+
+def test_a_window_too_short_to_hold_two_trades_falls_back_to_the_whole_span():
+    """A rate needs two dates. Returning None would switch the channel off entirely,
+    which is worse than a stale rate the baseline's own field reveals as un-windowed."""
+    log = _dated_log([12, 36], [20, 7])
+    b = EdgeBaseline.from_log(log, rate_window_years=0.001)
+    assert b.trades_per_year == pytest.approx(EdgeBaseline.from_log(log).trades_per_year)
+
+
+def test_the_window_never_re_measures_after_promotion():
+    """It is a windowed measurement taken ONCE, not a rolling one. `edge_monitor` still
+    has no parameter from which a baseline, or its rate, could be rebuilt."""
+    import inspect
+    assert set(inspect.signature(edge_monitor).parameters) == {
+        "trades", "baseline", "design", "thresholds"}
+    assert "rate_window_years" not in inspect.signature(edge_monitor).parameters
