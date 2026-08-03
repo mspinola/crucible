@@ -584,15 +584,27 @@ the complementary question: given that you searched N configs and kept the best-
   series' own **skew and kurtosis** (fat left tails widen the error bar). Read `≥ 95%` like a
   passed significance test.
 
-Where the permutation test corrects the *p-value* for the search, these correct the *IS ranking*
-and the *Sharpe* for it, the same multiple-testing disease, caught two more ways. Capital-free
-(stdlib `NormalDist`, no scipy).
+- **Deflated expectancy** (`deflated_expectancy`). The same bar, `SR0`, subtracted rather than
+  tested against: `deflated = mu − sigma × SR0`, a per-trade edge in **R** with the search's
+  expected luck removed. It exists because a probability cannot anchor a monitor (§14) and the
+  raw sample mean is the number the parameters were optimized on. Pass the trial **logs**, not
+  trial Sharpes, so the per-trade clock can't be got wrong.
 
-Unlike the trade-log tests, these two aren't drawn on the report or wired into the gauntlet.
+  Read it as a **bias correction, not a test**. It strips the selection bias a search of this
+  size is *expected* to produce, so a pure-noise winner still clears zero about half the time,
+  where `deflated_sharpe` correctly calls none of them significant. Establish the edge is real
+  with the gauntlet, then use this to decide what to anchor to.
+
+Where the permutation test corrects the *p-value* for the search, these correct the *IS ranking*,
+the *Sharpe*, and the *expectancy* for it, the same multiple-testing disease caught three more
+ways. Capital-free (stdlib `NormalDist`, no scipy).
+
+Unlike the trade-log tests, these aren't drawn on the report or wired into the gauntlet.
 They need the **whole search** as input (`pbo_cscv` a `T×N` periods×configs matrix.
-`deflated_sharpe` the winner's Sharpe plus the trial count), which a single `TradeLog` doesn't
-carry. Call them yourself with that matrix, same story as the block bootstrap (§3): a standalone
-check that runs on a different object than the one the report shows.
+`deflated_sharpe` the winner's Sharpe plus the trial count, `deflated_expectancy` one R series
+per config), which a single `TradeLog` doesn't carry. Call them yourself with that matrix, same
+story as the block bootstrap (§3): a standalone check that runs on a different object than the
+one the report shows.
 
 > **Sources.** **PBO / CSCV**: Bailey, Borwein, López de Prado & Zhu (2017), "The Probability of
 > Backtest Overfitting," *Journal of Computational Finance*. **AFML Ch. 11–12**. **Deflated /
@@ -1229,32 +1241,45 @@ The runnable version is
 seeded and synthetic, so these numbers reproduce exactly.
 
 ```python
-from crucible.validation import EdgeBaseline, cusum_design, edge_monitor, empirical_arl
+from crucible.validation import (
+    EdgeBaseline, cusum_design, deflated_expectancy, edge_monitor, empirical_arl,
+)
 
-validated = synthetic_book(2000, seed=1)            # the book that passed
-base = EdgeBaseline.from_log(validated, deflated_expectancy=..., n_variants=64)
+validated = max(trials, key=sharpe)                 # the config the search kept
+corrected = deflated_expectancy(validated.r, [t.r for t in trials], n_trials=64)
+base = EdgeBaseline.from_log(validated, deflated_expectancy=corrected, n_variants=64)
 verdict = edge_monitor(live_book, base)             # HOLDING | SLIPPING | DEGRADED
 ```
 
 ### Step 1: freeze the baseline, and deflate it (§5, §11)
 
+The example runs a real 64-config search and keeps the best, which is the config whose *luck*
+ran highest as well as whose edge did. That is the whole problem in one line.
+
 ```
-in-sample mean      +0.2088R over 2000 trades
-deflated baseline   +0.1671R   deflated=True
-naive baseline      +0.2088R   deflated=False
+in-sample mean      +0.2751R over 2000 trades
+search haircut      -0.0723R  (SR0 0.0503 x sigma 1.4386, N=64)
+deflated baseline   +0.2027R   deflated=True
+naive baseline      +0.2751R   deflated=False
 firing rate         150 trades/yr
 ```
 
 The in-sample mean is the number the parameters were **optimized on**, so it is biased high in
 exactly the way §5 describes. Anchoring the monitor to it makes "half the baseline" mean half of
-something inflated. Here a 20% search correction moves the reference from `+0.2088R` to
-`+0.1671R`, so every ratio measured against the naive figure is flattered by **25%**.
+something inflated. `deflated_expectancy` subtracts the expected best-of-64 under the null,
+`mu − sigma × SR0`, moving the reference from `+0.2751R` to `+0.2027R`: the naive figure flatters
+every ratio measured against it by **36%**, and **74%** of the raw edge survives.
 
-Two properties keep this honest. `EdgeBaseline` is **frozen at promotion**, and `edge_monitor`
-has *no parameter from which one could be rebuilt*, because a baseline recomputed from current
-data re-fits onto the drifted reality and can never fire. And an undeflated baseline is allowed
-but never silent: `deflated=False` rides in the verdict rather than being validated away, the
-same discipline `variant_count()` applies to a typed-in N (§5b).
+That correction is not cosmetic. Run the same untouched, fully healthy live book against both
+baselines and the naive one returns **DEGRADED** while the deflated one returns **HOLDING**
+(`test_the_deflation_is_what_keeps_the_healthy_book_holding`). An inflated reference does not
+merely mis-scale the ratios, it manufactures alarms on books that never decayed.
+
+Two further properties keep this honest. `EdgeBaseline` is **frozen at promotion**, and
+`edge_monitor` has *no parameter from which one could be rebuilt*, because a baseline recomputed
+from current data re-fits onto the drifted reality and can never fire. And an undeflated baseline
+is allowed but never silent: `deflated=False` rides in the verdict rather than being validated
+away, the same discipline `variant_count()` applies to a typed-in N (§5b).
 
 ### Step 2: design the detector, then check its claims
 
@@ -1262,14 +1287,14 @@ You state the shift worth catching and the false-alarm budget; `k` and `h` follo
 
 ```
 detects a shift to 50% of baseline
-k = +0.1253R   h = 37.71 sigma
+k = +0.1520R   h = 35.09 sigma
 nominal ARL0 = 3,752 trades = 25.0 years (mean, between false alarms) at 150 trades/yr
-nominal ARL1 =   806 trades =  5.4 years (mean, to detect the design shift)
+nominal ARL1 =   658 trades =  4.4 years (mean, to detect the design shift)
 ```
 
 `k` is the textbook midpoint `(mu_0 + mu_1)/2`. **The budget is stated in calendar time, and
 the cost comes back in the same unit:** you are buying one false alarm per 25 years and paying
-about 5.4 years to notice a halved edge. Both are numbers to argue with *before* deployment.
+about 4.4 years to notice a halved edge. Both are numbers to argue with *before* deployment.
 
 That the budget is in years rather than trades matters more than it looks. `monitor_arl0_years`
 is converted using the baseline's own firing rate, so one default means the same thing to every
@@ -1281,15 +1306,15 @@ Those ARLs come from a Gaussian approximation, and trade R is emphatically not G
 check rather than assume, by resampling the book's own returns:
 
 ```
-in control    mean 3,973 / median 2,951 trades   vs nominal mean 3,752 (1.06x)
-edge halved   mean   811 / median   686 trades   vs nominal mean   806 (1.01x)
+in control    mean 4,087 / median 3,244 trades   vs nominal mean 3,752 (1.09x)
+edge halved   mean   632 / median   500 trades   vs nominal mean   658 (0.96x)
 ```
 
 Close here, because this synthetic book is only mildly skewed. **Do not read that as general.**
 On a real pooled trend book (skew about +5, single trades near +39R) the in-control figure runs
 about **2.0x** nominal, and the error grows with skew and with the size of the budget.
 
-Note which line stays accurate: the **shifted** one, at 1.01x. Skew inflates the in-control run
+Note which line stays accurate: the **shifted** one, at 0.96x. Skew inflates the in-control run
 length, because in control the statistic hovers near zero and only alarms via rare large
 excursions, which is exactly where a fat tail bites. Under a real shift it reaches the boundary
 by drift, where tail shape barely matters. So a skewed book gets *fewer* false alarms than
@@ -1302,28 +1327,28 @@ are strongly right-skewed. Quoting one against someone else's other misstates la
 
 | Live book | Verdict | Trailing 200-trade read | Firing rate | CUSUM |
 |---|---|---|---|---|
-| edge intact | **HOLDING** | 110% of baseline | 100% | peak 67% of threshold |
-| edge halved | **DEGRADED** | -16% | 100% | alarm at live trade 1,138 |
-| signal drying up | **SLIPPING** | 88% (intact) | **33%** | peak 53%, silent |
+| edge intact | **HOLDING** | 91% of baseline | 100% | peak 82% of threshold |
+| edge halved | **DEGRADED** | -13% | 100% | alarm at live trade 276 |
+| signal drying up | **SLIPPING** | 72% (intact) | **33%** | peak 61%, silent |
 
 The third row is the failure mode an expectancy-only monitor cannot see. That book's per-trade
-edge is **fine** (88% of baseline, well inside noise); the signal simply stopped firing, 50
+edge is **fine** (72% of baseline, well inside noise); the signal simply stopped firing, 50
 trades a year against a baseline of 150. Annual R falls by two thirds with per-trade expectancy
 untouched. Opportunity-set decay is a distinct failure from edge decay and needs its own channel.
 
 ### Step 4: why the soft channel cannot say DEGRADED
 
-The "edge intact" book was generated with the edge **fully intact**, a quarter *above* the
-deflated baseline. It never decayed. Yet:
+The "edge intact" book was generated with the edge **fully intact**, 6% *above* the deflated
+baseline. It never decayed. Yet:
 
 ```
-trailing 200-trade read ranges -31% to 240% of baseline, on noise alone
-it dips below the 50% line in 9% of windows
-the CUSUM peaks at 53% of threshold and never fires
+trailing 200-trade read ranges -25% to 197% of baseline, on noise alone
+it dips below the 50% line in 11% of windows
+the CUSUM peaks at 82% of threshold and never fires
 ```
 
 A "cut size at 50% of baseline" rule would have cut this healthy book on whichever of those
-windows you happened to read. Today's read is 110%, which looks reassuring, and that is the same
+windows you happened to read. Today's read is 91%, which looks reassuring, and that is the same
 coin landing the other way up. Both are noise.
 
 That is why the split is structural rather than advisory: **only a detector with a stated

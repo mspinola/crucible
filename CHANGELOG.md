@@ -6,17 +6,43 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-- **The opportunity-set channel switched itself off for any log without `entry_date`.**
-  `_trades_per_year` read `entry_date` only, so a log built from a return column and an
-  exit date, which is an ordinary shape, produced `trades_per_year=None` on the baseline
-  and `frequency_ratio=None` in every verdict. It said so in `reasons` and nothing was
-  wrong-but-silent, yet the effect was that the one channel covering a signal that stops
-  firing was dead by default for a whole class of books. It now falls back to `exit_date`
-  (a rate is `n / span`, and either column dates the same trades closely enough), with
-  `entry_date` still preferred when both are present.
+### Added
+- **`validation.deflated_expectancy`**, closing the gap that stood at the top of
+  `docs/edge_monitor.md`'s open list since the monitor shipped. `EdgeBaseline` took a
+  `deflated_expectancy` float and nothing in the package produced one: `deflated_sharpe`
+  corrects a Sharpe and returns a **probability**, which is the right output for a gate
+  and useless to a monitor. A monitor needs a number in R to anchor to, and without one
+  the only available anchor was the sample mean, which is the number the parameters were
+  optimized on.
+
+  The conversion rides on the bar `deflated_sharpe` already uses: `SR0`, the expected
+  maximum per-trade Sharpe of N noise trials, carried back into R by the winner's own
+  sigma and subtracted, `deflated = mu - sigma * SR0`. Both now call one
+  `_expected_max_sharpe`, so two corrections for one search cannot disagree about how big
+  the search was. `EdgeBaseline.from_log` accepts the `DeflatedExpectancy` object as well
+  as a float, because handing over the wrong field of a result you already computed
+  anchors the monitor to the pre-correction number while reporting `deflated=True`.
+
+  **It takes trial LOGS, not trial Sharpes**, unlike `deflated_sharpe`. The Sharpes are
+  computed inside so their clock cannot be got wrong: multiplying a per-month Sharpe by a
+  per-trade sigma yields a haircut in no units at all, silently, which is the v0.4.0 units
+  bug in a new costume.
+
+  **It is a bias correction, not a significance test**, and the docstring, the `__str__`
+  and the property name all say so. It removes the selection bias a search of this size is
+  *expected* to produce, so a pure-noise winner still clears zero roughly half the time
+  (measured at 56% / 47% / 44% for N = 5 / 20 / 100, against `deflated_sharpe` correctly
+  calling 0% of the same draws significant). The result's property is `is_positive` rather
+  than `survives` for exactly that reason. A correction that leaves nothing raises when it
+  reaches `EdgeBaseline`, whose existing refusal now names deflation as a cause.
 
 ### Changed
+- **`examples/edge_monitor.py` now runs a real 64-config search** and deflates the winner,
+  where it previously applied a hardcoded `raw_mean * 0.8` under a comment beginning
+  "Pretend". Every figure in tutorial §14 moved as a result (the haircut is 26% of the raw
+  edge, not 20%, and the naive baseline flatters by 36%, not 25%). The example now exposes
+  `promoted_book()` so the tutorial's numbers have one source.
+
 - **The CUSUM's false-alarm budget is now stated in CALENDAR TIME.** New
   `Thresholds.monitor_arl0_years` (default 25), converted using the baseline's own firing
   rate; `monitor_arl0_trades` stays as the fallback when the rate is unknown.
@@ -45,6 +71,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   barely matters. So a skewed book buys extra false-alarm margin for free. Both the
   docstring and [docs/edge_monitor.md](docs/edge_monitor.md) now carry the graded table,
   and two tests pin it so the claim cannot quietly drift back.
+
+### Fixed
+- **`tests/test_edge_monitor_example.py` rebuilt the baseline it was supposed to pin**,
+  instead of importing it. So the "reproducibility guard" for tutorial §14 passed
+  unchanged while the example it guards printed entirely different numbers. It now imports
+  `promoted_book()`. A guard that reconstructs what it guards is not a guard.
+- **The opportunity-set channel switched itself off for any log without `entry_date`.**
+  `_trades_per_year` read `entry_date` only, so a log built from a return column and an
+  exit date, which is an ordinary shape, produced `trades_per_year=None` on the baseline
+  and `frequency_ratio=None` in every verdict. It said so in `reasons` and nothing was
+  wrong-but-silent, yet the effect was that the one channel covering a signal that stops
+  firing was dead by default for a whole class of books. It now falls back to `exit_date`
+  (a rate is `n / span`, and either column dates the same trades closely enough), with
+  `entry_date` still preferred when both are present.
 
 ## [0.5.0] - 2026-08-02
 

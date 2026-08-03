@@ -70,7 +70,7 @@ flowchart TD
 | Module | Package? | Purpose | Public entry points |
 |---|---|---|---|
 | **`edge`** | `edge/` (trade_log, simulator, metrics, stats) | Produce and describe the `TradeLog`; the honesty layer (CI + p-value). | `TradeLog`, `barrier_trades`, `edge_report`, `reality_check`, `bootstrap_ci`, `block_bootstrap_pvalue`, `random_entry_null` |
-| **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics, monitor) | Out-of-sample survival, data-mining corrections, the audited gauntlet, and the post-promotion decay monitor. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds`, `edge_monitor`, `EdgeBaseline` |
+| **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics, monitor) | Out-of-sample survival, data-mining corrections, the audited gauntlet, and the post-promotion decay monitor. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `deflated_expectancy`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds`, `edge_monitor`, `EdgeBaseline` |
 | **`breadth`** | `breadth.py` (single file) | How many *independent* bets a correlated set of return streams holds. | `effective_n`, `participation_ratio`, `Breadth` |
 | **`ml`** | `ml/` (ic, decay, redundancy, pit) | The same honesty aimed at a model's scores — a predictions frame, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window` |
 | **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard`, `monitor_panel` |
@@ -144,6 +144,7 @@ simulator), this is the output you must return.
 | `EdgeReport` | `edge/metrics.py:130` | dataclass | `n, win_rate, expectancy, profit_factor, payoff_ratio, sqn` (+ excursion optionals) |
 | `PBOResult` | `validation/pbo.py:68` | dataclass | `pbo, logits, oos_below_zero, degradation_slope/_r2, n_configs, n_splits, n_blocks`; `.label` ROBUST/GUARDED/OVERFIT |
 | `DeflatedSharpe` | `validation/pbo.py:194` | dataclass | `observed_sharpe, deflated_sharpe, sr0_threshold, n_trials, n_obs, skew, kurtosis`; `.label` SIGNIFICANT/MARGINAL/NOT SIGNIFICANT |
+| `DeflatedExpectancy` | `validation/pbo.py:324` | dataclass | `observed_expectancy, deflated_expectancy, haircut, sigma, sr0_threshold, n_trials, n_trades, n_scored`; `.is_positive`, `.retained`. A bias correction in R, not a test |
 | `Breadth` | `breadth.py:22` | frozen | `n_eff, n_assets, eigenvalues, loadings, corr`; `.redundancy` = n_assets/n_eff |
 | `Fold` / `WalkForwardResult` | `validation/walk_forward.py:62,75` | dataclass | fold detail; `folds, stitched, param_grid` |
 | `HoldoutResult` | `validation/holdout.py:51` | dataclass | early/late `Verdict`s |
