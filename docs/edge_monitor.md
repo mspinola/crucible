@@ -404,9 +404,14 @@ Ordered by how much each one undercuts the argument for the module.
 1. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
    figures are design targets, not field results. The first honest test is the first
    promoted book that genuinely degrades.
-2. **The README still does not mention the module,** though it enumerates every other
-   subpackage's API with a worked block. The worked example, tutorial §14 and the
-   `report.monitor_panel` block all exist now; the README is the last documentation gap.
+
+That is now the only one, which is worth saying plainly rather than leaving the section
+looking longer than it is. Every other item this page has carried since #109 has been
+answered: the baseline is deflated, the firing rate is anchored to a recent window, the
+calibration question is settled in the negative and recorded above, and the README
+carries the module beside every other subpackage. What remains is not a gap in the
+implementation. It is that the thing has never been tested by the event it exists to
+detect, and no amount of building changes that.
 
 ## Bottom line
 
