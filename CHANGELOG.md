@@ -6,6 +6,31 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **The opportunity-set channel switched itself off for any log without `entry_date`.**
+  `_trades_per_year` read `entry_date` only, so a log built from a return column and an
+  exit date, which is an ordinary shape, produced `trades_per_year=None` on the baseline
+  and `frequency_ratio=None` in every verdict. It said so in `reasons` and nothing was
+  wrong-but-silent, yet the effect was that the one channel covering a signal that stops
+  firing was dead by default for a whole class of books. It now falls back to `exit_date`
+  (a rate is `n / span`, and either column dates the same trades closely enough), with
+  `entry_date` still preferred when both are present.
+
+### Changed
+- **Corrected the module's claim about how far the Gaussian ARL approximation holds.** It
+  said the nominal figure stays "within 0.96x to 1.17x", generalizing from a synthetic
+  10%-win-rate book whose skew is +3. A real pooled trend-following book runs about skew
+  +5, with single trades near +39R against losses capped near -1R, and measures ~2.0x. The
+  error grows with skew and with the boundary: ~1.5x at skew +4, ~2.6x at +8, ~4.0x at
+  +11, and worse at larger `monitor_arl0_trades`.
+
+  The drift is conservative, so false alarms are rarer than advertised, but the same
+  inflation applies to `arl1`: a skewed book is slower to notice real decay than its
+  stated latency, which on an infrequently-traded book is years. `arl1` should be measured
+  with `empirical_arl(..., shift=design.detect_shift)` rather than read off the design.
+  Both the docstring and [docs/edge_monitor.md](docs/edge_monitor.md) now carry the graded
+  table, and two tests pin it so the claim cannot quietly drift back.
+
 ## [0.5.0] - 2026-08-02
 
 The edge-monitor release. The gauntlet asks "is this edge real?" once, over a fixed log;

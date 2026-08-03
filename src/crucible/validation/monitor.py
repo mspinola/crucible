@@ -28,17 +28,32 @@ baseline" mean something other than half the edge you have. That is a legitimate
 in a hurry, but it must be visible, so `deflated` rides in the verdict output rather
 than being validated away. Same principle as `variant_count()` refusing a typed-in int.
 
-**On the Gaussian assumption.** The ARL calibration below is Siegmund's approximation,
-which assumes normal increments, and per-trade R is neither normal nor symmetric. That
-sounds fatal and measurably is not: because the boundary sits 7 to 30 sigma away, the
-CUSUM sums hundreds of increments before it can alarm, and the central limit theorem
-does most of the work. Measured against resampled trade distributions, the nominal ARL0
-holds to within a few percent for an ordinary 43%-win-rate shape, and drifts to about
-+17% (conservative, meaning fewer false alarms than advertised) for a lottery-shaped
-10%-win-rate book with +12R winners. Verify rather than assume: `empirical_arl` resamples
-your own returns and reports the real number. Reach for it when your book is unusually
-tail-heavy or when you design a fast boundary, since the approximation is weakest where
-h is small.
+**On the Gaussian assumption, and how far it actually holds.** The ARL calibration below
+is Siegmund's approximation, which assumes normal increments. Per-trade R is neither
+normal nor symmetric, and the error that introduces is a function of SKEW, growing with
+the boundary. Measured by resampling, against nominal:
+
+    skew  +3   (10% win rate, +12R winners)          ~1.1x
+    skew  +4                                         ~1.5x to ~1.7x
+    skew  +5   (a real pooled trend book)            ~2.0x
+    skew  +8                                         ~2.2x to ~2.6x
+    skew +11                                         ~2.9x to ~4.0x
+
+with the higher figure in each range corresponding to a larger `monitor_arl0_trades`, so
+a stricter false-alarm budget is also the case where the approximation is least reliable.
+
+An earlier version of this note claimed the nominal figure "holds to within a few
+percent", citing a synthetic 10%-win-rate book. That book's skew was +3; real pooled
+trend-following runs about +5, with single trades near +39R against losses capped near
+-1R. The claim was true of the case measured and wrong about the population it was
+generalizing to.
+
+The drift is CONSERVATIVE: empirical ARL0 above nominal means fewer false alarms than
+advertised. The cost lands on the other side, because the same inflation applies to
+`arl1`: a detector on a skewed book is slower to notice real decay than its stated
+latency, and on an infrequently-traded book that difference can be years. Do not read
+`arl1` off the design for a skewed book; measure it with
+`empirical_arl(..., shift=design.detect_shift)`.
 
 **ARLs here are MEANS.** The run-length distribution is strongly right-skewed, so the
 median is materially lower than the mean (often by a third). A published "median 474
@@ -123,8 +138,19 @@ class EdgeBaseline:
 
 
 def _trades_per_year(trades: TradeLog) -> Optional[float]:
-    """Firing rate from entry dates, or None when the log carries no dates."""
+    """Firing rate from the log's own dates, or None when it carries none.
+
+    Prefers `entry_date` and falls back to `exit_date`, because a rate is `n / span` and
+    either column dates the same trades closely enough for that. The fallback is not
+    cosmetic: plenty of real logs are built from a return column and an exit date, and
+    without it the opportunity-set channel silently switches off for all of them. That is
+    the channel covering the one failure the other two cannot see, a signal that stops
+    firing while the trades it still takes keep their per-trade edge, so defaulting it
+    off is the expensive direction to be wrong in.
+    """
     dates = trades.col("entry_date")
+    if dates is None:
+        dates = trades.col("exit_date")
     if dates is None or len(dates) < 2:
         return None
     d = pd.to_datetime(pd.Series(dates)).sort_values()

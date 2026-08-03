@@ -184,15 +184,32 @@ test (`test_reference_value_is_the_textbook_midpoint`).
 
 ### Two things the first draft of this page got wrong
 
-**The Gaussian assumption is much less of a problem than claimed.** The draft said the
-nominal false-alarm rate would be "materially wrong" on fat-tailed returns. Measured, it
-is not. Across an ordinary 43%-win-rate shape and a lottery-shaped book (10% win rate,
-+12R winners), empirical ARL0 stays within 0.96x to 1.17x of nominal, and the drift is
-in the conservative direction. The reason is structural: the boundary sits 7 to 30 sigma
-out, so the CUSUM aggregates hundreds of increments before it can alarm and the central
-limit theorem carries it. The approximation is weakest where `h` is small, which is
-where `empirical_arl` earns its place. This is now a measured bound in the module
-docstring rather than a hedge.
+**The Gaussian assumption, corrected twice.** The first draft of this page said the
+nominal false-alarm rate would be "materially wrong" on fat-tailed returns. Measuring
+synthetic books contradicted that, so the page was changed to claim it "stays within 0.96x
+to 1.17x of nominal". Then the monitor met a real book, and that second claim was wrong
+too. It generalized from a synthetic 10%-win-rate case with skew **+3**; real pooled
+trend-following runs about **+5**, with single trades near +39R against losses capped
+near -1R.
+
+The error is a function of skew, and grows with the boundary:
+
+| skew | empirical ARL0 vs nominal |
+|---|---|
+| +3 (the synthetic case the old claim rested on) | ~1.1x |
+| +4 | ~1.5x to 1.7x |
+| **+5 (a real pooled trend book)** | **~2.0x** |
+| +8 | ~2.2x to 2.6x |
+| +11 | ~2.9x to 4.0x |
+
+The higher figure in each range is the larger `monitor_arl0_trades`, so a stricter
+false-alarm budget is also where the stated number is least trustworthy.
+
+The drift is conservative (fewer false alarms than advertised), but the cost lands on the
+other side: the same inflation applies to `arl1`, so a skewed book is slower to notice
+real decay than its stated latency. On an infrequently-traded book that difference is
+years. This is the strongest argument for `empirical_arl` existing at all, and the reason
+`arl1` should be measured rather than read off the design for any skewed book.
 
 **ARLs are means, and the reference implementation quotes a median.** Its "median 474
 trades = 37 months" cannot be reconciled with its stated `h = 29.7` under any single

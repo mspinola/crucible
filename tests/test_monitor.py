@@ -73,6 +73,39 @@ def test_from_log_leaves_the_firing_rate_off_without_dates():
     assert base.trades_per_year is None
 
 
+def test_the_firing_rate_falls_back_to_exit_dates():
+    """A log built from a return column and an exit date is ordinary, and without this
+    fallback the opportunity-set channel switched itself off for every one of them,
+    reporting only that it was off. Rate is n / span, and either column dates the same
+    trades closely enough for that."""
+    r = _typical(200)
+    dates = pd.date_range("2020-01-01", periods=200, freq="D")
+    exit_only = TradeLog.from_arrays(r, exit_date=dates)
+    assert exit_only.col("entry_date") is None
+    assert EdgeBaseline.from_log(exit_only).trades_per_year == pytest.approx(365.25, rel=0.02)
+
+
+def test_entry_dates_still_win_when_both_are_present():
+    r = _typical(200)
+    entry = pd.date_range("2020-01-01", periods=200, freq="D")        # 1/day
+    exit_ = pd.date_range("2020-01-01", periods=200, freq="2D")       # spans twice as long
+    base = EdgeBaseline.from_log(TradeLog.from_arrays(r, entry_date=entry, exit_date=exit_))
+    assert base.trades_per_year == pytest.approx(365.25, rel=0.02)
+
+
+def test_the_monitor_reports_a_live_firing_rate_from_exit_dates_alone():
+    """The end-to-end version: the channel that was dead for exit-date-only books."""
+    base = EdgeBaseline(expectancy=0.2, sigma=1.0, n_trades=2000,
+                        trades_per_year=365.25, deflated=True)
+    slow = TradeLog.from_arrays(np.random.default_rng(5).normal(0.2, 1.0, 100),
+                                exit_date=pd.date_range("2022-01-01", periods=100, freq="4D"))
+    v = edge_monitor(slow, base)
+    assert v.live_trades_per_year is not None
+    assert v.frequency_ratio == pytest.approx(0.25, rel=0.05)
+    assert v.label == SLIPPING
+    assert any("fires at" in x for x in v.reasons)
+
+
 # ── CUSUM design ────────────────────────────────────────────────────────────────────
 
 def test_reference_value_is_the_textbook_midpoint():
@@ -129,21 +162,65 @@ def test_nominal_arl0_survives_contact_with_gaussian_data():
 
 
 @pytest.mark.parametrize("win_rate,payoff", [(0.43, 1.8), (0.10, 12.0)])
-def test_gaussian_calibration_holds_on_skewed_trade_returns(win_rate, payoff):
-    """The design assumes normal increments and trade R is not normal. It survives
-    anyway: the boundary is many sigma out, so the CUSUM aggregates enough increments
-    for the CLT to carry it. Documented as a measured bound, not an assumption."""
+def test_gaussian_calibration_holds_on_mildly_skewed_trade_returns(win_rate, payoff):
+    """At modest skew the approximation is close, which is the case the design leans on.
+    See the next test for where that stops being true."""
     rng = np.random.default_rng(7)
     n = 40_000
     win = rng.random(n) < win_rate
     r = np.where(win, rng.normal(payoff, payoff / 3, n), rng.normal(-1.0, 0.2, n))
     mu, sd = float(r.mean()), float(r.std(ddof=1))
     assert mu > 0
+    assert _skew(r) < 3.5                       # the regime this test speaks for
 
     d = cusum_design(EdgeBaseline(expectancy=mu, sigma=sd, n_trades=n),
                      thresholds=Thresholds(monitor_arl0_trades=300))
     e = empirical_arl(d, r, baseline_expectancy=mu, n_sims=600, seed=3)
     assert 0.8 < e.inflation < 1.35
+
+
+def _skew(r):
+    return float(((r - r.mean()) ** 3).mean() / r.std() ** 3)
+
+
+def _trend_shaped(n=40_000, ln_sigma=1.10, seed=0):
+    """A book shaped like real pooled trend-following: ~42% win rate, losses capped near
+    -1R, and a long right tail. Real books of this kind run around skew +5; the synthetic
+    10%-win-rate 'lottery' the test above uses only reaches +3."""
+    rng = np.random.default_rng(seed)
+    return np.where(rng.random(n) < 0.42, rng.lognormal(0.55, ln_sigma, n),
+                    -np.abs(rng.normal(0.95, 0.25, n)))
+
+
+def test_the_gaussian_error_grows_with_skew_and_is_not_small():
+    """The correction to an earlier claim in this module's docstring, kept honest by a
+    test. A real trend book measured ~2.0x nominal; the docstring previously said "a few
+    percent" on the strength of a much tamer synthetic case."""
+    r = _trend_shaped()
+    assert _skew(r) > 5.0                       # in the regime real books occupy
+    mu, sd = float(r.mean()), float(r.std(ddof=1))
+    d = cusum_design(EdgeBaseline(expectancy=mu, sigma=sd, n_trades=r.size),
+                     thresholds=Thresholds(monitor_arl0_trades=2_000))
+    e = empirical_arl(d, r, baseline_expectancy=mu, n_sims=500, seed=3)
+    assert e.inflation > 1.5, (
+        "the Gaussian ARL is expected to be materially conservative on a skewed book; "
+        "if this now passes tightly, re-measure and correct the module docstring")
+    # conservative direction: fewer false alarms than advertised, not more
+    assert e.mean_run > d.arl0
+
+
+def test_a_stricter_false_alarm_budget_makes_the_approximation_worse():
+    """Which is the uncomfortable direction: the tighter you ask the false-alarm rate to
+    be, the less the stated number can be trusted, because h moves further out."""
+    r = _trend_shaped()
+    mu, sd = float(r.mean()), float(r.std(ddof=1))
+    base = EdgeBaseline(expectancy=mu, sigma=sd, n_trades=r.size)
+    inflations = []
+    for target in (2_000, 7_500):
+        d = cusum_design(base, thresholds=Thresholds(monitor_arl0_trades=target))
+        inflations.append(empirical_arl(d, r, baseline_expectancy=mu,
+                                        n_sims=400, seed=3).inflation)
+    assert inflations[1] > inflations[0]
 
 
 def test_run_length_is_right_skewed_so_mean_and_median_differ():
