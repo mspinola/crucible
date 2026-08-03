@@ -14,6 +14,7 @@ from crucible.validation import (
     EdgeBaseline,
     Thresholds,
     cusum_design,
+    deflated_expectancy,
     edge_monitor,
     empirical_arl,
     rolling_expectancy,
@@ -42,25 +43,49 @@ def thin(trades: TradeLog, keep_every: int) -> TradeLog:
     return TradeLog(trades.frame.iloc[::keep_every].reset_index(drop=True))
 
 
-def main():
-    # ── 1. the validated book, and the baseline frozen from it ──────────────────
-    validated = synthetic_book(2000, seed=1, start="2015-01-01")
-    raw_mean = float(validated.r.mean())
+def promoted_book():
+    """The search, the config it kept, and the baseline frozen from it.
 
-    # The number the parameters were optimized on is biased high. Pretend the
-    # search correction knocked 20% off it; anchoring to the corrected figure is
+    A function rather than inline setup so the tutorial's figures have exactly ONE
+    source: `tests/test_edge_monitor_example.py` imports this instead of rebuilding
+    it. A test that rebuilds the setup it is meant to pin passes happily while the
+    example it guards prints something else, which is what happened here.
+    """
+    # A real search: 64 configs scored, the best kept. The others are neighbouring
+    # variants of the same book, which is what a parameter sweep actually looks
+    # like, and their SPREAD is what sets how high a Sharpe luck alone could reach.
+    rng = np.random.default_rng(99)
+    trials = [synthetic_book(2000, edge=e, seed=1 + i, start="2015-01-01")
+              for i, e in enumerate(rng.uniform(0.85, 1.0, 64))]
+    # The config the search KEEPS is the best in sample, which is the one whose luck
+    # ran highest as well as whose edge ran highest. That is the whole problem.
+    validated = max(trials, key=lambda t: t.r.mean() / t.r.std(ddof=1))
+
+    # The number the parameters were optimized on is biased high. Subtract what a
+    # 64-wide search could have found by luck; anchoring to the corrected figure is
     # the whole reason to run this in crucible rather than by hand.
-    honest = EdgeBaseline.from_log(validated, deflated_expectancy=raw_mean * 0.8,
+    corrected = deflated_expectancy(validated.r, [t.r for t in trials], n_trials=64)
+    honest = EdgeBaseline.from_log(validated, deflated_expectancy=corrected,
                                    n_variants=64)
+    return validated, corrected, honest
+
+
+def main():
+    # ── 1. the search, the winner, and the baseline frozen from it ──────────────
+    validated, corrected, honest = promoted_book()
+    raw_mean = float(validated.r.mean())
     naive = EdgeBaseline.from_log(validated)          # deflated=False, and it says so
 
     print("1) THE FROZEN BASELINE")
     print(f"   in-sample mean      {raw_mean:+.4f}R over {validated.n} trades")
+    print(f"   search haircut      {-corrected.haircut:+.4f}R  "
+          f"(SR0 {corrected.sr0_threshold:.4f} x sigma {corrected.sigma:.4f}, N=64)")
     print(f"   deflated baseline   {honest.expectancy:+.4f}R   deflated={honest.deflated}")
     print(f"   naive baseline      {naive.expectancy:+.4f}R   deflated={naive.deflated}")
     print(f"   firing rate         {honest.trades_per_year:.0f} trades/yr")
-    print("   The naive baseline is 25% higher, so every ratio measured against it")
-    print("   is flattered by the same amount. Build this ONCE, at promotion.")
+    print(f"   The naive baseline is {naive.expectancy / honest.expectancy - 1:.0%} higher, "
+          "so every ratio measured")
+    print("   against it is flattered by the same amount. Build this ONCE, at promotion.")
 
     # ── 2. the detector, designed rather than typed in ──────────────────────────
     design = cusum_design(honest)
@@ -93,10 +118,12 @@ def main():
     roll = rolling_expectancy(healthy, v.window).dropna()
     below = float((roll < honest.expectancy * Thresholds().monitor_slip_ratio).mean())
 
+    healthy_mean = float(healthy.r.mean())
     print("\n5) THE REASON THE SOFT CHANNEL CANNOT SAY 'DEGRADED'")
     print("   The 'edge intact' book was generated with edge=1.0, so its TRUE per-trade")
-    print(f"   edge is {raw_mean:+.4f}R, a quarter ABOVE the {honest.expectancy:+.4f}R "
-          "baseline. It never decayed.")
+    print(f"   edge is {healthy_mean:+.4f}R, "
+          f"{healthy_mean / honest.expectancy - 1:.0%} ABOVE the "
+          f"{honest.expectancy:+.4f}R baseline. It never decayed.")
     print(f"   Even so, its trailing {v.window}-trade read dips below the 50% line in "
           f"{below:.0%} of windows,")
     print(f"   ranging {roll.min() / honest.expectancy:.0%} to "

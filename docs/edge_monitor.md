@@ -95,6 +95,9 @@ already produces the corrected version of exactly that figure: `deflated_sharpe`
 is a **deflated** expectancy is measuring decay from a number that was defensible in
 the first place.
 
+`validation.deflated_expectancy` now does that conversion; see
+[Deflating the baseline](#deflating-the-baseline) below.
+
 Worth flagging in the reference numbers: OOS expectancy (`+0.158%`) is *above* IS
 (`+0.134%`). That is backwards from the usual optimization bias. Either the search was
 narrow (small honest N), the in-sample window was hostile, or the out-of-sample period
@@ -160,10 +163,13 @@ crucible emits HOLDING / SLIPPING / DEGRADED. It does not emit "cut to half size
 ### What shipped
 
 ```python
-from crucible.validation import EdgeBaseline, cusum_design, edge_monitor, empirical_arl
+from crucible.validation import (
+    EdgeBaseline, cusum_design, deflated_expectancy, edge_monitor, empirical_arl,
+)
 
 # ONCE, at promotion. Freeze the result.
-base = EdgeBaseline.from_log(validated_log, deflated_expectancy=0.08, n_variants=64)
+corrected = deflated_expectancy(validated_log.r, [t.r for t in trials], n_trials=64)
+base = EdgeBaseline.from_log(validated_log, deflated_expectancy=corrected, n_variants=64)
 
 design = cusum_design(base)          # k and h derived from Thresholds, not typed in
 verdict = edge_monitor(live_log, base)
@@ -246,11 +252,70 @@ so is not.
 The rolling ratio and the firing-rate ratio cap out at `SLIPPING`. This is the part
 worth keeping if nothing else here survives review, and
 [`examples/edge_monitor.py`](https://github.com/mspinola/crucible/blob/main/examples/edge_monitor.py)
-shows why. On a book whose true edge is fully intact and a quarter **above** baseline,
-the 200-trade trailing read ranges from -31% to 240% of baseline on noise alone and dips
-under the 50% line in 9% of windows, while the CUSUM peaks at 53% of its threshold and
+shows why. On a book whose true edge is fully intact and **above** baseline,
+the 200-trade trailing read ranges from -25% to 197% of baseline on noise alone and dips
+under the 50% line in 11% of windows, while the CUSUM peaks at 82% of its threshold and
 never fires. A "cut at 50% of baseline" rule would have cut a healthy book on whichever
 window you happened to read.
+
+## Deflating the baseline
+
+Defect 1 was the largest gap on this page for as long as it stood: the argument for
+building the monitor here rather than copying the reference implementation rested on
+anchoring to a search-corrected number, and nothing in the package produced one.
+`deflated_sharpe` corrects a Sharpe and returns a **probability**, which is the right
+output for a gate and useless to a monitor. A monitor needs a number in R.
+
+`validation.deflated_expectancy` writes the conversion, on the bar `deflated_sharpe`
+already uses:
+
+```
+SR0      = expected MAXIMUM per-trade Sharpe of N noise trials
+           (Bailey/López de Prado, scaled by the spread of the trial Sharpes)
+deflated = mu - sigma * SR0
+```
+
+The bar lives in Sharpe units, so it is carried back into R by the winner's own sigma
+before being subtracted. Both functions now call one `_expected_max_sharpe`, so the two
+corrections for one search cannot disagree about how big the search was.
+
+```python
+from crucible.validation import deflated_expectancy, EdgeBaseline
+
+d = deflated_expectancy(winner.r, [t.r for t in every_variant_tried], n_trials=log)
+base = EdgeBaseline.from_log(winner, deflated_expectancy=d, n_variants=log.n_variants)
+```
+
+Three decisions worth recording.
+
+**It takes trial LOGS, not trial Sharpes**, unlike `deflated_sharpe`. The Sharpes are
+computed inside, so their clock cannot be got wrong. A per-month Sharpe and a per-trade
+Sharpe are different numbers on different scales, and multiplying the wrong one by a
+per-trade sigma produces a haircut in no units at all, silently. That is the v0.4.0 units
+bug in a new costume, and the fix is to not accept the ambiguous input.
+
+**It is a bias correction, not a significance test, and the docstring says so in those
+words.** It removes the selection bias a search of this size is *expected* to produce.
+The realized maximum sits above its own mean about half the time, so a pure-noise winner
+still clears zero here roughly as often as not: measured at 56% / 47% / 44% for N = 5 /
+20 / 100, while `deflated_sharpe` correctly calls 0% of the same draws significant
+(reproducer:
+`tests/test_deflated_expectancy.py::test_the_haircut_is_a_bias_correction_not_a_test`).
+The result object's property is therefore named `is_positive` rather than `survives`,
+because the first draft called it `survives` and that reads as a verdict it does not
+deliver. Establish the edge is real with the gauntlet; use this to decide what to anchor
+to afterwards.
+
+**It over-corrects a genuine edge, deliberately.** A winner chosen partly for real signal
+carries less selection bias than the pure-luck maximum being subtracted, so the deflated
+number sits below the truth. For a monitor baseline that is the safer direction: too low
+a bar makes the monitor slow to call decay, too high a bar makes it cry wolf, and a
+spurious alarm forces a re-optimization that taxes the honest N of the next verdict.
+
+A correction that leaves nothing raises rather than returning a smaller baseline.
+`EdgeBaseline` already refused a non-positive expectancy; the message now names deflation
+as a cause, because a book whose edge does not survive its own search is not a monitoring
+problem.
 
 ## Settled
 
@@ -268,25 +333,14 @@ they are recorded here with what decided them rather than left looking live.
 
 Ordered by how much each one undercuts the argument for the module.
 
-1. **Nothing deflates an expectancy.** `deflated_expectancy` is still a number the
-   caller supplies. `deflated_sharpe` corrects a Sharpe ratio, not a per-trade mean, so
-   the conversion is unwritten. This is the largest gap: anchoring to a search-corrected
-   baseline was the whole reason to build this here rather than copy the reference
-   implementation, and until it exists that advantage is a docstring rather than a
-   feature.
-2. **Nothing calls it.** The monitor needs a caller to freeze an `EdgeBaseline` at the
-   moment of promotion and hold it. In this stack that is `crucible_stack.orchestrate`
-   (which owns the `DeploymentLedger` and the promotion event) or `livebook`. Neither
-   knows the module exists, so today it runs only in its own tests. Sibling-repo work,
-   not crucible's.
-3. **The firing-rate channel is uncalibrated.** It compares a ratio to a threshold, so
+1. **The firing-rate channel is uncalibrated.** It compares a ratio to a threshold, so
    it can only ever say `SLIPPING`. Trade arrivals are approximately Poisson, so an
    arrival-process test would give it a stated false-alarm rate and let it stand beside
    the CUSUM.
-4. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
+2. **It has never met real decay.** Only synthetic decay, generated to test it. The ARL
    figures are design targets, not field results. The first honest test is the first
    promoted book that genuinely degrades.
-5. **The README still does not mention the module,** though it enumerates every other
+3. **The README still does not mention the module,** though it enumerates every other
    subpackage's API with a worked block. The worked example, tutorial §14 and the
    `report.monitor_panel` block all exist now; the README is the last documentation gap.
 
@@ -301,11 +355,11 @@ amount of code.
 The improvement over the reference version is not the detector. It is what the detector
 is anchored to: a search-corrected expectancy instead of the optimized in-sample one,
 denominated in R instead of percent of account, watched alongside the opportunity set
-rather than in isolation. Two of those three are built. The first is not, which is why
-it sits at the top of [Still open](#still-open).
+rather than in isolation. All three are now built, the first of them last and only after
+this page had carried it as the top open item for several revisions.
 
 The 2020 dip in the reference output is the uncalibrated alarm firing while the
 calibrated one stayed silent. That is not evidence the monitor works, and the same
 pattern reproduces here: in §14 of the tutorial, a book whose edge never decayed shows a
-trailing read swinging between -31% and 240% of baseline. Hence the rule that only a
+trailing read swinging between -25% and 197% of baseline. Hence the rule that only a
 detector with a stated false-alarm rate may escalate to `DEGRADED`.

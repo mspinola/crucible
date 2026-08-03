@@ -12,8 +12,9 @@ The honest tests you run once you have a TradeLog (or a strategy + prices):
   permutation    sign-permutation p-value, data-mining correction, White's
                  Reality Check + Hansen's SPA (its more powerful successor)
                  across every variant you searched
-  pbo            probability of backtest overfitting (CSCV) + deflated Sharpe —
-                 how much the ACT OF SELECTING the best config overfit
+  pbo            probability of backtest overfitting (CSCV), deflated Sharpe, and
+                 deflated expectancy: how much the ACT OF SELECTING the best config
+                 overfit, as a probability and as an edge in R
   search_space   the search ledger — an honest N for the data-mining correction,
                  counting every variant tried (not just the winner you kept)
   gate           an audited, un-overridable pass/fail gate (and a Gauntlet of them)
@@ -52,8 +53,10 @@ from crucible.validation.monitor import (
     rolling_expectancy,
 )
 from crucible.validation.pbo import (
+    DeflatedExpectancy,
     DeflatedSharpe,
     PBOResult,
+    deflated_expectancy,
     deflated_sharpe,
     pbo_cscv,
 )
@@ -85,6 +88,7 @@ __all__ = [
     "sign_permutation_pvalue", "sidak_correction", "variant_count",
     "whites_reality_check", "spa_test",
     "pbo_cscv", "PBOResult", "deflated_sharpe", "DeflatedSharpe",
+    "deflated_expectancy", "DeflatedExpectancy",
     "SearchSpaceLog",
     "Gate", "GateCheck", "Gauntlet",
     "fold_dispersion", "walk_forward_efficiency",

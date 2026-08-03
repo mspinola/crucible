@@ -109,7 +109,10 @@ class EdgeBaseline:
             raise ValueError(
                 f"baseline expectancy must be positive and finite, got {self.expectancy}. "
                 "Monitoring the decay of an edge that was never positive is meaningless; "
-                "the thing to run on a non-positive log is the gauntlet, not the monitor."
+                "the thing to run on a non-positive log is the gauntlet, not the monitor. "
+                "If this came from `deflated_expectancy`, the search's noise ceiling "
+                "exceeded the edge: the answer is not to monitor a smaller number, it is "
+                "that the book did not survive its own search."
             )
         if not math.isfinite(self.sigma) or self.sigma <= 0:
             raise ValueError(f"baseline sigma must be positive and finite, got {self.sigma}")
@@ -117,7 +120,7 @@ class EdgeBaseline:
             raise ValueError(f"baseline needs at least 2 trades, got {self.n_trades}")
 
     @classmethod
-    def from_log(cls, trades: TradeLog, *, deflated_expectancy: Optional[float] = None,
+    def from_log(cls, trades: TradeLog, *, deflated_expectancy: Optional[object] = None,
                  n_variants: Optional[int] = None,
                  trades_per_year: Optional[float] = None) -> "EdgeBaseline":
         """Measure a baseline from the log the edge was validated on. Call this ONCE, at
@@ -127,18 +130,30 @@ class EdgeBaseline:
         Supplying it sets `deflated=True`. Omitting it falls back to the log's sample
         mean, which is the number the parameters were optimized on and is therefore
         biased high; that is recorded as `deflated=False`, not silently accepted.
+
+        Accepts either a float or the `DeflatedExpectancy` that
+        `crucible.validation.deflated_expectancy` returns, read by attribute. Prefer
+        passing the object: it carries an `observed_expectancy` alongside the deflated
+        one, and handing over the wrong field of a result you already computed anchors
+        the monitor to the pre-correction number while reporting `deflated=True`, which
+        is worse than not deflating at all.
+
+        A correction that leaves nothing (`deflated_expectancy <= 0`) raises here, via
+        the same check that refuses a negative raw edge. That is not a monitor to build
+        with a smaller number; it is a book whose edge did not survive its own search,
+        and the honest response is to not deploy it.
         """
         r = trades.r
         if trades_per_year is None:
             trades_per_year = _trades_per_year(trades)
+        value = getattr(deflated_expectancy, "deflated_expectancy", deflated_expectancy)
         return cls(
-            expectancy=float(deflated_expectancy if deflated_expectancy is not None
-                             else r.mean()),
+            expectancy=float(value if value is not None else r.mean()),
             sigma=float(r.std(ddof=1)),
             n_trades=int(r.size),
             trades_per_year=trades_per_year,
             n_variants=n_variants,
-            deflated=deflated_expectancy is not None,
+            deflated=value is not None,
         )
 
 

@@ -225,6 +225,24 @@ class DeflatedSharpe:
         ])
 
 
+def _expected_max_sharpe(sd_trials: float, n_trials: int) -> float:
+    """The multiple-testing bar: expected MAXIMUM Sharpe of `n_trials` noise trials.
+
+    Bailey/López de Prado's two-point blend of the (1 - 1/N) and (1 - 1/(N e)) standard
+    normal quantiles, scaled by the dispersion of the trial Sharpes. The dispersion is
+    what makes this a property of *this* search rather than of N alone: a sweep over
+    near-identical variants has little spread to exploit and earns a small bar, while a
+    sweep whose configs scatter widely could have hit a high Sharpe by luck.
+
+    Shared by `deflated_sharpe` (which asks whether the winner CLEARS this bar) and
+    `deflated_expectancy` (which subtracts it).
+    """
+    return float(sd_trials * (
+        (1.0 - _EULER_GAMMA) * _NORM.inv_cdf(1.0 - 1.0 / n_trials)
+        + _EULER_GAMMA * _NORM.inv_cdf(1.0 - 1.0 / (n_trials * np.e))
+    ))
+
+
 def _psr(sr: float, sr_star: float, n: int, skew: float, kurt: float) -> float:
     """Probabilistic Sharpe Ratio: P(true SR > sr_star) given `n` observations and
     the return distribution's skew/kurtosis (Bailey & López de Prado 2012). The
@@ -285,13 +303,7 @@ def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns,
     skew = float((z ** 3).mean())
     kurt = float((z ** 4).mean())   # non-excess: 3.0 under normality
 
-    var_sr = float(np.var(sr_trials, ddof=1))
-    # Expected max of N standard-normal draws (Bailey/LdP): a two-point blend of the
-    # (1 - 1/N) and (1 - 1/(N e)) quantiles, scaled by the trial-Sharpe dispersion.
-    sr0 = np.sqrt(var_sr) * (
-        (1.0 - _EULER_GAMMA) * _NORM.inv_cdf(1.0 - 1.0 / N)
-        + _EULER_GAMMA * _NORM.inv_cdf(1.0 - 1.0 / (N * np.e))
-    )
+    sr0 = _expected_max_sharpe(float(np.std(sr_trials, ddof=1)), N)
     dsr = _psr(sr_obs, float(sr0), n, skew, kurt)
 
     return DeflatedSharpe(
@@ -302,4 +314,162 @@ def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns,
         n_obs=n,
         skew=skew,
         kurtosis=kurt,
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  Deflated expectancy
+# --------------------------------------------------------------------------- #
+
+@dataclass
+class DeflatedExpectancy:
+    """A per-trade edge with the search's expected luck subtracted, in R.
+
+    The companion to `DeflatedSharpe`, and deliberately a different KIND of answer.
+    `deflated_sharpe` returns a probability ("does this clear the bar?"), which is the
+    right output for a gate. A monitor cannot anchor to a probability: it needs a
+    *number* to compare live trades against, and anchoring to the raw sample mean anchors
+    to the number the search optimized. That gap is what this closes.
+    """
+    observed_expectancy: float    # raw per-trade mean R, the number the search maximized
+    deflated_expectancy: float    # what survives the multiple-testing bar. May be <= 0.
+    haircut: float                # observed - deflated, in R
+    sigma: float                  # per-trade dispersion in R
+    sr0_threshold: float          # the bar, in per-trade Sharpe units
+    n_trials: int                 # honest N the correction was priced against
+    n_trades: int
+    n_scored: int                 # trial logs actually supplied
+
+    @property
+    def is_positive(self) -> bool:
+        """Whether any edge is left after the haircut. Named for exactly what it checks.
+
+        **This is not a significance test and must not be read as one.** Subtracting the
+        EXPECTED maximum removes the average selection bias, and the realized maximum
+        lands above its own mean about half the time, so a pure-noise winner clears zero
+        here roughly as often as not (measured: 56% / 47% / 44% for N = 5 / 20 / 100,
+        against `deflated_sharpe` correctly calling 0% of them significant. Reproducer:
+        `tests/test_deflated_expectancy.py::test_the_haircut_is_a_bias_correction_not_a_test`).
+
+        Ask `deflated_sharpe` whether the edge is real. Ask this how much of it to
+        believe once you already know that it is.
+        """
+        return self.deflated_expectancy > 0
+
+    @property
+    def retained(self) -> float:
+        """Fraction of the raw edge left after the haircut. Negative when it exceeded it."""
+        return (self.deflated_expectancy / self.observed_expectancy
+                if self.observed_expectancy != 0 else float("nan"))
+
+    def __str__(self) -> str:
+        return "\n".join([
+            "=" * 60,
+            " DEFLATED EXPECTANCY  (per trade, in R)",
+            "=" * 60,
+            f"trials searched      : {self.n_trials}     scored: {self.n_scored}",
+            f"trades / sigma       : {self.n_trades}  /  {self.sigma:.3f} R",
+            "-" * 60,
+            f"observed expectancy  : {self.observed_expectancy:+.4f} R  (optimized on)",
+            f"search haircut       : {-self.haircut:+.4f} R  "
+            f"(SR0 {self.sr0_threshold:+.3f} x sigma)",
+            f"deflated expectancy  : {self.deflated_expectancy:+.4f} R     "
+            f"[{'EDGE REMAINS' if self.is_positive else 'NOTHING LEFT'}]",
+            f"  retained           : {self.retained:5.1%} of the raw edge",
+            "-" * 60,
+            "  a bias correction, NOT a significance test:",
+            "  ask deflated_sharpe whether the edge is real.",
+            "=" * 60,
+        ])
+
+
+def deflated_expectancy(returns: Returns, trial_returns: Sequence[Returns], *,
+                        n_trials: Optional[object] = None) -> DeflatedExpectancy:
+    """Subtract what the search could have found by luck from a per-trade expectancy.
+
+    `returns` is the winning config's own per-TRADE R series; `trial_returns` is one
+    per-trade R series per config you SCORED, the winner included. Both are per-trade,
+    and that is load-bearing.
+
+    The bar is `deflated_sharpe`'s SR0: the expected maximum per-trade Sharpe of N noise
+    trials, scaled by the spread of the trial Sharpes. Converting it back to R and
+    subtracting gives the edge that survives::
+
+        deflated = mu - sigma * SR0
+
+    **This takes trial LOGS, not trial Sharpes, unlike `deflated_sharpe`.** The Sharpes
+    are computed here so their clock cannot be got wrong. A per-MONTH Sharpe and a
+    per-TRADE Sharpe are different numbers on different scales, and multiplying the wrong
+    one by a per-trade sigma yields a haircut in no units at all, silently. That is the
+    v0.4.0 units bug in a new costume, and the way to not have it is to not accept the
+    ambiguous input.
+
+    `n_trials` separates configs TRIED from configs SCORED exactly as in
+    `deflated_sharpe`: pass an int or a `SearchSpaceLog`, and the bar rises to match.
+    Omitting it prices the correction at the number of logs supplied, which is right only
+    when every variant produced a scoreable result.
+
+    **The result can be non-positive, and is returned rather than raised.** A haircut
+    exceeding the raw edge means the search did not beat its own noise ceiling. That is
+    a finding about the search, so the caller gets to see it; what refuses is
+    `EdgeBaseline`, which will not build a monitor around a non-positive edge.
+
+    **This is a bias correction, not a significance test.** It removes the selection bias
+    a search of this size is EXPECTED to produce, which leaves a positive number for a
+    pure-noise winner about half the time (see `DeflatedExpectancy.is_positive`). Run it
+    on a book you have already established is real, to decide what to anchor to. Run
+    `deflated_sharpe` to establish that in the first place. Using this as a screen would
+    pass roughly half of pure noise.
+
+    It errs toward over-correcting a genuine edge, because a winner chosen partly for
+    real signal carries less selection bias than the pure-luck maximum being subtracted.
+    For a monitor baseline that is the safer direction: too low a bar makes the monitor
+    slow to call decay, too high a bar makes it cry wolf, and a spurious alarm here
+    forces a re-optimization that taxes the honest N of the next verdict.
+    """
+    r = np.asarray(returns, dtype=float)
+    r = r[np.isfinite(r)]
+    n = len(r)
+    if n < 2:
+        raise ValueError(f"need >= 2 trades to measure an expectancy, got {n}")
+
+    sr_trials = []
+    for t in trial_returns:
+        a = np.asarray(t, dtype=float)
+        a = a[np.isfinite(a)]
+        if a.size < 2:
+            continue                       # too thin to score, same posture as a NaN Sharpe
+        sd_t = a.std(ddof=1)
+        sr_trials.append(float(a.mean() / sd_t) if sd_t > 0 else 0.0)
+    scored = len(sr_trials)
+    if scored < 2:
+        raise ValueError(
+            f"need >= 2 scoreable trial logs to estimate the search's variance, got {scored}. "
+            "With one trial there is no search to correct for, and the expected maximum "
+            "of a single draw is not defined by this approximation."
+        )
+
+    ledger_n = getattr(n_trials, "session_n_variants", None)
+    N = scored if n_trials is None else int(ledger_n if ledger_n is not None else n_trials)
+    if N < scored:
+        raise ValueError(
+            f"n_trials={N} is fewer than the {scored} trial logs supplied; a search "
+            "cannot have tried fewer configs than it scored")
+
+    sigma = float(r.std(ddof=1))
+    if sigma <= 0:
+        raise ValueError("winning log has zero dispersion; there is no Sharpe to deflate")
+
+    sr0 = _expected_max_sharpe(float(np.std(np.asarray(sr_trials), ddof=1)), N)
+    haircut = sigma * sr0
+    mu = float(r.mean())
+    return DeflatedExpectancy(
+        observed_expectancy=mu,
+        deflated_expectancy=mu - haircut,
+        haircut=float(haircut),
+        sigma=sigma,
+        sr0_threshold=float(sr0),
+        n_trials=N,
+        n_trades=n,
+        n_scored=scored,
     )
