@@ -6,6 +6,26 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`EdgeBaseline.from_log(..., rate_window_years=)`**, measuring the baseline firing rate
+  over the last N years of the validated log rather than its whole span, and recording the
+  window on `EdgeBaseline.rate_window_years` so a verdict can say which claim it is making.
+
+  The default is unchanged (whole span), so nothing moves silently. But the whole span is
+  the wrong anchor for any book whose firing rate has trended, and the failure is quiet:
+  the full-span mean sits below what the book currently does, so the opportunity-set
+  channel compares live behaviour against a rate the book left behind years ago and reads
+  healthy while the rate falls.
+
+  Measured on a real 40-year trend book: **23.4/yr over the full span against 33.9/yr over
+  its last 7 years**. Anchored to the full span, a collapse to 30% below current behaviour
+  still scored 1.02 and could never trip the 0.6 line. The channel covering the one failure
+  the other two cannot see was structurally desensitised, not merely uncalibrated.
+
+  It is a windowed measurement taken ONCE, at promotion, not a rolling one. `edge_monitor`
+  still has no parameter from which a baseline or its rate could be rebuilt, which
+  `test_the_window_never_re_measures_after_promotion` pins.
+
 ## [0.6.0] - 2026-08-02
 
 The release that makes the monitor's baseline defensible and its calibration mean
