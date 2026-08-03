@@ -8,5 +8,5 @@ from crucible import breadth, edge, ml, strategies, validation
 
 # Kept in step with pyproject's `version` by a packaging-twin test in
 # tests/test_boundaries.py — bump both together when cutting a release.
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 __all__ = ["breadth", "edge", "ml", "strategies", "validation", "__version__"]

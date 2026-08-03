@@ -6,6 +6,28 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-02
+
+The release that makes the monitor's baseline defensible and its calibration mean
+something. 0.5.0 shipped the edge monitor the same day; running it against a real
+47-market book rather than the synthetic fixtures it was built on immediately exposed
+three calibration problems and confirmed the one gap already known, so this follows
+closely and deliberately.
+
+What changed, in order of how much it matters if you are already using 0.5.0:
+
+1. **`deflated_expectancy` exists.** 0.5.0's `EdgeBaseline` accepted a deflated number and
+   nothing in the package produced one, so every real baseline was the raw in-sample mean.
+   The monitor's central argument, that decay should be measured from a search-corrected
+   reference, was a docstring. It is now a function.
+2. **The false-alarm budget is denominated in years, not trades.** If you built a design
+   under 0.5.0 against a baseline that knows its firing rate, its calibration changes here,
+   and for a slow book it changes a lot: the old default gave a 23-trades/yr book a nominal
+   detection latency of 24 years.
+3. **The opportunity-set channel works for logs without `entry_date`.** Under 0.5.0 it
+   silently switched itself off for a whole ordinary class of books.
+
+
 ### Added
 - **`validation.deflated_expectancy`**, closing the gap that stood at the top of
   `docs/edge_monitor.md`'s open list since the monitor shipped. `EdgeBaseline` took a
