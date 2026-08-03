@@ -6,6 +6,30 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **`docs/edge_monitor.md` records why the firing-rate channel stays uncalibrated**, and
+  drops the claim that it could be. That item sat at the top of the page's open list from
+  the day the monitor shipped, on the reasoning that trade arrivals are approximately
+  Poisson and an arrival-process test would therefore give the channel a stated
+  false-alarm rate. The reasoning was wrong and the claim is removed rather than softened.
+
+  Three detectors were built and measured against a real book's arrivals, each designed
+  for a 10-year false-alarm budget: an exponential CUSUM on inter-arrival gaps at three
+  window lengths (0.36x / 0.35x / **0.18x** of the stated budget) and a Poisson CUSUM on
+  monthly counts (0.32x). All fire 3x to 5x more often than advertised, and unlike the
+  expectancy CUSUM's 1.39x skew inflation the error spends margin rather than buying it.
+
+  Calibrating the boundary empirically removes the bias but not the problem. Solved
+  against the real counts it leaves the delivered budget spanning **5.3 to 77.9 years**
+  for a stated 10. The limit is the data, not the model: a book firing 34 trades/yr gives
+  82 monthly periods in a 7-year window, and CUSUM run length depends on a tail that 82
+  samples cannot pin down.
+
+  `tests/test_frequency_calibration.py` pins the two general claims synthetically (80
+  periods leave an 8.6x spread in the delivered budget where 2,000 leave 1.3x), so the
+  limit is re-derivable without the book, and asserts that only the calibrated CUSUM can
+  still reach `DEGRADED`.
+
 ### Added
 - **`EdgeBaseline.from_log(..., rate_window_years=)`**, measuring the baseline firing rate
   over the last N years of the validated log rather than its whole span, and recording the
