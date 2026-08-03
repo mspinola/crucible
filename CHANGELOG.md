@@ -6,6 +6,19 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **The README covers `validation.monitor`.** It enumerated every other subpackage's API
+  with a worked block and had zero mentions of `edge_monitor`, `EdgeBaseline` or the
+  monitor at all, despite that module being the headline of two releases. It now gets a
+  section beside the others: the freeze-at-promotion snippet, the three channels, and the
+  three properties that are the point (only the calibrated channel escalates, the baseline
+  cannot be rebuilt, it anchors to a search-corrected number), plus the standing caveat
+  that it has never met real decay. `deflated_expectancy` is named in the validation
+  section, which also predated it.
+
+  `docs/edge_monitor.md` is down to one open item as a result, and says so rather than
+  leaving the section looking longer than it is.
+
 ## [0.7.0] - 2026-08-03
 
 A monitoring-accuracy release. Both entries concern the firing-rate channel, and

@@ -38,6 +38,7 @@ each harder than the last, each answered out loud by a named function:
 - ✅ **Price the search itself**: how much did *selecting* the best config overfit? Probability of Backtest Overfitting (CSCV) + deflated Sharpe → `validation.pbo`
 - ✅ **Account for correlation**: the effective number of *independent* bets across a correlated book → `breadth.effective_n`
 - ✅ **…then all of it, as one gate**: run every check above as an ordered, audited gauntlet (REAL → STRONG → DURABLE → GENERAL) that passes only if every gate does → `validation.run_gauntlet`
+- ✅ **…and after it goes live, is it *still* real?**: watch a promoted edge decay against the baseline frozen when it passed, with a stated false-alarm rate → `validation.monitor`
 
 ## 30-second example
 
@@ -148,7 +149,9 @@ it drops clearly-inferior variants so junk can't weaken the test. `SPA p ≤ WRC
 One step further, `pbo_cscv` + `deflated_sharpe` (`crucible.validation.pbo`), which ask
 how much the *act of selecting* the best config overfit: the Probability of Backtest
 Overfitting (Bailey/López de Prado CSCV) over a trial matrix, and the Sharpe deflated
-for the number of trials and its own skew/kurtosis.
+for the number of trials and its own skew/kurtosis. `deflated_expectancy` answers the
+same question as a **number in R** rather than a probability, `mu − sigma × SR0`, for
+when you need something to anchor to rather than a significance verdict.
 See [`examples/validation.py`](examples/validation.py).
 
 ## One verdict for the whole edge: `crucible.validation.run_gauntlet`
@@ -185,6 +188,57 @@ CI lower bound) → **DURABLE** (holds out-of-sample) → **GENERAL** (travels a
 markets), with two bring-your-own preambles (**DECLARE**, **CLEAN**) and a deliberate
 handoff (**SURVIVE**: capital survivability is out of scope). Thresholds live in one
 overridable `Thresholds`. Full write-up in [`docs/edge_gate.md`](docs/edge_gate.md).
+
+## Has a promoted edge decayed? `crucible.validation.monitor`
+
+The gauntlet judges a book **once**, over a fixed log. This is the question that arrives
+afterwards: *is it still real?* It is a **peer** of the gauntlet rather than a fifth
+gate, because it runs continuously instead of governing one decision, and nothing wires
+it into `run_gauntlet`.
+
+```python
+from crucible.validation import (
+    EdgeBaseline, cusum_design, deflated_expectancy, edge_monitor,
+)
+
+# ONCE, at promotion. Freeze the result and never rebuild it.
+corrected = deflated_expectancy(winner.r, [t.r for t in every_variant_tried], n_trials=log)
+base = EdgeBaseline.from_log(winner, deflated_expectancy=corrected,
+                             n_variants=log.n_variants, rate_window_years=7)
+
+print(cusum_design(base))            # k and h derived from a stated shift + budget
+print(edge_monitor(live_log, base))  # HOLDING | SLIPPING | DEGRADED
+```
+
+Three channels watch different failures. A **CUSUM** on per-trade R, calibrated to a
+false-alarm budget you state in *calendar years* and converted using the book's own
+firing rate. A **trailing-window** expectancy ratio. And a **firing-rate** ratio, which
+catches the failure the other two cannot see: a signal that quietly stops firing while
+the trades it still takes keep their per-trade edge, so annual R falls with expectancy
+reading full size.
+
+Three properties are the whole point, and each exists because the obvious alternative
+fails quietly:
+
+- **Only the calibrated channel may escalate.** The CUSUM alone can return `DEGRADED`;
+  the two ratio rules cap at `SLIPPING`. On a book whose edge never decayed, the trailing
+  read still ranged −25% to 197% of baseline on noise alone, so a "cut at 50% of baseline"
+  rule would have cut a healthy book on whichever window you happened to read.
+- **The baseline is frozen, and `edge_monitor` has no parameter that could rebuild one.**
+  A reference recomputed from current data re-fits onto the drifted reality and can never
+  fire. It looks correct in review and passes any test that does not span a real decay.
+- **It anchors to a search-corrected number.** Anchoring to the in-sample mean anchors to
+  the figure the parameters were optimized on: run one untouched, fully healthy book
+  against both and the naive baseline returns `DEGRADED` where the deflated one returns
+  `HOLDING`.
+
+Capital-free like the rest: it returns a verdict and refuses to convert that into a
+sizing action. `report.monitor_panel` draws the trailing series and the CUSUM path.
+Worked example in [`examples/edge_monitor.py`](examples/edge_monitor.py), the design and
+its open questions in [`docs/edge_monitor.md`](docs/edge_monitor.md).
+
+> **It has never met real decay.** Every latency figure it reports is a design target
+> measured against synthetic decay, not a field result. Read them as such.
 
 ## A shareable tearsheet: `crucible.report`
 
