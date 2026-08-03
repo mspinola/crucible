@@ -1262,36 +1262,49 @@ You state the shift worth catching and the false-alarm budget; `k` and `h` follo
 
 ```
 detects a shift to 50% of baseline
-k = +0.1253R   h = 46.98 sigma
-nominal ARL0 = 7,500 trades (mean, between false alarms)
-nominal ARL1 = 1,099 trades (mean, to detect the design shift)
+k = +0.1253R   h = 37.71 sigma
+nominal ARL0 = 3,752 trades = 25.0 years (mean, between false alarms) at 150 trades/yr
+nominal ARL1 =   806 trades =  5.4 years (mean, to detect the design shift)
 ```
 
-`k` is the textbook midpoint `(mu_0 + mu_1)/2`. **ARL1 is the cost, stated up front:** on a book
-firing 150 trades a year, 1,099 trades is about seven years of running at a halved edge before
-the calibrated alarm is expected to fire. That is the price of a 7,500-trade false-alarm budget,
-and it is a number to argue with *before* deployment, not to discover afterwards.
+`k` is the textbook midpoint `(mu_0 + mu_1)/2`. **The budget is stated in calendar time, and
+the cost comes back in the same unit:** you are buying one false alarm per 25 years and paying
+about 5.4 years to notice a halved edge. Both are numbers to argue with *before* deployment.
+
+That the budget is in years rather than trades matters more than it looks. `monitor_arl0_years`
+is converted using the baseline's own firing rate, so one default means the same thing to every
+book. A budget in trades does not: 7,500 trades is roughly 50 years at 150 trades/yr and roughly
+320 at 23, and the slower book silently gets a detector that cannot fire inside a career.
+(`monitor_arl0_trades` remains the fallback for a baseline with no known rate.)
 
 Those ARLs come from a Gaussian approximation, and trade R is emphatically not Gaussian. So
 check rather than assume, by resampling the book's own returns:
 
 ```
-in control    mean 7,188 / median 5,587 trades   vs nominal mean 7,500 (0.96x)
-edge halved   mean 1,118 /   median 916 trades   vs nominal mean 1,099 (1.02x)
+in control    mean 3,973 / median 2,951 trades   vs nominal mean 3,752 (1.06x)
+edge halved   mean   811 / median   686 trades   vs nominal mean   806 (1.01x)
 ```
 
-Close, and for a structural reason: the boundary sits 47 sigma out, so the CUSUM aggregates
-hundreds of increments before it can alarm and the CLT carries the skew. Note the **mean against
-the median**: they differ by roughly a quarter, because run lengths are strongly right-skewed.
-Quoting one against someone else's other misstates detection latency badly.
+Close here, because this synthetic book is only mildly skewed. **Do not read that as general.**
+On a real pooled trend book (skew about +5, single trades near +39R) the in-control figure runs
+about **2.0x** nominal, and the error grows with skew and with the size of the budget.
+
+Note which line stays accurate: the **shifted** one, at 1.01x. Skew inflates the in-control run
+length, because in control the statistic hovers near zero and only alarms via rare large
+excursions, which is exactly where a fat tail bites. Under a real shift it reaches the boundary
+by drift, where tail shape barely matters. So a skewed book gets *fewer* false alarms than
+advertised at no cost in detection speed, which is the pleasant direction to be wrong in.
+
+Note also the **mean against the median**: they differ by roughly a quarter, because run lengths
+are strongly right-skewed. Quoting one against someone else's other misstates latency badly.
 
 ### Step 3: three live books, one frozen baseline
 
 | Live book | Verdict | Trailing 200-trade read | Firing rate | CUSUM |
 |---|---|---|---|---|
-| edge intact | **HOLDING** | 110% of baseline | 100% | peak 53% of threshold |
-| edge halved | **DEGRADED** | -16% | 100% | alarm at live trade 1,219 |
-| signal drying up | **SLIPPING** | 88% (intact) | **33%** | peak 43%, silent |
+| edge intact | **HOLDING** | 110% of baseline | 100% | peak 67% of threshold |
+| edge halved | **DEGRADED** | -16% | 100% | alarm at live trade 1,138 |
+| signal drying up | **SLIPPING** | 88% (intact) | **33%** | peak 53%, silent |
 
 The third row is the failure mode an expectancy-only monitor cannot see. That book's per-trade
 edge is **fine** (88% of baseline, well inside noise); the signal simply stopped firing, 50

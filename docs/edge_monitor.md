@@ -205,11 +205,17 @@ The error is a function of skew, and grows with the boundary:
 The higher figure in each range is the larger `monitor_arl0_trades`, so a stricter
 false-alarm budget is also where the stated number is least trustworthy.
 
-The drift is conservative (fewer false alarms than advertised), but the cost lands on the
-other side: the same inflation applies to `arl1`, so a skewed book is slower to notice
-real decay than its stated latency. On an infrequently-traded book that difference is
-years. This is the strongest argument for `empirical_arl` existing at all, and the reason
-`arl1` should be measured rather than read off the design for any skewed book.
+The drift is conservative and, measured, free. Empirical ARL0 above nominal means fewer
+false alarms than advertised, and the inflation does **not** carry over to `arl1`:
+measured detection latency tracked nominal within a few percent at every budget tested on
+the real book. The asymmetry is structural. In control the statistic hovers near zero and
+alarms only via a rare large excursion, exactly where a fat right tail bites; under a real
+shift it reaches the boundary by drift, where tail shape barely matters.
+
+A draft of this section claimed the opposite, that `arl1` inflates too. That was reasoning
+by analogy from the ARL0 result rather than measuring, and measuring contradicted it. It
+is the third correction this page has recorded on the same paragraph, which is a fair
+indication of how poorly this particular thing yields to intuition.
 
 **ARLs are means, and the reference implementation quotes a median.** Its "median 474
 trades = 37 months" cannot be reconciled with its stated `h = 29.7` under any single

@@ -48,12 +48,17 @@ trend-following runs about +5, with single trades near +39R against losses cappe
 -1R. The claim was true of the case measured and wrong about the population it was
 generalizing to.
 
-The drift is CONSERVATIVE: empirical ARL0 above nominal means fewer false alarms than
-advertised. The cost lands on the other side, because the same inflation applies to
-`arl1`: a detector on a skewed book is slower to notice real decay than its stated
-latency, and on an infrequently-traded book that difference can be years. Do not read
-`arl1` off the design for a skewed book; measure it with
-`empirical_arl(..., shift=design.detect_shift)`.
+The drift is CONSERVATIVE and, measured, it costs nothing. Empirical ARL0 above nominal
+means fewer false alarms than advertised, and the inflation does NOT carry over to
+`arl1`: on the same real book, measured detection latency tracked nominal to within a few
+percent at every budget tested. The asymmetry is structural. In control the statistic
+hovers near zero and can only alarm via a rare large excursion, which is exactly where a
+fat right tail bites; under a real shift it reaches the boundary by drift, where tail
+shape barely matters. So a skewed book buys extra false-alarm margin for free.
+
+(An earlier draft of this paragraph asserted the opposite, that `arl1` inflates too and a
+skewed book is slower to notice decay. That was reasoning by analogy rather than
+measurement, and measurement contradicted it.)
 
 **ARLs here are MEANS.** The run-length distribution is strongly right-skewed, so the
 median is materially lower than the mean (often by a third). A published "median 474
@@ -181,15 +186,28 @@ class CusumDesign:
     detect_shift: float         # 0.5 = designed to detect a halving
     arl0: float                 # NOMINAL MEAN in-control run length, in trades
     arl1: float                 # NOMINAL MEAN trades to detect the design shift
+    arl0_basis: str = "trades"  # "years" when the budget came from the book's firing rate
+    trades_per_year: Optional[float] = None   # carried so the ARLs can be read in years
     method: str = "siegmund-gaussian"
 
+    def _yrs(self, trades: float) -> Optional[float]:
+        return trades / self.trades_per_year if self.trades_per_year else None
+
     def __str__(self) -> str:
+        def _in_years(trades: float) -> str:
+            y = self._yrs(trades)
+            return "" if y is None else f" = {y:,.1f} years"
+
+        rate = ("" if not self.trades_per_year
+                else f" at {self.trades_per_year:,.0f} trades/yr")
         return (
-            f"CUSUM design ({self.method})\n"
+            f"CUSUM design ({self.method}, budget set in {self.arl0_basis})\n"
             f"  detects a shift to {self.detect_shift:.0%} of baseline\n"
             f"  k = {self.k_r:+.4f}R   h = {self.h_std:.2f} sigma ({self.h_r:.3f}R)\n"
-            f"  nominal ARL0 = {self.arl0:,.0f} trades (mean, between false alarms)\n"
-            f"  nominal ARL1 = {self.arl1:,.0f} trades (mean, to detect the design shift)\n"
+            f"  nominal ARL0 = {self.arl0:,.0f} trades{_in_years(self.arl0)}"
+            f" (mean, between false alarms){rate}\n"
+            f"  nominal ARL1 = {self.arl1:,.0f} trades{_in_years(self.arl1)}"
+            f" (mean, to detect the design shift)\n"
             f"  Both are MEANS of a right-skewed distribution; the medians run well below.\n"
             f"  Gaussian approximation; check it with empirical_arl() on your own returns."
         )
@@ -234,9 +252,15 @@ def cusum_design(baseline: EdgeBaseline, *,
     """Derive the CUSUM from what you want it to do, not from a typed-in threshold.
 
     You state the shift worth detecting (`monitor_detect_shift`, default a halving) and
-    the false-alarm budget (`monitor_arl0_trades`); k and h follow, and the achieved
-    detection latency comes back as `arl1` so it is a stated cost rather than something
-    discovered three years into a live book.
+    the false-alarm budget; k and h follow, and the achieved detection latency comes back
+    as `arl1` so it is a stated cost rather than something discovered years into a live
+    book.
+
+    The budget is `monitor_arl0_years` whenever the baseline knows its firing rate, and
+    `monitor_arl0_trades` otherwise. Calendar time is the unit the decision is actually
+    made in, and a budget in trades silently means different things to different books:
+    7,500 trades is about 50 years at 150 trades/yr and about 320 years at 23, and the
+    slower book ends up with a detector that cannot fire inside a career.
     """
     shift = float(thresholds.monitor_detect_shift)
     if not 0.0 <= shift < 1.0:
@@ -249,7 +273,16 @@ def cusum_design(baseline: EdgeBaseline, *,
     if k_std <= 0:
         raise ValueError("degenerate design: the target shift is zero in sigma units")
 
-    h_std = _solve_h(k_std, float(thresholds.monitor_arl0_trades))
+    # The budget is a calendar-time statement wherever the book's firing rate is known,
+    # because "one false alarm per N years" means the same thing to every book and
+    # "per N trades" does not. Falls back to the trade count when the rate is unknown.
+    if baseline.trades_per_year and thresholds.monitor_arl0_years:
+        target, basis = (float(baseline.trades_per_year)
+                         * float(thresholds.monitor_arl0_years)), "years"
+    else:
+        target, basis = float(thresholds.monitor_arl0_trades), "trades"
+
+    h_std = _solve_h(k_std, target)
     b = h_std + _SIEGMUND_SHIFT
     return CusumDesign(
         k_r=0.5 * (mu0 + mu1),
@@ -260,6 +293,8 @@ def cusum_design(baseline: EdgeBaseline, *,
         detect_shift=shift,
         arl0=_siegmund_arl(-k_std, b),
         arl1=_siegmund_arl(+k_std, b),
+        arl0_basis=basis,
+        trades_per_year=baseline.trades_per_year,
     )
 
 

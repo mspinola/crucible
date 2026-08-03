@@ -41,7 +41,13 @@ class Thresholds:
 
     # ── MONITOR: has a PROMOTED edge decayed? (post-gauntlet, not a gate) ───
     monitor_detect_shift: float = 0.5       # design point: detect a fall to half baseline
-    monitor_arl0_trades: int = 7_500        # false-alarm budget, in trades, for the CUSUM
+    # The false-alarm budget is stated in CALENDAR TIME, because that is the unit the
+    # decision is made in: "how often am I willing to be sent back to the optimizer for
+    # nothing". A budget in trades means different things to different books. 7,500 trades
+    # is ~50 years at 150 trades/yr and ~320 years at 23, and the second book gets a
+    # detector that cannot fire inside a career.
+    monitor_arl0_years: float = 25.0        # false-alarm budget, in years
+    monitor_arl0_trades: int = 7_500        # fallback when the firing rate is unknown
     monitor_window: int = 200               # rolling window for the SOFT channel
     monitor_slip_ratio: float = 0.5         # soft: recent/baseline below this = SLIPPING
     monitor_min_frequency_ratio: float = 0.6  # soft: firing-rate collapse = SLIPPING
