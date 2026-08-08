@@ -7,6 +7,29 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **The docs site covers `validation.monitor` where a reader would look for it.** #121
+  fixed the README; the site had the same hole in three more places. The homepage's "What
+  crucible answers" grid enumerated eight capabilities and stopped at the gauntlet, the
+  run-modes page listed five modes and stopped there too, and the visualization catalog
+  documented every public `report` panel except `monitor_panel`, which was the only one
+  missing.
+
+  On the run-modes page the monitor is deliberately **not** a sixth row of the ladder.
+  That page's frame is escalating strictness over one fixed log, and the monitor is a peer
+  of the gauntlet running afterwards against a different log, so it sits below a break
+  with a line saying why. Listing it as the strictest rung would teach exactly the
+  misreading `docs/edge_monitor.md` settles in the negative, and the operational cost of
+  that misreading is real: running the monitor before a promotion has frozen a baseline is
+  what makes a decay trigger fire every cycle and inflate the multiple-testing denominator
+  of the next verdict.
+
+  `docs/gen_figures.py` grows a `panel_monitor_panel` figure. It is the one panel no
+  single log can feed, needing a frozen baseline plus a separate live log, so it is drawn
+  from the §14 example rather than the Donchian run. It deliberately shows the **healthy**
+  live book, where the trailing read crosses the soft SLIPPING line on a book whose edge
+  never decayed while the CUSUM below peaks near 29σ against a 35.1σ boundary and stays
+  silent. That is the panel's argument; a picture of the halved book would show a bigger
+  alarm and teach less.
 - **The README covers `validation.monitor`.** It enumerated every other subpackage's API
   with a worked block and had zero mentions of `edge_monitor`, `EdgeBaseline` or the
   monitor at all, despite that module being the headline of two releases. It now gets a

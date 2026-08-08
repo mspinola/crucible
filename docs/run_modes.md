@@ -17,6 +17,14 @@ whole-history `fullrange` vs an early/late `holdout`.)
 | **By segment** | *Which* slices hold — and *when* — not just the pool? | [`segmented_holdout`](#by-segment) · [`windowed_segments`](#by-segment) | [`segment_forest`](visualizations.md#segment_forest) |
 | **Walk-forward** | Does it survive being re-fit over rolling windows? | [`walk_forward`](#walk-forward) | feeds the gauntlet's DURABLE gate |
 | **Gauntlet** | Real, strong, durable, general — the deployable verdict? | [`run_gauntlet`](#gauntlet) | [`gauntlet_report`](visualizations.md) |
+| | *the ladder ends here; the row below is not a rung* | | |
+| **Edge monitor** | Has an edge that **already passed** decayed since? | [`edge_monitor`](#after-promotion) | [`monitor_panel`](visualizations.md#monitor_panel) |
+
+The last row is deliberately out of order. Every mode above it is a higher bar on the
+**same** log, so a book drops out at the rung matching its flaw. The monitor is not a
+higher bar and not a fifth gate: it runs *after* promotion, against a **different** log
+(the live one), and nothing wires it into `run_gauntlet`. It is a peer of the gauntlet
+rather than a member. See [After promotion](#after-promotion).
 
 All of them read a [`TradeLog`](architecture.md) in **R** — capital-free. The examples
 below run one book through the ladder: a **Donchian channel breakout** (long when price
@@ -164,3 +172,53 @@ gauntlet catches it. See [The gauntlet](edge_gate.md) for the full design.
     Where a book drops out tells you *why*: fails **Full sample** → no edge even in
     sample; passes that but fails **Holdout** → it was a one-era fluke; passes both but
     fails **DURABLE** → it only worked with hindsight. A genuine edge clears every rung.
+
+---
+
+## After promotion
+
+Everything above judges a **fixed** log, once, before capital. `edge_monitor` answers
+the question that only exists afterwards: the book passed, you funded it, **is the edge
+still delivering?** It is not a sixth rung. It reads the live log against a baseline
+frozen the day the gauntlet passed, and `run_gauntlet` neither calls it nor knows it
+exists.
+
+Two steps, and the split between them is the whole design:
+
+```python
+from crucible.validation import EdgeBaseline, deflated_expectancy, edge_monitor
+
+# ONCE, at promotion. Freeze this and persist it beside the book.
+# search_log is your SearchSpaceLog — the honest N, not a typed-in int.
+d = deflated_expectancy(winner.r, [t.r for t in every_variant_scored], n_trials=search_log)
+base = EdgeBaseline.from_log(winner, deflated_expectancy=d,
+                             n_variants=search_log.n_variants)
+
+# Every cycle thereafter: the whole live log since promotion, not a trailing slice.
+print(edge_monitor(live_log, base))
+```
+
+```
+EDGE MONITOR: SLIPPING   (n_live=434)
+  CUSUM      now 18.28 (52%) peak 21.52 (61%) of h=35.09
+  expectancy baseline +0.2027R  recent +0.1466R  ratio 72%
+  firing rate  ratio 33%
+```
+
+Three properties are worth knowing before you wire it up:
+
+- **The baseline is anchored to a search-corrected number.** `deflated_expectancy`
+  subtracts what a search that wide could have found by luck. Anchoring to the raw
+  in-sample mean instead is allowed, but then `deflated=False` rides in every verdict,
+  because "half of baseline" would mean half of a number that was biased high.
+- **It cannot re-baseline.** `edge_monitor` has no parameter from which a baseline could
+  be rebuilt. A baseline recomputed from current data re-fits onto the drifted reality
+  and can never fire, while looking entirely correct in review.
+- **Only the calibrated channel escalates.** The CUSUM carries a stated false-alarm rate
+  and is the only one that may say `DEGRADED`; the trailing-expectancy and firing-rate
+  ratios cap at `SLIPPING`. [`monitor_panel`](visualizations.md#monitor_panel) draws both
+  and shows why.
+
+Full design, including the one thing it has never been tested against, in
+[The edge monitor](edge_monitor.md); a worked run in
+[§14 of the tutorial](tutorial.md#14-worked-example-monitoring-a-promoted-edge-for-decay).

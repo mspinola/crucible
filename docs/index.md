@@ -81,7 +81,8 @@ size, **indistinguishable from noise**. crucible says so out loud.
 ## What crucible answers
 
 From a single trade log up to the whole correlated book, one question at a
-time, each harder than the last, each answered out loud by a named function:
+time, each harder than the last, and one that comes only after the rest are
+done. Each is answered out loud by a named function:
 
 <div class="grid cards" markdown>
 
@@ -156,6 +157,15 @@ time, each harder than the last, each answered out loud by a named function:
     every gate does.
 
     `validation.run_gauntlet`
+
+-   :material-radar:{ .lg .middle } **…and after it goes live, is it *still* real?**
+
+    ---
+
+    Watch a promoted edge decay against the baseline frozen when it passed,
+    with a stated false-alarm rate. Not a gate; it runs afterwards.
+
+    `validation.monitor`
 
 </div>
 

@@ -338,18 +338,25 @@ def panel_sheets() -> dict[str, str]:
     log doesn't provide — a cost series (gross_net_equity), the exit-independent
     edge-ratio curve, labelled segments (segment_forest), and an overlapping book
     (concurrency_timeline — the Donchian run is near-serial, so it draws nothing) —
-    synthesized here purely to show the shape."""
+    synthesized here purely to show the shape.
+
+    monitor_panel is the one panel no single log can feed at all: it needs a baseline
+    FROZEN at promotion plus a *separate* live log, which is the whole point of the
+    module. It is drawn from examples/edge_monitor.py (the §14 book) instead."""
     import numpy as np
     import pandas as pd
     spec = importlib.util.spec_from_file_location("dg", REPO / "examples" / "donchian_gauntlet.py")
     dg = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dg)
+    spec_em = importlib.util.spec_from_file_location("em", REPO / "examples" / "edge_monitor.py")
+    em = importlib.util.module_from_spec(spec_em)
+    spec_em.loader.exec_module(em)
     from crucible.edge import TradeLog
     from crucible.validation import walk_forward
     from crucible.report import (
         metrics_table, equity_drawdown, exit_reason_breakdown, holding_vs_r,
         exit_efficiency_dist, edge_ratio_curve, gross_net_equity,
-        concurrency_timeline, segment_forest, report_css)
+        concurrency_timeline, segment_forest, monitor_panel, report_css)
 
     px = dg.synthetic_prices()
     wf = walk_forward(px, dg.donchian, param_grid={"lookback": [20, 40]},
@@ -378,6 +385,15 @@ def panel_sheets() -> dict[str, str]:
     c_book = TradeLog(pd.DataFrame({"r": rng.normal(0.1, 1, cn), "entry_date": c_entry,
                                     "exit_date": c_entry + pd.to_timedelta(rng.integers(15, 80, cn), unit="D")}))
 
+    # monitor_panel: the §14 promoted book's frozen baseline against its HEALTHY live
+    # book, the one generated with edge=1.0, whose true edge never fell. That pairing
+    # is deliberate. It draws the panel's actual argument rather than a decay: the
+    # trailing read wandering across the soft SLIPPING line on a book with nothing
+    # wrong with it, while the calibrated detector below stays well short of its
+    # boundary. A figure of the halved book would show a bigger alarm and teach less.
+    _, _, frozen = em.promoted_book()
+    live = em.synthetic_book(1300, edge=1.0, seed=2, start="2022-01-01")
+
     panels = {
         "panel_metrics_table": metrics_table(tl),
         "panel_equity_drawdown": equity_drawdown(tl, test_start=test_start, **P),
@@ -388,6 +404,7 @@ def panel_sheets() -> dict[str, str]:
         "panel_edge_ratio_curve": edge_ratio_curve(horizons, eratio, **P),
         "panel_gross_net_equity": gross_net_equity(tl, cost=cost, **P),
         "panel_concurrency_timeline": concurrency_timeline(c_book, cap=4, **P),
+        "panel_monitor_panel": monitor_panel(live, frozen, **P),
     }
     missing = [n for n, h in panels.items() if not h]
     if missing:
