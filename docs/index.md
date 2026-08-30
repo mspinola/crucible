@@ -218,16 +218,25 @@ barrier simulator, export it from your backtester, or map any frame onto
 `TradeLog` — crucible hands back the verdict either way, whatever your data
 source.
 
-If you also need futures / COT data to build a signal from, there's an
-optional companion:
+If you also need futures / COT data to build a signal from, there are two
+optional companions:
 
-- **[cotdata](https://github.com/mspinola/cotdata)** — an *optional* data
-  layer: a local, file-based store that wraps Norgate, Databento, or yfinance
-  behind one read API, extensible to other data providers.
+- **[cotdata](https://github.com/mspinola/cotdata)**: CFTC positioning (all
+  four Commitments of Traders reports) in a local, file-based store. Free
+  public data, no account, any OS.
+- **[marketdata](https://github.com/mspinola/marketdata)** (installs as
+  `crucible-marketdata`): daily bars for futures and equities from Norgate,
+  Databento, or yfinance behind one read API, with adjustment tiers derived
+  on read.
 
-The flow runs one direction: **`cotdata` (data) → your signal → `crucible`
-(edge)**. Neither imports the other — crucible works alone with any source of
-trades.
+The flow runs one direction: **data → your signal → `crucible` (edge)**. The
+data layers import nothing from crucible, and crucible imports nothing from
+them; it works alone with any source of trades.
+
+Want the whole pipeline stood up end to end (the two stores, positioning
+metrics, the dashboard, and a validated study)? Follow the
+**[COT Toolset Field Guide](cot-toolset-field-guide.html)**, a single-page
+walkthrough from a fresh clone to a gauntlet verdict.
 
 ---
 
