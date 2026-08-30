@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COT Toolset Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F6F7F5;
+    --surface: #FFFFFF;
+    --ink: #1B2426;
+    --muted: #57696A;
+    --accent: #0E6E63;
+    --accent-ink: #0A5249;
+    --accent-soft: #E2EEEA;
+    --hazard: #A85B1E;
+    --hazard-soft: #F6ECE1;
+    --line: #D9DFDC;
+    --code-bg: #20282B;
+    --code-ink: #D9E2DE;
+    --code-accent: #7FD0C2;
+    --code-comment: #8AA09B;
+    --chip-bg: #EDF1EF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131719;
+      --surface: #1B2124;
+      --ink: #DFE6E3;
+      --muted: #93A4A0;
+      --accent: #56BFAF;
+      --accent-ink: #7ACFC1;
+      --accent-soft: #16302C;
+      --hazard: #D98B4A;
+      --hazard-soft: #2E241A;
+      --line: #2A3336;
+      --code-bg: #10171A;
+      --code-ink: #CFDAD6;
+      --code-accent: #7FD0C2;
+      --code-comment: #7C918C;
+      --chip-bg: #232B2E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131719;
+    --surface: #1B2124;
+    --ink: #DFE6E3;
+    --muted: #93A4A0;
+    --accent: #56BFAF;
+    --accent-ink: #7ACFC1;
+    --accent-soft: #16302C;
+    --hazard: #D98B4A;
+    --hazard-soft: #2E241A;
+    --line: #2A3336;
+    --code-bg: #10171A;
+    --code-ink: #CFDAD6;
+    --code-accent: #7FD0C2;
+    --code-comment: #7C918C;
+    --chip-bg: #232B2E;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 1.04rem;
+    line-height: 1.62;
+  }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1.4rem 5rem;
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: 3rem;
+  }
+  @media (max-width: 1023px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; } nav.toc { display: none; } }
+
+  /* ---------- header ---------- */
+  header.hero {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 3.4rem 1.4rem 2.2rem;
+  }
+  .eyebrow {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: .74rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0 0 .8rem;
+  }
+  h1 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.1rem, 4.6vw, 3.3rem);
+    line-height: 1.06;
+    letter-spacing: -.015em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .lede {
+    max-width: 62ch;
+    font-size: 1.13rem;
+    color: var(--muted);
+    margin: 0;
+  }
+  .lede strong { color: var(--ink); }
+
+  /* pipeline diagram */
+  .pipeline {
+    margin: 2.2rem auto 0;
+    padding: 1.2rem 1.4rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow-x: auto;
+  }
+  .pipe-row { display: flex; align-items: center; gap: .55rem; min-width: 700px; font-family: "Archivo", system-ui, sans-serif; }
+  .pipe-node {
+    border: 1.5px solid var(--line);
+    border-radius: 7px;
+    padding: .5rem .7rem;
+    text-align: center;
+    background: var(--bg);
+    flex: 1;
+  }
+  .pipe-node .t { font-weight: 700; font-size: .84rem; letter-spacing: .01em; }
+  .pipe-node .s { font-size: .7rem; color: var(--muted); margin-top: .15rem; line-height: 1.3; }
+  .pipe-node.hot { border-color: var(--accent); background: var(--accent-soft); }
+  .pipe-arrow { color: var(--muted); font-size: .95rem; flex: none; }
+  .pipe-caption { font-size: .78rem; color: var(--muted); margin: .8rem 0 0; font-family: "Archivo", system-ui, sans-serif; }
+
+  /* ---------- toc ---------- */
+  nav.toc {
+    position: sticky;
+    top: 1.6rem;
+    align-self: start;
+    padding-top: 1.4rem;
+    font-family: "Archivo", system-ui, sans-serif;
+  }
+  nav.toc .toc-title { font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); margin: 0 0 .7rem; font-weight: 600; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    display: flex; gap: .55rem; align-items: baseline;
+    padding: .32rem 0;
+    font-size: .84rem;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--accent-ink); }
+  nav.toc .n { font-variant-numeric: tabular-nums; font-size: .72rem; font-weight: 600; color: var(--accent-ink); min-width: 1.3em; }
+
+  /* ---------- main ---------- */
+  main { padding-top: 1.4rem; min-width: 0; }
+  main > section { margin: 0 0 3.6rem; }
+  main p, main ul, main ol { max-width: 70ch; }
+
+  .part-label {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: .74rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0 0 .4rem;
+  }
+  h2 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.72rem;
+    letter-spacing: -.01em;
+    line-height: 1.15;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.12rem;
+    margin: 2rem 0 .6rem;
+  }
+  section { border-top: 1px solid var(--line); padding-top: 2rem; }
+  section:first-of-type { border-top: 0; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .84em;
+    background: var(--chip-bg);
+    border-radius: 4px;
+    padding: .08em .34em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: .95rem 1.1rem;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: .9rem 0 1.2rem;
+    font-size: .83rem;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; color: inherit; }
+  pre .c { color: var(--code-comment); }
+  pre .k { color: var(--code-accent); }
+  .codelabel {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 1.1rem 0 -0.5rem;
+  }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 1rem 0 1.3rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { text-align: left; padding: .55rem .8rem; border-top: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    border-top: 0;
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--bg);
+  }
+  td code { white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* callouts */
+  .note, .trap {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .9rem 1.1rem .95rem;
+    margin: 1.2rem 0 1.4rem;
+    max-width: 70ch;
+    background: var(--surface);
+  }
+  .note { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+  .trap { border-color: color-mix(in srgb, var(--hazard) 45%, var(--line)); background: var(--hazard-soft); }
+  .note .tag, .trap .tag {
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: .3rem;
+  }
+  .note .tag { color: var(--accent-ink); }
+  .trap .tag { color: var(--hazard); }
+  .note p, .trap p { margin: .3rem 0 0; font-size: .95rem; }
+
+  .chip {
+    display: inline-block;
+    font-family: "Archivo", system-ui, sans-serif;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: .12em .55em;
+    border-radius: 99px;
+    background: var(--chip-bg);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip.ok { background: var(--accent-soft); color: var(--accent-ink); }
+  .chip.warn { background: var(--hazard-soft); color: var(--hazard); }
+
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: .3rem 0 .3rem 1.7rem; position: relative; }
+  .checklist li::before {
+    content: "";
+    position: absolute; left: 0; top: .62em;
+    width: .72em; height: .72em;
+    border: 1.6px solid var(--accent);
+    border-radius: 3px;
+  }
+  footer {
+    max-width: 1180px; margin: 0 auto; padding: 0 1.4rem 3rem;
+    color: var(--muted); font-size: .85rem;
+    font-family: "Archivo", system-ui, sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <p class="eyebrow">Setup and operations manual</p>
+  <h1>COT Toolset Field Guide</h1>
+  <p class="lede">How to stand up the <strong>cotdata / marketdata / cotmetrics / cot-analyzer / crucible / crucible-stack</strong> workspace from a fresh clone: connect a data source, populate the two stores, compute positioning metrics, and command a validated study through Claude Code. The worked example is the <strong>NPF CS 80/20</strong> book.</p>
+
+  <div class="pipeline" role="img" aria-label="Data flows from CFTC and price vendors through two parquet stores into cotmetrics, then into the dashboard and the strategy plus validation layers.">
+    <div class="pipe-row">
+      <div class="pipe-node"><div class="t">Sources</div><div class="s">CFTC (free) · Norgate · Databento · Yahoo</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node hot"><div class="t">Two stores</div><div class="s">cotdata_store (COT) · marketdata_store (bars)</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node"><div class="t">cotmetrics</div><div class="s">positioning index, signals, CotIndexer</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node"><div class="t">cot-analyzer</div><div class="s">Dash UI, computes nothing itself</div></div>
+    </div>
+    <div class="pipe-row" style="margin-top:.55rem;">
+      <div class="pipe-node"><div class="t">Strategy repo</div><div class="s">your rules (example: npf, private)</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node"><div class="t">crucible-stack</div><div class="s">define / search / size / deploy</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node hot"><div class="t">crucible</div><div class="s">the judge: is the edge real?</div></div>
+      <div class="pipe-arrow">&#9654;</div>
+      <div class="pipe-node"><div class="t">Verdict</div><div class="s">gauntlet report, tearsheets</div></div>
+    </div>
+    <p class="pipe-caption">Producers write, consumers only read. Store reads never touch the network.</p>
+  </div>
+</header>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <p class="toc-title">Contents</p>
+  <ol>
+    <li><a href="#map"><span class="n">0</span> The map</a></li>
+    <li><a href="#clone"><span class="n">1</span> Clone the workspace</a></li>
+    <li><a href="#env"><span class="n">2</span> Environments</a></li>
+    <li><a href="#cot"><span class="n">3</span> COT data</a></li>
+    <li><a href="#bars"><span class="n">4</span> Market bars</a></li>
+    <li><a href="#metrics"><span class="n">5</span> The metrics layer</a></li>
+    <li><a href="#dash"><span class="n">6</span> The dashboard</a></li>
+    <li><a href="#crucible"><span class="n">7</span> The validation stack</a></li>
+    <li><a href="#cs8020"><span class="n">8</span> Example: NPF CS 80/20</a></li>
+    <li><a href="#claude"><span class="n">9</span> Studies via Claude Code</a></li>
+    <li><a href="#verify"><span class="n">A</span> Verification &amp; traps</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ================= 0 THE MAP ================= -->
+<section id="map">
+  <p class="part-label">Part 0</p>
+  <h2>The map: eight packages, two stores, one direction</h2>
+  <p>The toolset is a set of <strong>sibling git checkouts under one plain directory</strong> (conventionally <code>~/code/trading_workspace/</code>). The workspace directory itself is not a repo. The sibling layout is load-bearing: editable installs, CI checkout steps, and <code>requirements.txt</code> entries all use relative <code>../&lt;repo&gt;</code> paths, so the directory names and the side-by-side placement are part of the contract.</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Repo</th><th>Visibility</th><th>Install name</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>cotdata</code></td><td><span class="chip ok">public · PyPI</span></td><td><code>cotdata</code></td><td>CFTC positioning only. Four COT reports, a vintage/provenance subsystem, and the parquet store consumers read.</td></tr>
+      <tr><td><code>marketdata</code></td><td><span class="chip ok">public · PyPI</span></td><td><code>crucible-marketdata</code></td><td>Daily bars: futures (Norgate or Databento) and equities/ETFs (Yahoo). Adjustment tiers derived on read. Also futures contract specs.</td></tr>
+      <tr><td><code>cotmetrics</code></td><td><span class="chip ok">public · PyPI</span></td><td><code>cotmetrics</code></td><td>Positioning index, z-scores, signals, and the <code>CotIndexer</code> that assembles per-instrument weekly panels from both stores.</td></tr>
+      <tr><td><code>cot-analyzer</code></td><td><span class="chip ok">public · source app</span></td><td>clone only</td><td>Dash/Plotly dashboard over cotmetrics. Computes no metrics of its own.</td></tr>
+      <tr><td><code>crucible</code></td><td><span class="chip ok">public · PyPI</span></td><td><code>crucible</code></td><td>Capital-free edge validation: the four-pillar gauntlet, bootstrap and permutation nulls, the post-promotion decay monitor. The judge.</td></tr>
+      <tr><td><code>crucible-stack</code></td><td><span class="chip ok">public · PyPI</span></td><td><code>crucible-stack</code></td><td>Define / search / size / deploy framework. Ships zero strategies, by design.</td></tr>
+      <tr><td><code>cotmetrics-config</code></td><td><span class="chip warn">private</span></td><td>clone only</td><td>The real <code>params.yaml</code>: 47-market universe and tuned lookbacks. Without it you run a 6-symbol sample.</td></tr>
+      <tr><td><code>npf</code></td><td><span class="chip warn">private</span></td><td>clone only</td><td>The strategy repo. Used here only as the worked example (the CS 80/20 book); your own strategy repo takes its place.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Dependency direction is one way, and each layer refuses the next layer's question:</p>
+  <pre><code>cotdata  &#9666;  cotmetrics  &#9666;  cot-analyzer
+crucible &#9666;  crucible-stack  &#9666;  &lt;your strategy repo&gt;  (example: npf)</code></pre>
+  <p>Note that <code>marketdata</code> is a <em>sibling</em> of <code>cotdata</code>, not a consumer: the two agree on symbol naming by convention and import nothing from each other. Equities have no COT report, which is why they cannot share one registry.</p>
+
+  <div class="trap"><span class="tag">Trap</span>
+    <p><code>pip install marketdata</code> installs a stranger's abandoned 2020 package. The distribution is <strong><code>crucible-marketdata</code></strong>; the import stays <code>import marketdata</code>. Any dependency declaration must name <code>crucible-marketdata</code>.</p>
+  </div>
+
+  <h3>The two stores</h3>
+  <p>Everything downstream reads two parquet stores, addressed by environment variable:</p>
+  <ul>
+    <li><code>COTDATA_STORE</code> (typically <code>~/code/cotdata_store</code>): CFTC positioning, written by <code>cotdata-update</code>.</li>
+    <li><code>MARKETDATA_STORE</code> (typically <code>~/code/marketdata_store</code>): daily bars and contract specs, written by <code>marketdata-update</code>.</li>
+  </ul>
+  <div class="trap"><span class="tag">Trap</span>
+    <p>The two stores may share a parent folder but <strong>must not share a root</strong>. Each package keeps a <code>manifest.json</code> at its root and rewrites it read-modify-write; one shared root silently loses entries. <code>cot-analyzer</code>'s launcher hard-fails if the two variables are equal.</p>
+  </div>
+</section>
+
+<!-- ================= 1 CLONE ================= -->
+<section id="clone">
+  <p class="part-label">Part 1</p>
+  <h2>Clone the workspace</h2>
+  <p>Create the container directory and clone the siblings into it. The public set is enough to fetch COT, fetch bars, compute metrics, run the dashboard, and validate your own strategies. The two private repos add the tuned universe and the worked-example book; skip them if you don't have access and see the fallbacks noted below.</p>
+
+  <pre><code>mkdir -p ~/code/trading_workspace &amp;&amp; cd ~/code/trading_workspace
+
+<span class="c"># Public toolset</span>
+git clone https://github.com/mspinola/cotdata.git
+git clone https://github.com/mspinola/marketdata.git
+git clone https://github.com/mspinola/cotmetrics.git
+git clone https://github.com/mspinola/cot-analyzer.git
+git clone https://github.com/mspinola/crucible.git
+git clone https://github.com/mspinola/crucible-stack.git
+
+<span class="c"># Private (requires access): tuned universe + the example strategy repo</span>
+git clone git@github.com:mspinola/cotmetrics-config.git
+git clone git@github.com:mspinola/npf.git</code></pre>
+
+  <p>Directory names matter. <code>-e ../cotdata</code> and friends resolve relative to each repo, so renaming a checkout breaks installs, and CI reproduces exactly this layout when it checks siblings out next to each repo.</p>
+
+  <div class="note"><span class="tag">Without the private repos</span>
+    <p>No <code>cotmetrics-config</code>: cotmetrics falls back to its packaged 6-symbol sample universe (ES, NQ, RTY, GC, SI, CL) with untuned 52-week lookbacks, or you write your own <code>params.yaml</code> in the same schema (Part 5). No <code>npf</code>: substitute your own strategy repo built on <code>crucible-stack</code>; Part 8 still shows you what a complete book config looks like.</p>
+  </div>
+
+  <div class="trap"><span class="tag">Trap</span>
+    <p>Skipping the <code>marketdata</code> clone does not fail at install time. It fails at import: <code>cotmetrics/__init__.py</code> re-exports <code>signals</code>, which imports <code>marketdata</code> at module level, so the first <code>import cotmetrics</code> raises <code>ModuleNotFoundError: No module named 'marketdata'</code>.</p>
+  </div>
+</section>
+
+<!-- ================= 2 ENV ================= -->
+<section id="env">
+  <p class="part-label">Part 2</p>
+  <h2>Environments and variables</h2>
+  <p>Venvs are per-repo, created with <a href="https://docs.astral.sh/uv/">uv</a>, but in practice <strong>one master venv does most of the work</strong>. Python 3.11 is the workspace-wide pin (cotdata/marketdata/cotmetrics/crucible accept 3.10+, but crucible-stack and the strategy layer require 3.11+, and 3.11 is what every deployed box runs).</p>
+
+  <h3>The master environment</h3>
+  <p>If you cloned <code>npf</code> (or once you have your own strategy repo with an equivalent <code>requirements.txt</code>), one venv holds everything as editable installs:</p>
+  <pre><code>cd ~/code/trading_workspace/npf
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt   <span class="c"># installs -e . plus -e ../cotdata, ../marketdata,</span>
+                                     <span class="c"># ../cotmetrics, ../crucible, ../crucible-stack</span></code></pre>
+
+  <p>Working library-only (no strategy repo), give each package its own venv from its README, for example:</p>
+  <pre><code><span class="c"># marketdata, with the free Yahoo producer:</span>
+cd ~/code/trading_workspace/marketdata
+uv venv --python 3.11
+uv pip install -e ".[yahoo,dev]" "setuptools&lt;81"
+
+<span class="c"># cotdata:</span>
+cd ~/code/trading_workspace/cotdata
+uv venv --python 3.11 &amp;&amp; uv pip install -e ".[dev]"
+
+<span class="c"># cot-analyzer (its own venv, Dash stack + editable siblings):</span>
+cd ~/code/trading_workspace/cot-analyzer
+uv venv &amp;&amp; source .venv/bin/activate &amp;&amp; uv pip install -r requirements.txt</code></pre>
+
+  <div class="note"><span class="tag">Two pins worth knowing</span>
+    <p><strong><code>setuptools&lt;81</code></strong>: version 81 removed <code>pkg_resources</code>; keep the pin in working venvs or expect <code>ModuleNotFoundError: No module named 'pkg_resources'</code>. <strong>uv venvs ship without pip</strong>: inside them, <code>python -m pip</code> fails with <code>No module named pip</code>; use <code>uv pip install --python .venv/bin/python ...</code> instead. On Windows this is sneaky, because a bare <code>pip install</code> then silently targets the global Python.</p>
+  </div>
+
+  <h3>Editable installs are the working tree</h3>
+  <p>There is no copy. <code>import cotdata</code> reads the checkout directly, in whatever state it is in at that moment. Four consequences: a <code>git checkout</code> / <code>stash</code> / <code>rebase</code> in a sibling changes your behavior with no change in your own repo; <code>rm</code> in a sibling removes it for every venv pointing at it; <code>pip list</code> versions are install-time metadata, never refreshed, so verify APIs by signature, not by pin; and stale <code>__pycache__</code> can outlive deleted modules. Also verify imports resolve where you think: a sibling <em>not</em> installed in the active venv still imports from the workspace root as a phantom namespace package instead of failing.</p>
+  <pre><code>python -c "import cotdata; print(cotdata.__file__)"   <span class="c"># a real install prints a path;</span>
+                                                      <span class="c"># a phantom prints None</span></code></pre>
+
+  <h3>Environment variables</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Variable</th><th>Points at</th><th>If unset</th></tr></thead>
+    <tbody>
+      <tr><td><code>COTDATA_STORE</code></td><td><code>~/code/cotdata_store</code></td><td><strong>raises</strong> (<code>RuntimeError</code>) on any store access</td></tr>
+      <tr><td><code>MARKETDATA_STORE</code></td><td><code>~/code/marketdata_store</code></td><td><strong>raises</strong> on any store access</td></tr>
+      <tr><td><code>COTMETRICS_PARAMS</code></td><td><code>cotmetrics-config/params.yaml</code></td><td><span class="chip warn">silent-ish fallback</span> to the packaged 6-symbol sample (one logged warning)</td></tr>
+      <tr><td><code>COTMETRICS_CACHE</code></td><td>derived per-instrument parquet cache</td><td>defaults to <code>~/.cache/cotmetrics</code></td></tr>
+      <tr><td><code>COT_VIZ_CONFIG</code></td><td>same <code>params.yaml</code> (dashboard palettes / chart mapping)</td><td>falls back to cot-analyzer's packaged sample</td></tr>
+      <tr><td><code>MARKETDATA_PRICE_SOURCE</code></td><td>default bar vendor</td><td><code>yfinance</code>; invalid value raises</td></tr>
+      <tr><td><code>DATABENTO_API_KEY</code></td><td>Databento ingest (paid stage only)</td><td>only needed for <code>--ingest-databento</code></td></tr>
+      <tr><td><code>MARKETDATA_NO_NETWORK</code></td><td>set to skip network-marked tests</td><td>network tests run</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Put the store variables in your shell profile:</p>
+  <pre><code><span class="c"># ~/.zshrc or ~/.bash_profile</span>
+export COTDATA_STORE=~/code/cotdata_store
+export MARKETDATA_STORE=~/code/marketdata_store
+export COTMETRICS_PARAMS=~/code/trading_workspace/cotmetrics-config/params.yaml
+export COT_VIZ_CONFIG=~/code/trading_workspace/cotmetrics-config/params.yaml</code></pre>
+
+  <div class="trap"><span class="tag">The most common silent-wrong-result failure</span>
+    <p><code>COTMETRICS_PARAMS</code> falling back to the sample universe. A run then scans 6 markets and reports as if it scanned the whole book, and the output looks completely normal. The repo launchers (<code>npf/run-local.sh</code>, <code>cot-analyzer/run-local.sh</code>) set the variable for you, which is exactly why you use them instead of calling <code>python main.py</code> directly.</p>
+  </div>
+
+  <div class="note"><span class="tag">Scheduling note</span>
+    <p>A scheduled job's environment is a property of its <em>launcher</em>, not of the shell you tested from. launchd, cron, and Task Scheduler do not read your shell profile, so any wrapper script you schedule must default these variables itself (the shipped wrappers all do, in the <code>${VAR:-default}</code> style).</p>
+  </div>
+</section>
+
+<!-- ================= 3 COT ================= -->
+<section id="cot">
+  <p class="part-label">Part 3</p>
+  <h2>COT data: free, any OS, no account</h2>
+  <p><code>cotdata</code> downloads the CFTC's own public history files over plain HTTPS. No API key, no subscription, works on macOS, Linux, and Windows. This is the zero-cost half of the system and the first thing to populate.</p>
+
+  <pre><code>export COTDATA_STORE=~/code/cotdata_store
+cotdata-update --cot-all      <span class="c"># all four reports; first run pulls full history, cached after</span>
+cotdata-update --check        <span class="c"># read-only status from the manifest, no network</span>
+python -c "import cotdata; print(cotdata.get_cot('ES').tail())"</code></pre>
+
+  <h3>The four reports</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Report</th><th>Flag</th><th>History from</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Legacy (futures-only)</td><td><code>--cot-legacy</code></td><td class="num">1986</td><td>Commercials / large specs / small traders. The report the positioning index is built from.</td></tr>
+      <tr><td>Disaggregated (futures-only)</td><td><code>--cot-disagg</code></td><td class="num">2006</td><td>Producer/Merchant, Swap Dealers, Managed Money, Other Reportables. Physical commodities.</td></tr>
+      <tr><td>TFF (futures-only)</td><td><code>--cot-tff</code></td><td class="num">2006</td><td>Traders in Financial Futures: Dealer, Asset Manager, Leveraged Funds. Financials.</td></tr>
+      <tr><td>Supplemental / CIT</td><td><code>--cot-supplemental</code></td><td class="num">2006</td><td>13 agricultural markets with the index-trader carve-out. <strong>Futures-and-options combined</strong>, so its open interest is not comparable with the other three, and the file itself does not say so.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Reading it</h3>
+  <p>The public API is deliberately small. <code>get_cot</code> returns a date-indexed DataFrame per market; the registry maps internal symbols (<code>ES</code>, <code>GC</code>, <code>CL</code>, <code>6A</code>, ...) to CFTC market codes, stitching historical code changes behind one symbol:</p>
+  <pre><code>import cotdata
+
+legacy = cotdata.get_cot("GC")                      <span class="c"># default report="legacy"</span>
+disagg = cotdata.get_cot("GC", report="disagg")
+tff    = cotdata.get_cot("ES", report="tff")
+cit    = cotdata.get_cot("ZW", report="supplemental")
+
+cotdata.all_symbols()                               <span class="c"># the 51-market registry</span>
+cotdata.symbol("GC")                                <span class="c"># registry entry, incl. cftc_code</span></code></pre>
+
+  <p>The store on disk is one parquet per market per report (<code>cot_legacy/GC_088691.parquet</code> and so on), plus per-half manifests and a <code>status.json</code> that schedulers can poll. There is also a <strong>vintage subsystem</strong> (<code>cotdata-vintage fetch / ingest / diff / asof / coverage</code>) that snapshots the CFTC's raw files over time so revisions and restatements are detectable; you don't need it on day one, but know it exists before building anything that assumes COT history never changes.</p>
+
+  <div class="trap"><span class="tag">Trap</span>
+    <p><code>cotdata</code> has <strong>no price code at all</strong> (ADR-0007 moved every bar to marketdata). <code>cotdata.get_prices</code> was deleted, not deprecated, so stale example code raises <code>AttributeError</code>; a leftover <code>.venv/bin/cotdata-prices</code> script from an old install fails loudly with an ImportError. Bars come from <code>marketdata.get_bars</code>, full stop. Also: <code>cotdata-update --symbols</code> is currently parsed but ignored; every run updates the whole registry.</p>
+  </div>
+</section>
+
+<!-- ================= 4 BARS ================= -->
+<section id="bars">
+  <p class="part-label">Part 4</p>
+  <h2>Market bars: pick your vendor</h2>
+  <p><code>marketdata</code> serves two domains from one store: <strong>equities/ETFs</strong> (free, via Yahoo) and <strong>futures</strong> (Norgate or Databento). Which vendors you can run depends on your OS and budget:</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>You want</th><th>Vendor</th><th>OS</th><th>Cost</th><th>Command</th></tr></thead>
+    <tbody>
+      <tr><td>Equity / ETF bars</td><td>yfinance</td><td>any</td><td>free</td><td><code>marketdata-update --bars --domain equities</code></td></tr>
+      <tr><td>Futures bars, deep history</td><td>Norgate (NDU)</td><td><strong>Windows only</strong></td><td>subscription</td><td><code>marketdata-update --bars --domain futures</code></td></tr>
+      <tr><td>Futures bars, cross-platform</td><td>Databento (GLBX)</td><td>any</td><td>paid ingest</td><td><code>--ingest-databento</code> then <code>--build-databento</code></td></tr>
+      <tr><td>Futures via Yahoo</td><td colspan="4">not a thing: every futures registry row sets <code>yahoo: null</code> on purpose, so a futures read can never silently resolve to a same-named equity ticker</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Path A: zero-cost start (any OS)</h3>
+  <pre><code>export MARKETDATA_STORE=~/code/marketdata_store
+marketdata-update --bars --domain equities     <span class="c"># every registered ETF/index via Yahoo</span>
+marketdata-update --check                      <span class="c"># read-only summary from the manifest</span></code></pre>
+  <p>Yahoo bars are stored nearly raw plus dated dividend/split actions, and every adjustment tier (<code>split</code>, <code>raw</code>, <code>total</code>) is <strong>derived on read</strong>, never stored. That is deliberate: Yahoo restates its own adjusted column every time a dividend lands, while raw bars plus dated actions are immutable facts.</p>
+
+  <h3>Path B: futures via Databento (any OS, paid)</h3>
+  <pre><code>export DATABENTO_API_KEY=db-...
+marketdata-update --ingest-databento --windowed-n1-stats   <span class="c"># stage 1: PAID, resumable, run by hand</span>
+marketdata-update --build-databento                        <span class="c"># stage 2: free, local files only</span></code></pre>
+  <p>Two stages on purpose: ingest appends raw vendor files under the store's <code>_raw/</code> area and is billed; build is a free, offline projection into store bars, so you can rebuild forever without paying twice. Limits to know: history starts at the CME Globex floor of <strong>2010-06-06</strong>, and eight registry markets are not on Globex at all (ICE softs SB/CT/CC/KC/OJ, ICE WBS and DX, CME lumber LBR); they are skipped, never billed.</p>
+
+  <h3>Path C: futures via Norgate (Windows box, deep history)</h3>
+  <p>The Norgate producer drives a locally installed, authenticated Norgate Data Updater; there is no macOS/Linux path at any Python version. The standard pattern is one Windows producer box on a schedule, with every other machine reading a <em>synced copy</em> of the store (reads never touch the network, so a synced store is fully functional everywhere). It writes both futures tiers per symbol (<code>backadj</code> and <code>unadj</code>, with <code>propadj</code> derived on read), plus the contract-specs table (<code>marketdata-update --metadata</code>: point value, tick size, margin) that cost models need.</p>
+  <div class="note"><span class="tag">Producer scheduling, in one paragraph</span>
+    <p><code>--require-final</code> gates the futures fetch on Norgate holding a newer <em>settled</em> session than the store, deferring with a non-zero exit until then; the retry is a repeating scheduler trigger, and a healthy night deliberately <em>ends</em> on a defer. So judge a nightly run by the store contents (<code>--check</code>, did <code>last_date</code> advance), never by the task's last exit code. Details live in the repo's scheduling docs (<code>marketdata/README.md</code>, <code>docs/LINUX_SCHEDULING.md</code>, <code>cotdata/docs/WINDOWS_SETUP.md</code>).</p>
+  </div>
+
+  <h3>Reading bars</h3>
+  <pre><code>import marketdata
+
+spy = marketdata.get_bars("SPY")                    <span class="c"># equities default tier: split</span>
+tr  = marketdata.get_bars("TLT", "total")           <span class="c"># total-return tier, derived on read</span>
+es  = marketdata.get_bars("ES")                     <span class="c"># futures default tier: backadj</span>
+raw = marketdata.get_bars("ES", "unadj")            <span class="c"># as-traded, for sizing/costs</span>
+
+<span class="c"># Point-in-time futures read: the series AS IT STOOD on that date</span>
+old = marketdata.get_bars("HE", "backadj", asof="2015-06-01")
+
+marketdata.coverage_gaps(["ES", "GC", "SPY"], stale_after_days=7)   <span class="c"># manifest-only, cheap</span>
+marketdata.read_metadata()                          <span class="c"># contract specs table</span></code></pre>
+  <p>Futures bars carry more than OHLCV: <code>Delivery Month</code> flips exactly at each roll, and <code>FirstContract</code> / <code>SecondContract</code> name the two most active expiries each day. Note there is <strong>no per-expiry price series in the store</strong> (continuous series only, both vendors), and <code>asof=</code> matters whenever your logic uses ratios of back-adjusted prices, because additive back-adjustment re-anchors all history at every roll.</p>
+</section>
+
+<!-- ================= 5 METRICS ================= -->
+<section id="metrics">
+  <p class="part-label">Part 5</p>
+  <h2>The metrics layer: cotmetrics</h2>
+  <p><code>cotmetrics</code> turns the two stores into positioning metrics. The core object is the 0-to-100 <strong>positioning index</strong>: where today's net position sits inside its own lookback range, computed per trader group (commercials, large specs, small traders), on either raw net contracts or net divided by open interest ("OI-normalized", Larry Williams' WILLCO generalized to all three legs).</p>
+
+  <h3>The universe file</h3>
+  <p><code>COTMETRICS_PARAMS</code> points at a YAML file defining the instrument universe: asset classes, per-instrument <code>Name</code> / <code>Symbol</code> / <code>CustomLookbackWeeks</code> / optional <code>Role</code>, the lookback set, and the year range. The private <code>cotmetrics-config/params.yaml</code> names 47 markets across 9 asset classes with per-market tuned lookbacks, and marks a handful <code>Role: heldout</code> (indexed but never plotted or selected, reserved as out-of-sample markets). The packaged sample has the same schema with 6 symbols, so everything runs out of the box, just on a toy universe. Writing your own file in this schema is fully supported.</p>
+
+  <h3>Minimal working example</h3>
+  <pre><code><span class="c"># stores populated (Parts 3-4), env vars set (Part 2)</span>
+from cotmetrics.indexer import get_indexer
+import cotmetrics.constants as const
+
+idx = get_indexer()          <span class="c"># builds once; ~90s cold on the full universe,</span>
+                             <span class="c"># fast afterwards off the COTMETRICS_CACHE parquet cache</span>
+
+name = idx.get_instrument_from_symbol("GC").name    <span class="c"># instruments are addressed by name: "Gold"</span>
+df = idx.get_symbols_data(name, "Custom")           <span class="c"># or "26" / "52"; basis=const.BASIS_OI_NORM for net/OI</span>
+
+print(df[[const.COMMS_IDX, const.LRG_IDX, const.SML_IDX,
+          const.CLOSING_PRICE]].tail())</code></pre>
+  <p>The returned weekly frame carries stable "wire format" alias columns downstream code reads by literal name: <code>comms_idx</code> / <code>lrg_idx</code> / <code>sml_idx</code> (the index per leg), z-scores, momentum, <code>willco</code>, <code>oi_zscore</code>, and setup flags like <code>pos_idx_setup_long</code>. Prices arrive by resampling daily bars from <code>marketdata.get_bars</code> to weekly Tuesday bars, matching the COT report date; two markets (MSCI EAFE and EM futures) are priced through ETF proxies (<code>MFS &#8594; EFA</code>, <code>MME &#8594; EEM</code>) because no continuous futures series exists for them.</p>
+
+  <div class="note"><span class="tag">A statistical property worth respecting</span>
+    <p>Positioning-index extremes arrive in <strong>episodes</strong> (mean run ~5 weeks), so a count of extreme weeks is not a sample size, and positioning <em>levels</em> are near unit-root, so correlating levels across series is spurious by construction. Measured write-up: <code>cotmetrics/docs/positioning-series-properties.md</code>. Any study you command later should difference, block-resample, or otherwise account for this.</p>
+  </div>
+</section>
+
+<!-- ================= 6 DASH ================= -->
+<section id="dash">
+  <p class="part-label">Part 6</p>
+  <h2>The dashboard: cot-analyzer</h2>
+  <p>A Dash app over cotmetrics, and deliberately nothing more: <em>cotmetrics carries no presentation config, cot-analyzer computes no metrics</em>. Pages include a positioning heatmap, the cross-asset crowding strip, per-market graphs and analysis, Disaggregated/TFF category views, dollar exposure aggregation, and an options max-pain view.</p>
+  <pre><code>cd ~/code/trading_workspace/cot-analyzer
+./run-local.sh          <span class="c"># http://127.0.0.1:5001</span></code></pre>
+  <p>Use the launcher, not <code>python src/main.py</code>: it wires the cache/log/db paths, points <code>COTMETRICS_PARAMS</code> and <code>COT_VIZ_CONFIG</code> at the private config when the sibling exists, sources the repo's <code>.env</code> (where <code>COTDATA_STORE</code> / <code>MARKETDATA_STORE</code> live for deployment), and refuses to start if the two stores are unset or identical. There is <strong>no hot reload</strong>; restart after every edit.</p>
+  <p>On boot the app runs a cheap manifest-only price check and <strong>refuses to start</strong> if the bar store can serve no configured instrument at all (the failure it guards against is silence: a dashboard of blank charts). A partial store warns and boots; <code>COT_ANALYZER_ALLOW_MISSING_PRICES=1</code> downgrades the refusal for development.</p>
+</section>
+
+<!-- ================= 7 CRUCIBLE ================= -->
+<section id="crucible">
+  <p class="part-label">Part 7</p>
+  <h2>The validation stack: crucible and crucible-stack</h2>
+  <p>This is the part of the toolset that keeps you honest. The architecture is a <strong>chain of refusals</strong>: each layer answers exactly one question and refuses the next one, so no single session can generate a hypothesis, run its own gate, and narrate the result as a win.</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Layer</th><th>Asks</th><th>Refuses to ask</th></tr></thead>
+    <tbody>
+      <tr><td><code>crucible_stack.optimize</code></td><td>which config, and what did the search cost?</td><td>is it real?</td></tr>
+      <tr><td><code>crucible</code></td><td>is the edge real, corrected for the search?</td><td>what would it earn?</td></tr>
+      <tr><td><code>crucible_stack.capital</code></td><td>what does an account trading it look like?</td><td>should we deploy it?</td></tr>
+      <tr><td><code>crucible_stack.orchestrate</code></td><td>is it still right, may it go live?</td><td>(none)</td></tr>
+      <tr><td><code>crucible.validation.monitor</code></td><td>has a promoted edge decayed?</td><td>should we cut size?</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The pivot between layers is the <code>TradeLog</code>: capital-free, denominated in R (one unit of risk taken at entry). That is what lets crucible judge an edge without knowing account size; the single place R converts to currency is <code>EquityResult.meta["r_denominator"]</code> in the capital simulator.</p>
+
+  <h3>The gauntlet in five minutes</h3>
+  <p>crucible's headline call is <code>run_gauntlet</code>, four pillars: <strong>REAL</strong> (distinguishable from noise, corrected for how many variants you searched), <strong>STRONG</strong> (economically meaningful at the CI lower bound), <strong>DURABLE</strong> (holds up walk-forward over time), <strong>GENERAL</strong> (travels to markets it wasn't built on). Verdicts are a boolean <code>passed</code> plus an audit report; thresholds are tuned to fail a marginal result rather than pass it.</p>
+
+  <pre><code>from crucible.edge import barrier_trades
+from crucible.validation import run_gauntlet, walk_forward, SearchSpaceLog
+
+log = SearchSpaceLog(scope="GC:my_grid", path="search.jsonl")   <span class="c"># the ledger</span>
+for params in grid:
+    log.record(params, status="tried")     <span class="c"># BEFORE it runs, so failures still count</span>
+    entries = my_signal(px, **params)      <span class="c"># a boolean Series over an OHLC frame</span>
+    ...
+log.mark_selected(best_params)
+
+wf = walk_forward(px, my_signal, best_params, ...)   <span class="c"># leakage-free by construction</span>
+
+g = run_gauntlet(
+    wf.stitched,        <span class="c"># the honest, stitched out-of-sample trade log</span>
+    prices=px,          <span class="c"># enables REAL's random-timing null</span>
+    wf=wf,              <span class="c"># adds the DURABLE gate</span>
+    n_variants=log,     <span class="c"># the LEDGER drives the multiple-testing correction</span>
+)
+print(g.audit_report())
+print(g.passed)</code></pre>
+
+  <div class="trap"><span class="tag">The rule that carries everything</span>
+    <p><strong>Hand <code>n_variants</code> the ledger, not a number.</strong> Every variant you try, including discards, goes into the <code>SearchSpaceLog</code>; an undercounted denominator is a prettier p-value and a broken gate. Agents make good-looking strategies free to produce, which is exactly what breaks a naive significance test.</p>
+  </div>
+
+  <p>crucible-stack wraps this into the search-and-deploy loop: <code>sweep()</code> runs a grid and returns a <code>TrialMatrix</code> (recording both varied and <em>fixed</em> params, with the shared ledger attached), <code>select()</code> picks a winner and prices it against the whole search (PBO, deflated Sharpe, reality check, ANDed into a single <code>trustworthy</code> flag), <code>simulate_equity()</code> / <code>equity_bands()</code> turn the surviving log into a currency account with bootstrap bands, and <code>orchestrate</code> owns the <code>DeploymentLedger</code>, drift envelopes frozen at promotion, and re-optimization triggers. Your strategies live in <em>your</em> repo, registered via <code>@register_strategy</code>; crucible-stack ships none and a boundary test keeps it that way.</p>
+</section>
+
+<!-- ================= 8 CS 80/20 ================= -->
+<section id="cs8020">
+  <p class="part-label">Part 8</p>
+  <h2>Worked example: the NPF CS 80/20 book</h2>
+  <p>Everything above converges in one config file. In npf's naming, books are written <code>NPF &lt;gate&gt; &lt;band&gt;</code>, so <strong>CS 80/20</strong> means: gate <code>CS</code>, entry band <code>hi: 80 / lo: 20</code>. All books run the same engine (<code>NpfStrategy</code>); only parameters differ. The deploy variant lives at <code>npf/config/npf/cmr_cs_oinorm_liquid.yaml</code> and is the default config of every analysis mode.</p>
+
+  <h3>Anatomy of the config</h3>
+  <pre><code>strategy:
+  name: "NPF"
+  mode: "fixed"
+  params:
+    cot_start_date: "1986-01-01"   <span class="c"># COT history floor for the weekly frame</span>
+    gate: "CS"                     <span class="c"># commercials AND small specs, opposite extremes</span>
+    oi_normalized: true            <span class="c"># index legs on net/OI instead of raw net</span>
+    hi: 80                         <span class="c"># crowded-long index threshold (loose band)</span>
+    lo: 20                         <span class="c"># crowded-short index threshold</span>
+    trigger: "chart"               <span class="c"># price confirmation before entry</span>
+    stop: "wick"                   <span class="c"># stop placement mode (+ always-on 2.5R hard floor)</span>
+    exit: "cot_neutral"            <span class="c"># exit when the GATE'S OWN legs revert to neutral</span>
+    entry_fill: "next_open"</code></pre>
+  <ul>
+    <li><strong><code>gate: "CS"</code></strong> is a conjunction, not a spread: enter long only when the commercial index is at or above <code>hi</code> <em>and</em> the small-spec index is at or below <code>lo</code> (mirror for shorts). The gate vocabulary is <code>C</code> / <code>CL</code> / <code>CLS</code> / <code>CS</code> plus WILLCO variants; equity markets are forced to commercials-only by rule.</li>
+    <li><strong><code>hi/lo: 80/20</code></strong> is the loose band (the engine defaults to a tight 95/5). OI-normalization is what pays at the loose band.</li>
+    <li><strong><code>exit: "cot_neutral"</code></strong> is gate-matched: a CS entry rides until the C and S legs are both neutral again. The per-symbol index lookback is the tuned "Custom" window from the cotmetrics params file, which is why the private config matters.</li>
+    <li>The <code>data:</code> block picks the universe by asset class plus explicit symbol adds; the <code>holdout:</code>, <code>pardo_wfm:</code>, and <code>sizing:</code> blocks feed the corresponding analysis modes below.</li>
+  </ul>
+
+  <h3>Commanding a run</h3>
+  <p><code>./analyze</code> is the one entry point, a thin dispatcher mapping friendly mode names onto <code>main.py</code> flag bundles. It runs with the project venv via the <code>./npf</code> wrapper, expects the store variables in your environment, and defaults to the CS 80/20 liquid config:</p>
+  <pre><code>cd ~/code/trading_workspace/npf
+./analyze gauntlet                          <span class="c"># four-pillar verdict on the pooled book</span>
+./analyze gauntlet --n-variants 24          <span class="c"># declare the search size for REAL's correction</span>
+./analyze holdout                           <span class="c"># early/late split scorecard (2019 split, 8wk embargo)</span>
+./analyze wfa --symbol GC                   <span class="c"># per-asset walk-forward</span>
+./analyze mc                                <span class="c"># account-level Monte Carlo under the sizing block</span></code></pre>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Mode</th><th>What it answers</th></tr></thead>
+    <tbody>
+      <tr><td><code>gauntlet</code></td><td>REAL / STRONG / DURABLE / GENERAL on the pooled book, costs netted, via <code>crucible.validation.run_gauntlet</code></td></tr>
+      <tr><td><code>holdout</code></td><td>early/late split scorecard plus a deep-diagnostics detail page</td></tr>
+      <tr><td><code>fullrange</code></td><td>the whole history as one in-sample block, no embargo</td></tr>
+      <tr><td><code>classwf</code></td><td>per-asset-class rolling walk-forward</td></tr>
+      <tr><td><code>wfa</code></td><td>per-asset walk-forward (add <code>--symbol</code>)</td></tr>
+      <tr><td><code>stage6</code></td><td>cross-asset generalization (<code>--dev-assets</code> / <code>--held-out</code>)</td></tr>
+      <tr><td><code>mc</code></td><td>portfolio Monte Carlo: drawdown and ruin under the config's sizing policy</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Output lands as HTML tearsheets under <code>results/tearsheets/</code>, and every run first writes a durable JSON <strong>run record</strong> under <code>results/runs/&lt;date&gt;/</code> carrying provenance: git commit, dirty-tree flag, resolved data window, and both store paths. Quoted figures always trace back to one of these. Useful passthroughs: <code>--gross</code> (skip the cost model), <code>--side long|short|both</code>, <code>--general-by class|symbol</code>, and pointing <code>--config</code> at a <em>directory</em> compares every config in it into one dated results folder.</p>
+
+  <div class="note"><span class="tag">Pre-registration is wired in, not aspirational</span>
+    <p><code>main.py</code> runs a preflight before computing anything: it can require a frozen spec (<code>--require-prereg</code>), checks the spec has not been edited since first use (content-hashed), and aborts on a loosened threshold. The template is <code>config/_PREREG.template.yaml</code>; a hypothesis shorter than 40 characters is rejected because a placeholder is not a commitment.</p>
+  </div>
+</section>
+
+<!-- ================= 9 CLAUDE ================= -->
+<section id="claude">
+  <p class="part-label">Part 9</p>
+  <h2>Commanding a study through Claude Code</h2>
+  <p>The workspace is built to be driven by an agent, and the governance for that is written down where the agent reads it: the workspace <code>CLAUDE.md</code> plus <code>npf/AGENTS.md</code> (research governance) and <code>crucible/AGENTS.md</code> (using the library). Claude Code loads these automatically when you open a session in the workspace. The core rule everything else serves:</p>
+  <div class="note"><span class="tag">The one rule</span>
+    <p><strong>The agent is the intern, crucible is the judge, the human decides.</strong> An agent may draft the hypothesis, write the signal, and build the trade log. It must not then declare the result good; it hands the TradeLog to the gate and reports back what the gate said, verbatim, including the failures.</p>
+  </div>
+
+  <h3>The session pattern: separate the roles</h3>
+  <ol>
+    <li><strong>Generator pass.</strong> One session drafts the pre-registered spec, the config, and the code, and logs every variant it tries (including discards) in a <code>SearchSpaceLog</code>. It does not run the verdict.</li>
+    <li><strong>Evaluator pass.</strong> A fresh session (one that did not author the book) runs the gauntlet and reads the output back, failures included, with the true variant count: <code>./analyze gauntlet &lt;config&gt; --n-variants &lt;N&gt;</code>.</li>
+    <li><strong>Review pass (when the spec introduces a new outcome or window).</strong> A third session reads the frozen spec and scripts, runs <em>nothing</em>, and appends findings plus an explicit list of what it could not check.</li>
+  </ol>
+  <p>Example prompts that respect the seams:</p>
+  <pre><code><span class="c"># Session 1 (generator)</span>
+"Draft a pre-registered spec and a config for a &lt;hypothesis&gt; book on the CS 80/20
+ engine. Log every variant you try in a SearchSpaceLog with a path. Freeze the spec
+ under docs/. Do NOT run the gauntlet or characterize the results."
+
+<span class="c"># Session 2 (evaluator, fresh)</span>
+"Run ./analyze gauntlet config/npf/&lt;book&gt;.yaml --n-variants &lt;N from the ledger&gt;.
+ Report the audit output verbatim, including every failed check. Do not modify
+ the config or the spec."</code></pre>
+
+  <h3>House rules the guide inherits</h3>
+  <ul>
+    <li><strong>Assume look-ahead until proven otherwise.</strong> Build trade logs with <code>holdout</code> / <code>walk_forward</code> so purge and embargo hold by construction; an imported log's leakage-freedom is unproven and must be labeled as such.</li>
+    <li><strong>Attack a passing book before celebrating it:</strong> perturb the frozen config (risk multiples, lookback, entry fill, embargo) and rerun the gate. Diagnosis after a pass, never a second search.</li>
+    <li><strong>Every quoted figure carries a reproducer</strong> (script, seed, data reference), and working notes are authored under the repo's <code>docs/</code> from the first keystroke, not in a scratchpad.</li>
+    <li><strong>Measure, do not assume.</strong> The workspace docs are full of dated corrections where probing the actual files overturned a written assumption. When a doc and a measurement disagree, fix the doc in the same change.</li>
+  </ul>
+</section>
+
+<!-- ================= APPENDIX ================= -->
+<section id="verify">
+  <p class="part-label">Appendix</p>
+  <h2>Verification checklist and known traps</h2>
+  <p>Run these after setup, in order. Each one is cheap and each failure points at exactly one part of this guide.</p>
+  <ul class="checklist">
+    <li><code>python -c "import cotdata, marketdata, cotmetrics, crucible; print(cotdata.__file__)"</code> prints real paths, not <code>None</code> (phantom-package check, Part 2).</li>
+    <li><code>cotdata-update --check</code> and <code>marketdata-update --check</code> both report populated domains with recent <code>last_date</code>s (Parts 3-4).</li>
+    <li><code>python -c "import cotdata; print(cotdata.get_cot('ES').tail(3))"</code> returns rows.</li>
+    <li><code>python -c "import marketdata; print(marketdata.get_bars('SPY').tail(3))"</code> returns rows.</li>
+    <li>The CotIndexer snippet (Part 5) prints index columns, and the boot log does <em>not</em> warn about the sample params fallback.</li>
+    <li><code>cd cot-analyzer &amp;&amp; ./run-local.sh</code> boots without the price-store refusal and renders charts at <code>http://127.0.0.1:5001</code>.</li>
+    <li>Per-repo test suites pass with a store variable exported; strategy-repo suites run against the committed fixture store, never the live one (the repo READMEs carry the exact commands).</li>
+  </ul>
+
+  <h3>The traps, collected</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Trap</th><th>Symptom</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td>Sample-params fallback</td><td>runs cover 6 markets, look normal</td><td>export <code>COTMETRICS_PARAMS</code>; use the launchers</td></tr>
+      <tr><td>Wrong PyPI name</td><td><code>pip install marketdata</code> installs junk</td><td>the distribution is <code>crucible-marketdata</code></td></tr>
+      <tr><td>Shared store root</td><td>manifest entries silently vanish</td><td><code>COTDATA_STORE</code> and <code>MARKETDATA_STORE</code> are different directories</td></tr>
+      <tr><td>Phantom namespace package</td><td>import succeeds, behavior is baffling</td><td>check <code>module.__file__</code> is not <code>None</code></td></tr>
+      <tr><td>setuptools 81+</td><td><code>No module named 'pkg_resources'</code></td><td>pin <code>setuptools&lt;81</code> in working venvs</td></tr>
+      <tr><td>uv venv has no pip</td><td><code>No module named pip</code>, or Windows installs go global</td><td>use <code>uv pip install</code></td></tr>
+      <tr><td>Editable install = working tree</td><td>tests change behavior with no local edit</td><td>check sibling <code>git status</code> before hunting a flake</td></tr>
+      <tr><td>Scheduler env</td><td>cron/launchd job dies or silently scans the sample</td><td>launchers must default every store variable themselves</td></tr>
+      <tr><td>Exit-code health checks</td><td>nightly futures task "fails" every night</td><td>a defer exits non-zero by design; judge by the store</td></tr>
+      <tr><td>Undercounted search</td><td>a beautiful p-value</td><td>one <code>SearchSpaceLog</code> across the whole search; pass the ledger to the gate</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <p>COT Toolset Field Guide · covers cotdata, marketdata, cotmetrics, cot-analyzer, crucible, crucible-stack · worked example: NPF CS 80/20. Repo READMEs and <code>docs/</code> are the living authority; when this guide and a measurement disagree, trust the measurement and fix the doc.</p>
+</footer>
+</body>
+</html>
