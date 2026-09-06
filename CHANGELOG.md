@@ -6,6 +6,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`pine/`: the TradingView port of `crucible.edge`, with a guard test.** `CrucibleEdge.pine`
+  ports every edge metric, the report, cumulative R and max drawdown, and CSV export in
+  `TradeLog.from_frame`'s column order; `CrucibleEdgeConformance.pine` checks it on a chart
+  against values crucible produced (`pine/gen_vectors.py`, committed as `pine/vectors.json`).
+  `tests/test_pine_conformance.py` regenerates the vectors on every run and fails when either
+  file has drifted from the current crucible, so a metric change cannot land without the port.
+  Moved here from the npf repo, where it was built; the gauntlet is deliberately not ported
+  (a chart cannot know the search count). Docs: `docs/pine.md`.
+
 ### Changed
 - **The docs site covers `validation.monitor` where a reader would look for it.** #121
   fixed the README; the site had the same hole in three more places. The homepage's "What
