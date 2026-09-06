@@ -41,6 +41,7 @@ nav:
   - The edge monitor (design): edge_monitor.md
   - Architecture: architecture.md
   - Python support: python_support.md
+  - The Pine port: pine.md
 
 markdown_extensions:
   - admonition
