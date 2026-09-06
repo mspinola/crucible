@@ -118,6 +118,10 @@ would have shown you as a rising equity curve is, at this sample size,
 - **A generic barrier simulator**, `barrier_trades`: OHLC + a boolean entry
   signal → a `TradeLog`. No instrument specifics.
 - **Example signals**: `ma_cross`, `macd_cross`. Demos, not endorsed edges.
+- **A TradingView port of the scorecard**, [`pine/CrucibleEdge.pine`](pine): the edge
+  metrics and the report as a Pine v6 library, checked on a chart against values crucible
+  itself produces and guarded by a test here so the two cannot drift. The gauntlet is
+  deliberately not ported: a chart cannot know the search count.
 
 ## Does the edge survive out of sample? `crucible.validation`
 
