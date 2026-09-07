@@ -7,6 +7,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`examples/README.md`, an index of the examples.** One row per file: what it shows,
+  which extra it needs (core, `[report]`, `[examples]` + network), and whether CI runs it.
+  `tests/test_examples_readme.py` keeps the roster in sync both ways (every example is
+  listed; nothing listed has been deleted).
 - **`examples/stridsman_postpub.py`: judging a published system on post-publication
   data.** A worked case study of the procedure used to evaluate the systems in Thomas
   Stridsman's *Trading Systems That Work* (2000) on the 26 years after publication:
