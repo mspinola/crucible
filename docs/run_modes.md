@@ -32,6 +32,13 @@ closes above the prior 20-bar high; exit on a 2.5R target, a 1R stop, or a 30-ba
 on the reproducible synthetic prices in
 [`examples/donchian_gauntlet.py`](https://github.com/mspinola/crucible/blob/main/examples/donchian_gauntlet.py).
 
+A second worked example,
+[`examples/stridsman_postpub.py`](https://github.com/mspinola/crucible/blob/main/examples/stridsman_postpub.py),
+runs the ladder the other way round: a system whose rules and parameters were
+*published* (Stridsman, 2000), judged only on data from after publication, with the
+publication date as the holdout, every look counted in a `SearchSpaceLog`, and the
+detrended null scaled into R for a mixed long/short book.
+
 ```python
 from crucible.edge import barrier_trades
 from crucible.validation import (

@@ -6,6 +6,17 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **`examples/stridsman_postpub.py`: judging a published system on post-publication
+  data.** A worked case study of the procedure used to evaluate the systems in Thomas
+  Stridsman's *Trading Systems That Work* (2000) on the 26 years after publication:
+  implement the published rules with the published parameters, treat the publication
+  date as the holdout, count every look in a `SearchSpaceLog`, and run the gauntlet with
+  the detrended null and an R-denominated `null_scale` for a mixed long/short book. Runs
+  on reproducible synthetic prices (no network); the docstring records what the real
+  evaluation found (five nulls, one marginal lean that still failed the gate) and which
+  parts of the book's execution model the example approximates.
+
 ### Changed
 - **The docs site covers `validation.monitor` where a reader would look for it.** #121
   fixed the README; the site had the same hole in three more places. The homepage's "What
