@@ -1,0 +1,597 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © matt_spinola
+
+//@version=6
+
+// @description CrucibleEdge: the crucible edge metrics on TradingView. A function-for-function
+// port of `crucible.edge` (Python, crucible 0.7.0): the capital-free scorecard crucible computes
+// from a TradeLog before any gate runs. Same names, same formulas, same conventions, so a number
+// on a chart means what the same number means in crucible's edge report.
+//
+//   Pine                      crucible                           notes
+//   TradeLog                  crucible.edge.TradeLog             r required; mfe, mae, barsHeld, dates optional
+//   winRate(r)                win_rate                           share of r > 0 over non-na r
+//   expectancy(r)             expectancy                         wr*avg_win - lr*avg_loss (== mean r)
+//   profitFactor(r)           profit_factor                      gross profit / gross loss; +inf -> na (see isInf)
+//   payoffRatio(r)            payoff_ratio                       avg win / avg loss; +inf -> na
+//   sqn(r, cap)               sqn                                mean / sample std x sqrt(min(n, cap)), cap 100
+//   excursionRatio(mfe, mae)  excursion_ratio                    mean MFE / |mean MAE|
+//   eRatio(mfeK, maeK)        e_ratio                            same, at a fixed horizon k
+//   timeAsymmetry(bars, r)    time_asymmetry                     avg bars in winners / in losers
+//   exitEfficiency(r, mfe)    exit_efficiency                    winners: mean r / mean MFE
+//   edgeReport(log)           edge_report -> EdgeReport          every metric the log has columns for
+//   cumulativeR(r)            report.tearsheet.cumulative_r      summed R in log order
+//   maxDrawdownR(r)           report.tearsheet.equity_drawdown   deepest peak-to-trough of summed R
+//   csvHeader(), csvLine(..)  TradeLog.from_frame                 export a log for the Python gate
+//   breakEvenWinRate(payoff)  (derived)                          1 / (1 + payoff): the win rate at which expectancy is 0
+//   exitReasons(log)          (derived)                          count and mean R per exit reason, most frequent first
+//   drawEdgeReport(..)        (crucible.report analogue)          the report as a table: rows, tooltips, flags, theme
+//   drawEdgeReportGrid(..)    (crucible.report analogue)          the same report as a label-over-value grid (BackTestLib's look)
+//
+// Infinity: Pine has no +inf. Where crucible returns +inf (no losers), these functions return na
+// and the companion `isInf` predicates say why. NaN in crucible is na here.
+//
+// What is NOT here, on purpose: bootstrap_ci, reality_check, the nulls, pbo, run_gauntlet,
+// SearchSpaceLog. Those need seeded randomness and the count of every variant searched, which a
+// chart script cannot know. This library is the scorecard, not the judge. Export the log
+// (csvLine) and run the gate in Python. Conformance: CrucibleEdgeConformance.pine checks every
+// function against values crucible's own edge_report produced (pine/gen_vectors.py, pine/vectors.json).
+library("CrucibleEdge")
+
+// ── TradeLog ────────────────────────────────────────────────────────────────────────────
+//@type TradeLog A set of closed trades in R. One element per trade in every array; use na for a
+// missing optional value. Mirrors crucible.edge.TradeLog (r required, the rest optional).
+export type TradeLog
+    array<float> r
+    array<float> mfe
+    array<float> mae
+    array<float> barsHeld
+    array<int> entryTime
+    array<int> exitTime
+    array<string> reason     // why the trade closed ("Stop", "Hard stop", "COT neutral", ...); na when unknown
+
+//@function newLog An empty TradeLog with every column allocated.
+export newLog() =>
+    TradeLog.new(array.new<float>(), array.new<float>(), array.new<float>(), array.new<float>(), array.new<int>(), array.new<int>(), array.new<string>())
+
+//@function append Add one closed trade. r is required; pass na for what you do not have. `reason` is the
+// exit reason label (a strategy passes strategy.closedtrades.exit_comment); it feeds the exit-reason rows.
+export append(TradeLog log, float r, float mfe = na, float mae = na, float barsHeld = na, int entryTime = na, int exitTime = na, string reason = na) =>
+    array.push(log.r, r)
+    array.push(log.mfe, mfe)
+    array.push(log.mae, mae)
+    array.push(log.barsHeld, barsHeld)
+    array.push(log.entryTime, entryTime)
+    array.push(log.exitTime, exitTime)
+    // logs built before this column existed have a shorter reason array; keep it aligned
+    if na(log.reason)
+        log.reason := array.new<string>()
+    while array.size(log.reason) < array.size(log.r) - 1
+        array.push(log.reason, string(na))
+    array.push(log.reason, reason)
+    log
+
+//@function count Number of trades in the log (na r included, as crucible's n counts rows).
+export count(TradeLog log) =>
+    array.size(log.r)
+
+// crucible's `_arr`: drop NaN.
+dropNa(array<float> a) =>
+    out = array.new<float>()
+    if not na(a)
+        for v in a
+            if not na(v)
+                array.push(out, v)
+    out
+
+// ── Metrics ─────────────────────────────────────────────────────────────────────────────
+//@function winRate crucible.edge.win_rate: share of trades with r > 0 among non-na r. 0 when empty.
+export winRate(array<float> r) =>
+    x = dropNa(r)
+    n = array.size(x)
+    if n == 0
+        0.0
+    else
+        w = 0
+        for v in x
+            if v > 0
+                w += 1
+        w / n
+
+//@function expectancy crucible.edge.expectancy: win_rate*avg_win - loss_rate*avg_loss, in R. 0 when empty.
+export expectancy(array<float> r) =>
+    x = dropNa(r)
+    n = array.size(x)
+    if n == 0
+        0.0
+    else
+        sw = 0.0
+        nw = 0
+        sl = 0.0
+        nl = 0
+        for v in x
+            if v > 0
+                sw += v
+                nw += 1
+            else if v < 0
+                sl += v
+                nl += 1
+        avgWin = nw > 0 ? sw / nw : 0.0
+        avgLoss = nl > 0 ? math.abs(sl / nl) : 0.0
+        (nw / n) * avgWin - (nl / n) * avgLoss
+
+//@function profitFactorIsInf True when crucible's profit_factor would be +inf (gross profit > 0, no losses).
+export profitFactorIsInf(array<float> r) =>
+    x = dropNa(r)
+    gp = 0.0
+    gl = 0.0
+    for v in x
+        if v > 0
+            gp += v
+        else if v < 0
+            gl += -v
+    gl == 0 and gp > 0
+
+//@function profitFactor crucible.edge.profit_factor: gross profit / gross loss. na where crucible returns +inf; 0 when no profit and no loss.
+export profitFactor(array<float> r) =>
+    x = dropNa(r)
+    gp = 0.0
+    gl = 0.0
+    for v in x
+        if v > 0
+            gp += v
+        else if v < 0
+            gl += -v
+    gl == 0 ? (gp > 0 ? na : 0.0) : gp / gl
+
+//@function payoffRatioIsInf True when crucible's payoff_ratio would be +inf (winners, no losers).
+export payoffRatioIsInf(array<float> r) =>
+    x = dropNa(r)
+    nw = 0
+    nl = 0
+    for v in x
+        if v > 0
+            nw += 1
+        else if v < 0
+            nl += 1
+    nw > 0 and nl == 0
+
+//@function payoffRatio crucible.edge.payoff_ratio: average win / average loss. na where crucible returns +inf; 0 with no winners.
+export payoffRatio(array<float> r) =>
+    x = dropNa(r)
+    sw = 0.0
+    nw = 0
+    sl = 0.0
+    nl = 0
+    for v in x
+        if v > 0
+            sw += v
+            nw += 1
+        else if v < 0
+            sl += v
+            nl += 1
+    nw == 0 ? 0.0 : nl == 0 ? na : (sw / nw) / math.abs(sl / nl)
+
+//@function sqn crucible.edge.sqn: Van Tharp System Quality Number, mean / sample std x sqrt(min(n, cap)). 0 when n < 2 or the spread is floating-point noise.
+export sqn(array<float> r, int cap = 100) =>
+    x = dropNa(r)
+    n = array.size(x)
+    if n < 2
+        0.0
+    else
+        sd = array.stdev(x, false)
+        absMean = 0.0
+        for v in x
+            absMean += math.abs(v)
+        absMean := absMean / n
+        sd <= 1e-12 * (absMean + 1e-12) ? 0.0 : array.avg(x) / sd * math.sqrt(math.min(n, cap))
+
+//@function excursionRatio crucible.edge.excursion_ratio: mean(MFE) / |mean(MAE)|, NaN-dropped separately. na when either is empty or mean MAE is 0 (crucible: nan / +inf).
+export excursionRatio(array<float> mfe, array<float> mae) =>
+    f = dropNa(mfe)
+    a = dropNa(mae)
+    if array.size(f) == 0 or array.size(a) == 0
+        float(na)
+    else
+        m = math.abs(array.avg(a))
+        m == 0 ? na : array.avg(f) / m
+
+//@function eRatio crucible.edge.e_ratio: excursionRatio at a fixed horizon k. Pass the k-bar MFE/MAE arrays.
+export eRatio(array<float> mfeK, array<float> maeK) =>
+    excursionRatio(mfeK, maeK)
+
+//@function timeAsymmetry crucible.edge.time_asymmetry: mean bars held in winners / mean bars held in losers. na (crucible nan) without both.
+export timeAsymmetry(array<float> barsHeld, array<float> r) =>
+    n = math.min(array.size(barsHeld), array.size(r))
+    wb = 0.0
+    nw = 0
+    lb = 0.0
+    nl = 0
+    if n > 0
+        for i = 0 to n - 1
+            v = array.get(r, i)
+            b = array.get(barsHeld, i)
+            if v > 0
+                wb += b
+                nw += 1
+            else if v < 0
+                lb += b
+                nl += 1
+    if nw == 0 or nl == 0
+        float(na)
+    else
+        denom = lb / nl
+        denom == 0 ? na : (wb / nw) / denom
+
+//@function exitEfficiency crucible.edge.exit_efficiency: among winners, mean r / mean MFE. na without winners or when mean MFE <= 0.
+export exitEfficiency(array<float> r, array<float> mfe) =>
+    n = math.min(array.size(r), array.size(mfe))
+    sr = 0.0
+    sm = 0.0
+    nw = 0
+    if n > 0
+        for i = 0 to n - 1
+            v = array.get(r, i)
+            if v > 0
+                sr += v
+                sm += array.get(mfe, i)
+                nw += 1
+    if nw == 0
+        float(na)
+    else
+        avail = sm / nw
+        avail > 0 ? (sr / nw) / avail : na
+
+//@function breakEvenWinRate The win rate at which expectancy is exactly zero for a given payoff ratio: 1 / (1 + payoff).
+// Compare it with wins / (wins + losses), scratches excluded; above it the book has positive expectancy. na without a payoff;
+// 0 when the payoff is infinite (no losers).
+export breakEvenWinRate(float payoff, bool payoffInf = false) =>
+    payoffInf ? 0.0 : na(payoff) or payoff <= 0 ? na : 1.0 / (1.0 + payoff)
+
+//@function exitReasons Tally the log's exit reasons: distinct labels, their trade counts and mean R, sorted by count
+// descending. Trades with na reason are skipped. Returns [labels, counts, meanR].
+export exitReasons(TradeLog log) =>
+    labels = array.new<string>()
+    counts = array.new<int>()
+    sums = array.new<float>()
+    if not na(log.reason)
+        n = math.min(array.size(log.reason), array.size(log.r))
+        if n > 0
+            for i = 0 to n - 1
+                lab = array.get(log.reason, i)
+                if not na(lab)
+                    k = array.indexof(labels, lab)
+                    v = array.get(log.r, i)
+                    if k < 0
+                        array.push(labels, lab)
+                        array.push(counts, 1)
+                        array.push(sums, nz(v))
+                    else
+                        array.set(counts, k, array.get(counts, k) + 1)
+                        array.set(sums, k, array.get(sums, k) + nz(v))
+    // insertion sort by count, descending (a handful of labels, stable)
+    m = array.size(labels)
+    if m > 1
+        for i = 1 to m - 1
+            j = i
+            while j > 0 and array.get(counts, j) > array.get(counts, j - 1)
+                tl = array.get(labels, j)
+                array.set(labels, j, array.get(labels, j - 1))
+                array.set(labels, j - 1, tl)
+                tc = array.get(counts, j)
+                array.set(counts, j, array.get(counts, j - 1))
+                array.set(counts, j - 1, tc)
+                ts = array.get(sums, j)
+                array.set(sums, j, array.get(sums, j - 1))
+                array.set(sums, j - 1, ts)
+                j -= 1
+    means = array.new<float>()
+    if m > 0
+        for i = 0 to m - 1
+            array.push(means, array.get(sums, i) / array.get(counts, i))
+    [labels, counts, means]
+
+//@function cumulativeR report.tearsheet.cumulative_r: running sum of R in log order (na r skipped).
+export cumulativeR(array<float> r) =>
+    out = array.new<float>()
+    s = 0.0
+    for v in r
+        if not na(v)
+            s += v
+        array.push(out, s)
+    out
+
+//@function maxDrawdownR report.tearsheet.equity_drawdown: deepest peak-to-trough of summed R, as a positive number. 0 when empty.
+// The running peak starts at the FIRST trade's cumulative R, as crucible's `eq - maximum.accumulate(eq)` does, not at
+// the flat start of 0. A log that opens with losers therefore reports the drawdown from its first close, not from zero
+// (three losers of -1, -0.5, -1 read 1.5, not 2.5). Same convention as crucible so the numbers agree; the conformance
+// case all_losers pins it.
+export maxDrawdownR(array<float> r) =>
+    eq = cumulativeR(r)
+    dd = 0.0
+    if array.size(eq) > 0
+        peak = array.get(eq, 0)
+        for v in eq
+            peak := math.max(peak, v)
+            dd := math.max(dd, peak - v)
+    dd
+
+// ── Report ──────────────────────────────────────────────────────────────────────────────
+//@type EdgeReport crucible.edge.EdgeReport, plus the drawdown the tearsheet draws. Optional metrics
+// are na when the log lacks the column, exactly where crucible leaves them None.
+export type EdgeReport
+    int n = 0
+    int nWins = 0            // intermediates of expectancy / payoff, exposed for display
+    int nLosses = 0
+    float avgWinR = na
+    float avgLossR = na
+    float winRate = na
+    float expectancy = na
+    float profitFactor = na
+    bool profitFactorInf = false
+    float payoffRatio = na
+    bool payoffRatioInf = false
+    float sqn = na
+    float excursionRatio = na
+    float eRatio = na
+    float timeAsymmetry = na
+    float exitEfficiency = na
+    float maxDrawdownR = na
+    float breakEvenWinRate = na          // 1 / (1 + payoff); derived, not a crucible field
+    array<string> reasonLabels           // exit reasons, most frequent first (na when the log has none)
+    array<int> reasonCounts
+    array<float> reasonMeanR
+
+hasAny(array<float> a) =>
+    array.size(dropNa(a)) > 0
+
+//@function edgeReport crucible.edge.edge_report: every metric the log has the columns to support.
+export edgeReport(TradeLog log) =>
+    rep = EdgeReport.new()
+    rep.n := array.size(log.r)
+    sw = 0.0
+    sl = 0.0
+    for v in log.r
+        if v > 0
+            sw += v
+            rep.nWins += 1
+        else if v < 0
+            sl += v
+            rep.nLosses += 1
+    rep.avgWinR := rep.nWins > 0 ? sw / rep.nWins : na
+    rep.avgLossR := rep.nLosses > 0 ? sl / rep.nLosses : na
+    rep.winRate := winRate(log.r)
+    rep.expectancy := expectancy(log.r)
+    rep.profitFactor := profitFactor(log.r)
+    rep.profitFactorInf := profitFactorIsInf(log.r)
+    rep.payoffRatio := payoffRatio(log.r)
+    rep.payoffRatioInf := payoffRatioIsInf(log.r)
+    rep.sqn := sqn(log.r, 100)
+    rep.maxDrawdownR := maxDrawdownR(log.r)
+    rep.breakEvenWinRate := breakEvenWinRate(rep.payoffRatio, rep.payoffRatioInf)
+    [labels, counts, means] = exitReasons(log)
+    if array.size(labels) > 0
+        rep.reasonLabels := labels
+        rep.reasonCounts := counts
+        rep.reasonMeanR := means
+    if hasAny(log.mfe) and hasAny(log.mae)
+        rep.excursionRatio := excursionRatio(log.mfe, log.mae)
+    if hasAny(log.barsHeld)
+        rep.timeAsymmetry := timeAsymmetry(log.barsHeld, log.r)
+    if hasAny(log.mfe)
+        rep.exitEfficiency := exitEfficiency(log.r, log.mfe)
+    rep
+
+// ── Export ──────────────────────────────────────────────────────────────────────────────
+//@function csvHeader Column header matching TradeLog.from_frame's default names, plus exit_reason (from_frame keeps
+// extra columns; nothing in crucible reads it).
+export csvHeader() =>
+    "r,mfe,mae,bars_held,entry_date,exit_date,exit_reason"
+
+csvNum(float x) =>
+    na(x) ? "" : str.tostring(x, "#.######")
+
+csvDate(int t, string timezone) =>
+    na(t) ? "" : str.format_time(t, "yyyy-MM-dd", timezone)
+
+//@function csvLine One trade as a CSV row for the Python gate (dates in the given time zone).
+export csvLine(float r, float mfe, float mae, float barsHeld, int entryTime, int exitTime, string timezone = "UTC", string reason = na) =>
+    csvNum(r) + "," + csvNum(mfe) + "," + csvNum(mae) + "," + csvNum(barsHeld) + "," + csvDate(entryTime, timezone) + "," + csvDate(exitTime, timezone) + "," + (na(reason) ? "" : reason)
+
+//@function logCsv Write the whole log to the Pine Logs pane, header first. Copy the pane into a .csv.
+export logCsv(TradeLog log, string timezone = "UTC") =>
+    log.info(csvHeader())
+    if array.size(log.r) > 0
+        for i = 0 to array.size(log.r) - 1
+            reason = na(log.reason) or i >= array.size(log.reason) ? string(na) : array.get(log.reason, i)
+            log.info(csvLine(array.get(log.r, i), array.get(log.mfe, i), array.get(log.mae, i), array.get(log.barsHeld, i),
+                 array.get(log.entryTime, i), array.get(log.exitTime, i), timezone, reason))
+
+// ── Report table (the crucible.report analogue) ─────────────────────────────────────────
+// The metric functions above are arithmetic only. Everything about SHOWING a report lives
+// here, once, so every script that draws one shows the same rows, the same definitions in the
+// tooltips, and the same flags: the ones crucible's EdgeReport prints for itself (expectancy > 0
+// fail/pass, profit factor > 1.25 warn/pass, excursion ratio > 1 fail/pass, time asymmetry > 1
+// warn/pass; the rest informational). Never the gauntlet's verdict.
+
+//@type ReportStyle Colours and text size for drawEdgeReport. Build one with styleAuto / styleDark / styleLight.
+export type ReportStyle
+    color keyBg
+    color valBg
+    color fg
+    color pass
+    color warn
+    color fail
+    string textSize = "small"
+    bool bold = false            // heavier strokes; on for the light palette, where thin text reads grey
+
+//@function textFormat The text_formatting a caller should pass for cells drawn in this style.
+export textFormat(ReportStyle st) =>
+    st.bold ? text.format_bold : text.format_none
+
+//@function styleLight A fixed light table: opaque grey cells that stand off a white chart, black text, flag tints
+// strong enough to read at a glance. Draw the table with a border colour (table.new border_color) for gridlines.
+export styleLight(string textSize = "small") =>
+    ReportStyle.new(color.new(#c9ced6, 0), color.new(#e6e9ee, 0), color.black,
+         color.new(#3aa65a, 20), color.new(#e6931f, 20), color.new(#dd4b43, 20), textSize, true)
+
+//@function styleDark A fixed dark table: translucent black cells, white text.
+export styleDark(string textSize = "small") =>
+    ReportStyle.new(color.new(color.black, 0), color.new(color.black, 20), color.white,
+         color.new(color.green, 60), color.new(color.orange, 55), color.new(color.red, 55), textSize)
+
+//@function styleAuto Picks styleLight or styleDark from the chart background's brightness (chart.bg_color luma), so a
+// table reads on either theme without a manual switch. Earlier versions tinted chart.bg_color, which vanished on white.
+export styleAuto(string textSize = "small") =>
+    luma = 0.299 * color.r(chart.bg_color) + 0.587 * color.g(chart.bg_color) + 0.114 * color.b(chart.bg_color)
+    luma > 128 ? styleLight(textSize) : styleDark(textSize)
+
+//@function styleFor A style from a "Auto (chart)" / "Dark" / "Light" input string.
+export styleFor(string theme, string textSize = "small") =>
+    theme == "Dark" ? styleDark(textSize) : theme == "Light" ? styleLight(textSize) : styleAuto(textSize)
+
+//@function metricTooltip The definition of a report row, from crucible's docstrings. Keys: report, trades, win_rate,
+// expectancy, profit_factor, payoff_ratio, break_even, avg_win_loss, sqn, max_drawdown, excursion_ratio, time_asymmetry,
+// exit_efficiency, exit_reasons, exit_reason.
+export metricTooltip(string key) =>
+    switch key
+        "report" => "crucible.edge.edge_report on this trade log. Every metric is in R (1R = the risk taken at entry), gross, capital-free. Colours are the flags the Python report prints for itself (green pass, orange warn, red fail); they are not the gauntlet's verdict."
+        "trades" => "n: closed trades in the log. Winners are r > 0, losers r < 0; r == 0 is a scratch and counts in neither."
+        "win_rate" => "win_rate: share of trades with r > 0. Informational."
+        "expectancy" => "expectancy: win_rate x average win - loss_rate x average loss, in R, which equals the mean R per trade. Flag: > 0 pass, otherwise fail."
+        "profit_factor" => "profit_factor: gross R won / gross R lost. inf when there are no losers. Flag: > 1.25 pass, otherwise warn."
+        "payoff_ratio" => "payoff_ratio (reward / risk): average winning R / average losing R, the terminal reward-to-risk. Informational."
+        "break_even" => "Break-even win rate = 1 / (1 + payoff): the share of decisive trades that must win for expectancy to be zero at this payoff. Shown against the actual wins / (wins + losses), scratches excluded. Flag: actual above break-even pass, otherwise fail (the same test as expectancy > 0, seen from the win-rate side)."
+        "avg_win_loss" => "The two halves of expectancy and payoff: mean R of the winners and mean R of the losers."
+        "sqn" => "sqn: Van Tharp System Quality Number, mean R / sample standard deviation of R x sqrt(min(n, 100)). 0 when n < 2 or the spread is floating-point noise. Informational."
+        "max_drawdown" => "Deepest peak-to-trough of cumulative R at equal risk per trade, as crucible's tearsheet draws it. Summed R, not an equity curve: capital-free."
+        "excursion_ratio" => "excursion_ratio: mean MFE / |mean MAE|, both in R, measured from entry over every held bar. How far trades run for you versus against you. Flag: > 1 pass, otherwise fail."
+        "time_asymmetry" => "time_asymmetry: mean bars held in winners / mean bars held in losers. Above 1 means winners run and losers are cut. Flag: > 1 pass, otherwise warn."
+        "exit_efficiency" => "exit_efficiency: among winners, mean R captured / mean MFE available. 100% means the exit sold the top. Informational."
+        "exit_reasons" => "How the trades closed: one row per exit reason, most frequent first, with the trade count and the mean R of those trades. Losers beyond -1R come from the close-through stop (fills at the breaching close, not the level) and the hard stop; a reason whose mean R is far from -1R or from the average winner is where the book's shape comes from. Informational."
+        "exit_reason" => "Trades that closed for this reason: count, share of all trades, and their mean R."
+        => ""
+
+//@function flagColor The cell colour for a metric value under crucible's own flag rules; valBg where the metric is informational or na.
+export flagColor(string key, float value, bool isInf, ReportStyle st) =>
+    if isInf
+        st.pass
+    else if na(value)
+        st.valBg
+    else
+        switch key
+            "expectancy" => value > 0 ? st.pass : st.fail
+            "break_even" => value > 0 ? st.pass : st.fail   // value = decisive win rate - break-even win rate
+            "profit_factor" => value > 1.25 ? st.pass : st.warn
+            "excursion_ratio" => value > 1.0 ? st.pass : st.fail
+            "time_asymmetry" => value > 1.0 ? st.pass : st.warn
+            => st.valBg
+
+txtSize(string s) =>
+    s == "tiny" ? size.tiny : s == "normal" ? size.normal : s == "large" ? size.large : size.small
+
+num(float x, string fmt) =>
+    na(x) ? "-" : str.tostring(x, fmt)
+
+signed(float x, string fmt) =>
+    na(x) ? "-" : (x > 0 ? "+" : "") + str.tostring(x, fmt)
+
+reportRow(table t, int col, int row, string key, string label, string value, color valBg, ReportStyle st) =>
+    tip = metricTooltip(key)
+    table.cell(t, col, row, label, text_color = st.fg, bgcolor = st.keyBg, text_size = txtSize(st.textSize), tooltip = tip, text_formatting = textFormat(st))
+    table.cell(t, col + 1, row, value, text_color = st.fg, bgcolor = valBg, text_size = txtSize(st.textSize), tooltip = tip, text_formatting = textFormat(st))
+
+// ── Grid layout (the BackTestLib look: label over value, several metrics per row) ───────
+gridCell(table t, int col, int row, string key, string label, string value, color bg, ReportStyle st) =>
+    table.cell(t, col, row, label + "\n" + value, text_color = st.fg, bgcolor = bg, text_size = txtSize(st.textSize), tooltip = metricTooltip(key), text_formatting = textFormat(st))
+
+//@function edgeReportGridRows Rows drawEdgeReportGrid writes for a table `columns` wide (12 metric cells, then the reason cells).
+export edgeReportGridRows(int columns = 5, int maxReasons = 0) =>
+    c = math.max(columns, 1)
+    math.ceil(12.0 / c) + (maxReasons > 0 ? math.ceil(maxReasons / float(c)) : 0)
+
+//@function drawEdgeReportGrid The same report as drawEdgeReport laid out as a grid, `columns` cells per row, each cell
+// "label / value" with the definition as its tooltip and crucible's flags as its colour (BackTestLib's summary look).
+// No title cell: the Trades cell carries the report tooltip. The table needs `columns` columns and
+// edgeReportGridRows(columns, maxReasons) rows from `row`. Returns the next free row.
+export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int columns = 5, int maxReasons = 0) =>
+    c = math.max(columns, 1)
+    decisive = rep.nWins + rep.nLosses
+    actualWr = decisive > 0 ? rep.nWins / decisive : na
+    beMargin = na(actualWr) or na(rep.breakEvenWinRate) ? na : actualWr - rep.breakEvenWinRate
+    keys   = array.from("report", "win_rate", "expectancy", "profit_factor", "payoff_ratio", "break_even", "avg_win_loss", "sqn", "max_drawdown", "excursion_ratio", "time_asymmetry", "exit_efficiency")
+    labels = array.from("Trades (R, gross)", "Win rate", "Expectancy", "Profit factor", "Reward / risk", "Break-even WR", "Avg win / loss", "SQN-100", "Max DD", "Excursion", "Time asym", "Exit eff")
+    values = array.from(
+         str.tostring(rep.n) + " (" + str.tostring(rep.nWins) + "W / " + str.tostring(rep.nLosses) + "L)",
+         num(rep.winRate * 100, "#.#") + "%",
+         signed(rep.expectancy, "#.###") + " R",
+         rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"),
+         rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"),
+         num(rep.breakEvenWinRate * 100, "#.#") + "%" + (na(actualWr) ? "" : " (act " + num(actualWr * 100, "#.#") + "%)"),
+         signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R",
+         num(rep.sqn, "#.##"),
+         num(rep.maxDrawdownR, "#.#") + " R",
+         num(rep.excursionRatio, "#.##"),
+         num(rep.timeAsymmetry, "#.##"),
+         na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%")
+    colors = array.from(st.valBg, st.valBg,
+         flagColor("expectancy", rep.expectancy, false, st),
+         flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st),
+         st.valBg,
+         flagColor("break_even", beMargin, false, st),
+         st.valBg, st.valBg, st.valBg,
+         flagColor("excursion_ratio", rep.excursionRatio, false, st),
+         flagColor("time_asymmetry", rep.timeAsymmetry, false, st),
+         st.valBg)
+    for i = 0 to 11
+        gridCell(t, i % c, row + math.floor(i / c), array.get(keys, i), array.get(labels, i), array.get(values, i), array.get(colors, i), st)
+    next = row + math.ceil(12.0 / c)
+    if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
+        k = math.min(maxReasons, array.size(rep.reasonLabels))
+        for i = 0 to k - 1
+            cnt = array.get(rep.reasonCounts, i)
+            share = rep.n > 0 ? cnt * 100.0 / rep.n : na
+            val = str.tostring(cnt) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
+            gridCell(t, i % c, next + math.floor(i / c), "exit_reason", "Exit: " + array.get(rep.reasonLabels, i), val, st.valBg, st)
+        next += math.ceil(k / float(c))
+    next
+
+//@function edgeReportRows Rows drawEdgeReport writes, so the caller can size its table. `maxReasons` > 0 adds a header
+// row plus one row per exit reason (up to that many); size for the most reasons the strategy can produce.
+export edgeReportRows(int maxReasons = 0) =>
+    13 + (maxReasons > 0 ? 1 + maxReasons : 0)
+
+//@function drawEdgeReport Draw the report into a table, two columns wide starting at (col, row). The table needs
+// edgeReportRows(maxReasons) rows from `row`. Every row carries its definition as a tooltip. With `maxReasons` > 0 and
+// a log that carries exit reasons, the most frequent reasons follow the metrics (count, share, mean R). Returns the
+// next free row.
+export drawEdgeReport(table t, int col, int row, EdgeReport rep, ReportStyle st, string title = "crucible edge report", int maxReasons = 0) =>
+    r = row
+    decisive = rep.nWins + rep.nLosses
+    actualWr = decisive > 0 ? rep.nWins / decisive : na
+    beMargin = na(actualWr) or na(rep.breakEvenWinRate) ? na : actualWr - rep.breakEvenWinRate
+    reportRow(t, col, r, "report", title, "R, gross", st.valBg, st)
+    reportRow(t, col, r + 1, "trades", "Trades", str.tostring(rep.n) + "  (" + str.tostring(rep.nWins) + " W / " + str.tostring(rep.nLosses) + " L)", st.valBg, st)
+    reportRow(t, col, r + 2, "win_rate", "Win rate", num(rep.winRate * 100, "#.#") + "%", st.valBg, st)
+    reportRow(t, col, r + 3, "expectancy", "Expectancy", signed(rep.expectancy, "#.###") + " R", flagColor("expectancy", rep.expectancy, false, st), st)
+    reportRow(t, col, r + 4, "profit_factor", "Profit factor", rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"), flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st), st)
+    reportRow(t, col, r + 5, "payoff_ratio", "Reward / risk (payoff)", rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"), st.valBg, st)
+    reportRow(t, col, r + 6, "break_even", "Break-even win rate", num(rep.breakEvenWinRate * 100, "#.#") + "%" + (na(actualWr) ? "" : "  (actual " + num(actualWr * 100, "#.#") + "%)"), flagColor("break_even", beMargin, false, st), st)
+    reportRow(t, col, r + 7, "avg_win_loss", "Avg win / avg loss", signed(rep.avgWinR, "#.##") + " R / " + signed(rep.avgLossR, "#.##") + " R", st.valBg, st)
+    reportRow(t, col, r + 8, "sqn", "SQN-100", num(rep.sqn, "#.##"), st.valBg, st)
+    reportRow(t, col, r + 9, "max_drawdown", "Max drawdown", num(rep.maxDrawdownR, "#.#") + " R", st.valBg, st)
+    reportRow(t, col, r + 10, "excursion_ratio", "Excursion ratio", num(rep.excursionRatio, "#.##"), flagColor("excursion_ratio", rep.excursionRatio, false, st), st)
+    reportRow(t, col, r + 11, "time_asymmetry", "Time asymmetry", num(rep.timeAsymmetry, "#.##"), flagColor("time_asymmetry", rep.timeAsymmetry, false, st), st)
+    reportRow(t, col, r + 12, "exit_efficiency", "Exit efficiency", na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%", st.valBg, st)
+    next = r + 13
+    if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
+        reportRow(t, col, next, "exit_reasons", "Exit reasons", "count  (share)  mean R", st.valBg, st)
+        next += 1
+        k = math.min(maxReasons, array.size(rep.reasonLabels))
+        for i = 0 to k - 1
+            c = array.get(rep.reasonCounts, i)
+            share = rep.n > 0 ? c * 100.0 / rep.n : na
+            val = str.tostring(c) + "  (" + num(share, "#") + "%)  " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
+            reportRow(t, col, next, "exit_reason", "  " + array.get(rep.reasonLabels, i), val, st.valBg, st)
+            next += 1
+    next

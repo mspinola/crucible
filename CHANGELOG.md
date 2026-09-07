@@ -16,6 +16,14 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   on reproducible synthetic prices (no network); the docstring records what the real
   evaluation found (five nulls, one marginal lean that still failed the gate) and which
   parts of the book's execution model the example approximates.
+- **`pine/`: the TradingView port of `crucible.edge`, with a guard test.** `CrucibleEdge.pine`
+  ports every edge metric, the report, cumulative R and max drawdown, and CSV export in
+  `TradeLog.from_frame`'s column order; `CrucibleEdgeConformance.pine` checks it on a chart
+  against values crucible produced (`pine/gen_vectors.py`, committed as `pine/vectors.json`).
+  `tests/test_pine_conformance.py` regenerates the vectors on every run and fails when either
+  file has drifted from the current crucible, so a metric change cannot land without the port.
+  Moved here from the npf repo, where it was built; the gauntlet is deliberately not ported
+  (a chart cannot know the search count). Docs: `docs/pine.md`.
 
 ### Changed
 - **The docs site covers `validation.monitor` where a reader would look for it.** #121

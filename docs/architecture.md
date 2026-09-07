@@ -75,6 +75,7 @@ flowchart TD
 | **`ml`** | `ml/` (ic, decay, redundancy, pit) | The same honesty aimed at a model's scores — a predictions frame, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window` |
 | **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard`, `monitor_panel` |
 | **`strategies`** | `strategies/` (ma_cross, macd_cross) | Demo signals for examples and tests. *Not endorsed edges.* | `ma_cross`, `macd_cross` |
+| **`pine`** | `pine/` at the repo root, not a Python package | The TradingView port of `edge` (Pine v6), its on-chart conformance check, and the vectors crucible generates for it. Scorecard only; nothing from the gauntlet. See [The Pine port](pine.md). | `CrucibleEdge.pine`, `CrucibleEdgeConformance.pine`, `gen_vectors.py` |
 
 ## The data-flow spine (signal → verdict)
 
@@ -189,7 +190,7 @@ variants you discarded. This records them.
 
 | You want to… | Touch | Notes |
 |---|---|---|
-| Add or fix an edge metric | `edge/metrics.py` | Add to `EdgeReport` if it belongs on the scorecard. |
+| Add or fix an edge metric | `edge/metrics.py` | Add to `EdgeReport` if it belongs on the scorecard. `tests/test_pine_conformance.py` will fail until `pine/vectors.json` is regenerated and the Pine port follows (see `pine/README.md`). |
 | Add a statistical test / correction | `validation/` (new module or `permutation.py` / `pbo.py`) | Keep it numpy/pandas-only; feed it `SearchSpaceLog`'s N. |
 | Add or retune a gauntlet gate | `validation/gauntlet.py` + `validation/thresholds.py` | New gates are `Gate`-returning factories; wire into `run_gauntlet`. Thresholds go in `Thresholds`, never inline. |
 | Change how a promoted edge is monitored | `validation/monitor.py` + `validation/thresholds.py` | Post-promotion, not a gate. Keep it stateless: no clock, no persistence. Only a detector with a stated false-alarm rate may escalate to DEGRADED. |
