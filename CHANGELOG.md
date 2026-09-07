@@ -13,9 +13,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   implement the published rules with the published parameters, treat the publication
   date as the holdout, count every look in a `SearchSpaceLog`, and run the gauntlet with
   the detrended null and an R-denominated `null_scale` for a mixed long/short book. Runs
-  on reproducible synthetic prices (no network); the docstring records what the real
-  evaluation found (five nulls, one marginal lean that still failed the gate) and which
-  parts of the book's execution model the example approximates.
+  on synthetic prices (no real asset, no network; trend regimes planted only before the
+  publication date, so the full history flatters and the post-publication gauntlet fails);
+  the docstring records what the real evaluation found (five nulls, one marginal lean that
+  still failed the gate) and which parts of the book's execution model the example
+  approximates. `tests/test_stridsman_postpub_example.py` guards the two facts that
+  narrative depends on through the example's own `judge()` path, without pinning any
+  report formatting.
+- **`examples/stridsman_postpub_yfinance.py`: the same procedure on real data.** Shares the
+  rules and the judging with the synthetic example (one implementation, no drift), pulls
+  `ES=F` or `SPY` from Yahoo Finance, and discloses up front why a front-month series with
+  roll gaps is a harder, differently biased test than the ratio-adjusted contracts the
+  book requires. Needs the `[examples]` extra and network access, so not part of CI.
 - **`pine/`: the TradingView port of `crucible.edge`, with a guard test.** `CrucibleEdge.pine`
   ports every edge metric, the report, cumulative R and max drawdown, and CSV export in
   `TradeLog.from_frame`'s column order; `CrucibleEdgeConformance.pine` checks it on a chart

@@ -10,11 +10,12 @@ Breakout kept a small real lean (~+0.14R/trade) that still failed the gauntlet o
 effect size and cross-market generality, which is roughly what the book's own
 philosophy predicts for parameters frozen in 1999.
 
-This example demonstrates that procedure end to end on reproducible synthetic
-prices (no network, exact numbers every run), using the book's SDB rules. The
-synthetic series is built to tell the story: multi-year trend regimes are planted
-BEFORE the publication date (the era the rules were fitted to) and none after, so
-the full-history scorecard flatters and the post-publication gauntlet does not.
+This example demonstrates that procedure end to end on SYNTHETIC prices: no real
+asset is involved, no network, exact numbers every run. The series is a seeded
+random walk built to tell the story: multi-year trend regimes are planted BEFORE
+the publication date (the era the rules were fitted to) and none after, so the
+full-history scorecard flatters and the post-publication gauntlet does not. For
+the same procedure on a real instrument, see ``examples/stridsman_postpub_yfinance.py``.
 
   1. implement the published rules with the published parameters, no tuning;
   2. split at the "publication date" and evaluate only trades entered after it;
@@ -97,24 +98,22 @@ def sdb_trades(px: pd.DataFrame) -> TradeLog:
     return TradeLog(both.reset_index(drop=True))
 
 
-def main() -> None:
-    px = synthetic_prices()
+THR = Thresholds(n_boot=5000, n_perm=5000, n_random_sims=500)
 
-    # 1-2. published rules; the full history flatters (its trends were planted for
-    # the rules to find), so only trades entered after publication are judged
+
+def judge(px: pd.DataFrame, *, scope: str = "stridsman-sdb-postpub", thr: Thresholds = THR):
+    """The whole procedure on one OHLC frame: (full-history log, post-publication
+    log, gauntlet verdict). One code path, shared by this example, the yfinance
+    example, and the test that guards the narrative."""
+    # 1-2. published rules; only trades entered after publication are judged
     all_trades = sdb_trades(px)
     post = TradeLog(all_trades.frame[all_trades.frame["entry_date"] >= PUB_DATE]
                     .reset_index(drop=True))
-    print(f"FULL HISTORY, {all_trades.n} trades (the era the rules were built for):")
-    print(edge_report(all_trades))
-    print(f"\nPOST-PUBLICATION ONLY, {post.n} trades entered on/after {PUB_DATE} "
-          "(the only ones judged):")
-    print(edge_report(post))
 
     # 3. the honest denominator: every configuration looked at goes in the ledger.
     # One frozen configuration here; the real 2026 evaluation carried nine
     # (seven book-final configurations plus two exploratory looks; looks count).
-    looks = SearchSpaceLog(scope="stridsman-sdb-postpub-example")
+    looks = SearchSpaceLog(scope=scope)
     looks.record({"band_len": BAND_LEN, "band_k": BAND_K,
                   "stop": STOP, "target": TARGET, "timeout": TIMEOUT},
                  status="tried")
@@ -130,8 +129,21 @@ def main() -> None:
         directions=post.frame["direction"].to_numpy(),
         null_scale=np.full(post.n, 1.0 / (STOP / 100.0)),
         n_variants=looks,
-        thr=Thresholds(n_boot=5000, n_perm=5000, n_random_sims=500),
+        thr=thr,
     )
+    return all_trades, post, gauntlet
+
+
+def main() -> None:
+    px = synthetic_prices()
+    all_trades, post, gauntlet = judge(px)
+
+    # the full history flatters (its trends were planted for the rules to find)
+    print(f"FULL HISTORY, {all_trades.n} trades (the era the rules were built for):")
+    print(edge_report(all_trades))
+    print(f"\nPOST-PUBLICATION ONLY, {post.n} trades entered on/after {PUB_DATE} "
+          "(the only ones judged):")
+    print(edge_report(post))
     print("\n" + gauntlet.audit_report())
     print("\nGAUNTLET PASSED:", gauntlet.passed)
     print("\nThe full-history scorecard looked fine because the trends it fed on "
