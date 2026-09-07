@@ -167,11 +167,18 @@ def report_sheets() -> dict[str, str]:
     dg = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dg)
     import numpy as np
-    from crucible.edge import reality_check, expectancy
-    from crucible.validation import walk_forward, run_gauntlet, Thresholds
-    from crucible.report import (verdict_banner, metrics_table, verdict_summary,
-                                 gate_block, cumulative_r, report_css)
-    from crucible.report.tearsheet import _PILLARS, _plotly, _COSTS_NOT_ATTESTED
+
+    from crucible.edge import expectancy, reality_check
+    from crucible.report import (
+        cumulative_r,
+        gate_block,
+        metrics_table,
+        report_css,
+        verdict_banner,
+        verdict_summary,
+    )
+    from crucible.report.tearsheet import _COSTS_NOT_ATTESTED, _PILLARS, _plotly
+    from crucible.validation import Thresholds, run_gauntlet, walk_forward
 
     px = dg.synthetic_prices()
     tp, sl, to = 2.5, 1.0, 30
@@ -360,11 +367,11 @@ def ml_sheets() -> dict[str, str]:
     spec = importlib.util.spec_from_file_location("mm", REPO / "examples" / "ml_meta_label.py")
     mm = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mm)
-    from crucible.ml import quantile_decay
     from crucible.edge import TradeLog
-    from crucible.validation import run_gauntlet
-    from crucible.report import verdict_banner, report_css
+    from crucible.ml import quantile_decay
+    from crucible.report import report_css, verdict_banner
     from crucible.report.tearsheet import _plotly
+    from crucible.validation import run_gauntlet
 
     go, _ = _plotly()
     css = report_css()
@@ -418,11 +425,20 @@ def panel_sheets() -> dict[str, str]:
     em = importlib.util.module_from_spec(spec_em)
     spec_em.loader.exec_module(em)
     from crucible.edge import TradeLog
-    from crucible.validation import walk_forward
     from crucible.report import (
-        metrics_table, equity_drawdown, exit_reason_breakdown, holding_vs_r,
-        exit_efficiency_dist, edge_ratio_curve, gross_net_equity,
-        concurrency_timeline, segment_forest, monitor_panel, report_css)
+        concurrency_timeline,
+        edge_ratio_curve,
+        equity_drawdown,
+        exit_efficiency_dist,
+        exit_reason_breakdown,
+        gross_net_equity,
+        holding_vs_r,
+        metrics_table,
+        monitor_panel,
+        report_css,
+        segment_forest,
+    )
+    from crucible.validation import walk_forward
 
     px = dg.synthetic_prices()
     wf = walk_forward(px, dg.donchian, param_grid={"lookback": [20, 40]},
@@ -496,9 +512,9 @@ def render_png(html: str, out: Path, pad: int = 22) -> None:
     bg = im.getpixel((2, 2))
     bbox = ImageChops.difference(im, Image.new("RGB", im.size, bg)).getbbox()
     if bbox:
-        l, t, r, b = bbox
-        im = im.crop((max(0, l - pad), max(0, t - pad),
-                      min(im.width, r + pad), min(im.height, b + pad)))
+        left, top, right, bottom = bbox
+        im = im.crop((max(0, left - pad), max(0, top - pad),
+                      min(im.width, right + pad), min(im.height, bottom + pad)))
     im.save(out)
     raw.unlink(missing_ok=True)
     print(f"wrote {out.relative_to(REPO)}  ({im.width}x{im.height})")
@@ -515,6 +531,7 @@ def render_logo(out: Path, colors: dict = LOGO_FULL, size: int = 96, pad: int = 
     """Render the crucible mark to a transparent, alpha-cropped PNG in the given
     colorway (see LOGO_FULL / LOGO_MONO)."""
     from PIL import Image
+
     from crucible.report.tearsheet import _logo_svg
     svg = _logo_svg(size=size, **colors)
     html = f'<!doctype html><html><head><meta charset="utf-8">' \
@@ -532,9 +549,9 @@ def render_logo(out: Path, colors: dict = LOGO_FULL, size: int = 96, pad: int = 
     im = Image.open(raw).convert("RGBA")
     bbox = im.split()[-1].getbbox()  # crop to the alpha (non-transparent) bounds
     if bbox:
-        l, t, r, b = bbox
-        im = im.crop((max(0, l - pad), max(0, t - pad),
-                      min(im.width, r + pad), min(im.height, b + pad)))
+        left, top, right, bottom = bbox
+        im = im.crop((max(0, left - pad), max(0, top - pad),
+                      min(im.width, right + pad), min(im.height, bottom + pad)))
     im.save(out)
     raw.unlink(missing_ok=True)
     print(f"wrote {out.relative_to(REPO)}  ({im.width}x{im.height}, transparent)")
