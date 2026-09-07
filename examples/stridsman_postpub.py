@@ -33,7 +33,11 @@ adds a channel exit and a trailing stop). The faithful reproduction needs a
 bespoke intrabar simulator; this file is about the judging, not the simulating.
 
     python examples/stridsman_postpub.py
+    python examples/stridsman_postpub.py --report stridsman_postpub.html   # + HTML report
+                                                     # (needs the [report] extra)
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -134,7 +138,23 @@ def judge(px: pd.DataFrame, *, scope: str = "stridsman-sdb-postpub", thr: Thresh
     return all_trades, post, gauntlet
 
 
+def write_report(path: str, post: TradeLog, gauntlet, *, title: str, subtitle: str) -> str:
+    """The gauntlet-organized HTML page for the post-publication log: verdict
+    banner, edge panels (R distribution, cumulative R, excursions, bootstrap
+    expectancy), and one block per pillar that ran. Needs the [report] extra."""
+    from crucible.report import gauntlet_report
+    return gauntlet_report(gauntlet, post, path, title=title, subtitle=subtitle,
+                           pillar_notes={"DURABLE": "not run: frozen published parameters, "
+                                                    "no walk-forward refit exists",
+                                         "GENERAL": "not run: one instrument"})
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--report", metavar="PATH",
+                    help="also write the gauntlet HTML report here (needs crucible[report])")
+    args = ap.parse_args()
+
     px = synthetic_prices()
     all_trades, post, gauntlet = judge(px)
 
@@ -146,6 +166,12 @@ def main() -> None:
     print(edge_report(post))
     print("\n" + gauntlet.audit_report())
     print("\nGAUNTLET PASSED:", gauntlet.passed)
+    if args.report:
+        out = write_report(args.report, post, gauntlet,
+                           title="Stridsman SDB (1999 parameters), post-publication",
+                           subtitle=f"synthetic prices, {post.n} trades entered on/after "
+                                    f"{PUB_DATE}, one look in the ledger")
+        print(f"\nwrote {out}")
     print("\nThe full-history scorecard looked fine because the trends it fed on "
           "were planted\nbefore publication; on the years after, the gate refuses "
           "it. That is the machinery\nworking: a published system is owed nothing. "

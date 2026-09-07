@@ -43,7 +43,16 @@ from crucible.edge import edge_report
 # Share one implementation of the rules and the judging with the synthetic example
 # rather than carrying a second copy that could drift from it.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from stridsman_postpub import BAND_K, BAND_LEN, PUB_DATE, STOP, TARGET, TIMEOUT, judge  # noqa: E402
+from stridsman_postpub import (  # noqa: E402
+    BAND_K,
+    BAND_LEN,
+    PUB_DATE,
+    STOP,
+    TARGET,
+    TIMEOUT,
+    judge,
+    write_report,
+)
 
 
 def load_ohlc(ticker: str, start: str) -> pd.DataFrame:
@@ -70,6 +79,8 @@ def main() -> None:
     p.add_argument("--start", default="2000-01-01",
                    help="download start; the judged window begins at the later of this "
                         "and the publication date, after indicator warmup")
+    p.add_argument("--report", metavar="PATH",
+                   help="also write the gauntlet HTML report here (needs crucible[report])")
     args = p.parse_args()
 
     px = load_ohlc(args.ticker, args.start)
@@ -85,6 +96,13 @@ def main() -> None:
     print(edge_report(post))
     print("\n" + gauntlet.audit_report())
     print("\nGAUNTLET PASSED:", gauntlet.passed)
+    if args.report:
+        out = write_report(args.report, post, gauntlet,
+                           title=f"Stridsman SDB (1999 parameters) on {args.ticker}",
+                           subtitle=f"Yahoo Finance, {post.n} trades entered on/after "
+                                    f"{PUB_DATE}, one look in the ledger; see the "
+                                    "docstring for the roll-gap caveat")
+        print(f"\nwrote {out}")
     print("\nThis is one instrument, one look, on a data series with the caveats in the "
           "docstring.\nWhatever it says, it says about this configuration on this series, "
           "with durability\nuntested (no walk-forward refit exists for frozen published "

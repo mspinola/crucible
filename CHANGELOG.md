@@ -25,6 +25,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ES=F` or `SPY` from Yahoo Finance, and discloses up front why a front-month series with
   roll gaps is a harder, differently biased test than the ratio-adjusted contracts the
   book requires. Needs the `[examples]` extra and network access, so not part of CI.
+  Both examples take `--report PATH` to write the gauntlet-organized HTML page
+  (`report.gauntlet_report`, the `[report]` extra), and `docs/gen_figures.py` renders two
+  figures for the run-modes case study from the example's own output
+  (`docs/img/stridsman_cumr.png`, `docs/img/stridsman_gates.png`).
 - **`pine/`: the TradingView port of `crucible.edge`, with a guard test.** `CrucibleEdge.pine`
   ports every edge metric, the report, cumulative R and max drawdown, and CSV export in
   `TradeLog.from_frame`'s column order; `CrucibleEdgeConformance.pine` checks it on a chart
