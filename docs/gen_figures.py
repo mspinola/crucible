@@ -6,6 +6,8 @@ site and PDF use. Run it when a worked example changes or a diagram needs an edi
 
 Rendered from ``crucible.report`` blocks, so they never drift from the numbers:
   gauntlet_hero/scope/gates/cumr/bootstrap.png  the §12 Donchian run (and §11 scope)
+  stridsman_cumr.png / stridsman_gates.png      the published-system case study
+                                                (examples/stridsman_postpub.py)
   ml_decay.png / ml_verdict.png                 the §13 ML take/skip example
   panel_*.png                                   the visualization-catalog gallery,
                                                 one per crucible.report panel
@@ -256,6 +258,70 @@ def report_sheets() -> dict[str, str]:
     }
 
 
+def stridsman_sheets() -> dict[str, str]:
+    """Two figures for the published-system case study (run_modes.md), rendered
+    from examples/stridsman_postpub.py's own judge() output so they cannot drift
+    from the numbers the example prints."""
+    spec = importlib.util.spec_from_file_location("sp", REPO / "examples" / "stridsman_postpub.py")
+    sp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sp)
+    from crucible.report import (
+        cumulative_r,
+        gate_block,
+        metrics_table,
+        report_css,
+        verdict_banner,
+    )
+    from crucible.report.tearsheet import _COSTS_NOT_ATTESTED, _PILLARS, _plotly
+
+    px = sp.synthetic_prices()
+    all_trades, post, g = sp.judge(px)
+    css = report_css()
+    pub = sp.PUB_DATE
+
+    # the gate figure: banner (un-run pillars labelled, not failed) + metrics + blocks
+    notes = {"DURABLE": "not run: frozen published parameters, no walk-forward refit",
+             "GENERAL": "not run: one instrument"}
+    banner = verdict_banner(g, title="A published system, judged after publication",
+                            subtitle=f"Stridsman SDB, 1999 parameters · {post.n} trades "
+                                     f"entered on/after {pub} · one look in the ledger",
+                            pillar_notes=notes)
+    note = f"<div class='cr-hostnote'>{_COSTS_NOT_ATTESTED}</div>"
+    by = {x.name: x for x in g.gates}
+    gates = (banner + note + metrics_table(post)
+             + "".join(gate_block(by[p]) for p in _PILLARS if p in by))
+
+    # the cumulative-R figure: the full history (its trends planted for the rules to
+    # find) against the post-publication segment judged on its own, from zero
+    go, _ = _plotly()
+    cr_all = cumulative_r(all_trades)
+    cr_post = cumulative_r(post)
+    grid = "rgba(128,128,128,0.18)"
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=list(cr_all.index), y=cr_all.values, mode="lines",
+                             name="full history", line=dict(color="#9aa3ad", width=2)))
+    fig.add_trace(go.Scatter(x=list(cr_post.index), y=cr_post.values, mode="lines",
+                             name="post-publication, judged on its own",
+                             line=dict(color="#b42318", width=2.5)))
+    fig.add_vline(x=pub, line_dash="dash", line_color="#5b6570")
+    fig.add_annotation(x=pub, y=1.0, yref="paper", text="published", showarrow=False,
+                       xanchor="left", yanchor="top", font=dict(color="#5b6570"))
+    fig.add_hline(y=0, line_dash="dot", line_color="#888")
+    fig.update_layout(height=360, margin=dict(t=44, l=48, r=24, b=36),
+                      title="Cumulative R: the era the rules were built for, then the years after",
+                      legend=dict(orientation="h", y=-0.14),
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color="#5b6570"))
+    fig.update_xaxes(gridcolor=grid, zerolinecolor=grid)
+    fig.update_yaxes(gridcolor=grid, zerolinecolor=grid, title_text="R")
+    chart = fig.to_html(full_html=False, include_plotlyjs=True)
+
+    return {
+        "stridsman_gates": _sheet(gates, 840, css),
+        "stridsman_cumr": _sheet(chart, 840, css),
+    }
+
+
 PURGE_EMBARGO_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
   body{margin:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
   .wrap{max-width:820px;margin:0 auto;padding:22px}
@@ -478,6 +544,7 @@ def main() -> None:
     IMG.mkdir(exist_ok=True)
     sheets = dict(report_sheets())
     sheets.update(ml_sheets())
+    sheets.update(stridsman_sheets())     # the published-system case study
     sheets.update(panel_sheets())          # the visualization-catalog gallery
     sheets["triple_barrier"] = TRIPLE_BARRIER_HTML
     sheets["gate_ladder"] = GATE_LADDER_HTML

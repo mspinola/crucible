@@ -26,3 +26,5 @@ jobs:
         run: python -m pytest -q
       - name: Run quickstart (smoke test)
         run: python examples/quickstart.py
+      - name: Case-study example (published system, post-publication data)
+        run: python examples/stridsman_postpub.py
