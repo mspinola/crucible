@@ -26,7 +26,7 @@
 //   breakEvenWinRate(payoff)  (derived)                          1 / (1 + payoff): the win rate at which expectancy is 0
 //   exitReasons(log)          (derived)                          count and mean R per exit reason, most frequent first
 //   drawEdgeReport(..)        (crucible.report analogue)          the report as a table: rows, tooltips, flags, theme
-//   drawEdgeReportGrid(..)    (crucible.report analogue)          the same report as a label-over-value grid (BackTestLib's look)
+//   drawEdgeReportGrid(..)    (crucible.report analogue)          the same report as BackTestLib's five-column summary grid
 //
 // Infinity: Pine has no +inf. Where crucible returns +inf (no losers), these functions return na
 // and the companion `isInf` predicates say why. NaN in crucible is na here.
@@ -461,7 +461,7 @@ export metricTooltip(string key) =>
         "expectancy" => "expectancy: win_rate x average win - loss_rate x average loss, in R, which equals the mean R per trade. Flag: > 0 pass, otherwise fail."
         "profit_factor" => "profit_factor: gross R won / gross R lost. inf when there are no losers. Flag: > 1.25 pass, otherwise warn."
         "payoff_ratio" => "payoff_ratio (reward / risk): average winning R / average losing R, the terminal reward-to-risk. Informational."
-        "break_even" => "Break-even win rate = 1 / (1 + payoff): the share of decisive trades that must win for expectancy to be zero at this payoff. Shown against the actual wins / (wins + losses), scratches excluded. Flag: actual above break-even pass, otherwise fail (the same test as expectancy > 0, seen from the win-rate side)."
+        "break_even" => "Break-even win rate = 1 / (1 + payoff): the share of decisive trades that must win for expectancy to be zero at this payoff. Flag: the actual wins / (wins + losses), scratches excluded, above break-even pass, otherwise fail (the same test as expectancy > 0, seen from the win-rate side)."
         "avg_win_loss" => "The two halves of expectancy and payoff: mean R of the winners and mean R of the losers."
         "sqn" => "sqn: Van Tharp System Quality Number, mean R / sample standard deviation of R x sqrt(min(n, 100)). 0 when n < 2 or the spread is floating-point noise. Informational."
         "max_drawdown" => "Deepest peak-to-trough of cumulative R at equal risk per trade, as crucible's tearsheet draws it. Summed R, not an equity curve: capital-free."
@@ -496,65 +496,82 @@ num(float x, string fmt) =>
 signed(float x, string fmt) =>
     na(x) ? "-" : (x > 0 ? "+" : "") + str.tostring(x, fmt)
 
+// Scratches (r == 0) are shown only when the log holds some, as BackTestLib's Won / Lost cell does.
+flatText(EdgeReport rep) =>
+    flat = rep.n - rep.nWins - rep.nLosses
+    flat > 0 ? " / " + str.tostring(flat) + " flat" : ""
+
+// "n (W / L [/ k flat])" for the list layout's Trades row.
+tradesText(EdgeReport rep) =>
+    str.tostring(rep.n) + " (" + str.tostring(rep.nWins) + " W / " + str.tostring(rep.nLosses) + " L" + flatText(rep) + ")"
+
+// "W / L [/ k flat]" for the grid's Won / Lost cell, BackTestLib's format.
+wonLostText(EdgeReport rep) =>
+    str.tostring(rep.nWins) + " / " + str.tostring(rep.nLosses) + flatText(rep)
+
 reportRow(table t, int col, int row, string key, string label, string value, color valBg, ReportStyle st) =>
     tip = metricTooltip(key)
     table.cell(t, col, row, label, text_color = st.fg, bgcolor = st.keyBg, text_size = txtSize(st.textSize), tooltip = tip, text_formatting = textFormat(st))
     table.cell(t, col + 1, row, value, text_color = st.fg, bgcolor = valBg, text_size = txtSize(st.textSize), tooltip = tip, text_formatting = textFormat(st))
 
-// ── Grid layout (the BackTestLib look: label over value, several metrics per row) ───────
+// ── Grid layout (BackTestLib's summary table, cell for cell) ───────────────────────────
+GRID_COLS = 5
+
 gridCell(table t, int col, int row, string key, string label, string value, color bg, ReportStyle st) =>
     table.cell(t, col, row, label + "\n" + value, text_color = st.fg, bgcolor = bg, text_size = txtSize(st.textSize), tooltip = metricTooltip(key), text_formatting = textFormat(st))
 
-//@function edgeReportGridRows Rows drawEdgeReportGrid writes for a table `columns` wide (12 metric cells, then the reason cells).
-export edgeReportGridRows(int columns = 5, int maxReasons = 0) =>
-    c = math.max(columns, 1)
-    math.ceil(12.0 / c) + (maxReasons > 0 ? math.ceil(maxReasons / float(c)) : 0)
+//@function edgeReportGridRows Rows drawEdgeReportGrid writes: two metric rows, then Won / Lost, BE Win %, Avg W / L and
+// up to `maxReasons` exit-reason cells wrapping five to a row. The table needs 5 columns.
+export edgeReportGridRows(int maxReasons = 0) =>
+    math.ceil((13 + math.max(maxReasons, 0)) / float(GRID_COLS))
 
-//@function drawEdgeReportGrid The same report as drawEdgeReport laid out as a grid, `columns` cells per row, each cell
-// "label / value" with the definition as its tooltip and crucible's flags as its colour (BackTestLib's summary look).
-// No title cell: the Trades cell carries the report tooltip. The table needs `columns` columns and
-// edgeReportGridRows(columns, maxReasons) rows from `row`. Returns the next free row.
-export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int columns = 5, int maxReasons = 0) =>
-    c = math.max(columns, 1)
+//@function drawEdgeReportGrid The report laid out as BackTestLib's summary grid: five cells per row, each "label / value"
+// with the definition as its tooltip and crucible's flags as its colour. Row 1: Trades, Win Rate, Expectancy, PF (R),
+// Payoff (RR). Row 2: SQN-100, Max DD, Excursion, Time Asym, Exit Eff. Row 3: Won / Lost, BE Win %, Avg W / L, then one
+// cell per exit reason (most frequent first, up to `maxReasons`), continuing onto further rows five at a time.
+// No title cell: the Trades cell carries the report tooltip. The table needs 5 columns and
+// edgeReportGridRows(maxReasons) rows from `row`. Returns the next free row.
+export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int maxReasons = 0) =>
     decisive = rep.nWins + rep.nLosses
     actualWr = decisive > 0 ? rep.nWins / decisive : na
     beMargin = na(actualWr) or na(rep.breakEvenWinRate) ? na : actualWr - rep.breakEvenWinRate
-    keys   = array.from("report", "win_rate", "expectancy", "profit_factor", "payoff_ratio", "break_even", "avg_win_loss", "sqn", "max_drawdown", "excursion_ratio", "time_asymmetry", "exit_efficiency")
-    labels = array.from("Trades (R, gross)", "Win rate", "Expectancy", "Profit factor", "Reward / risk", "Break-even WR", "Avg win / loss", "SQN-100", "Max DD", "Excursion", "Time asym", "Exit eff")
+    keys   = array.from("report", "win_rate", "expectancy", "profit_factor", "payoff_ratio", "sqn", "max_drawdown", "excursion_ratio", "time_asymmetry", "exit_efficiency", "trades", "break_even", "avg_win_loss")
+    labels = array.from("Trades", "Win Rate", "Expectancy", "PF (R)", "Payoff (RR)", "SQN-100", "Max DD", "Excursion", "Time Asym", "Exit Eff", "Won / Lost", "BE Win %", "Avg W / L")
     values = array.from(
-         str.tostring(rep.n) + " (" + str.tostring(rep.nWins) + "W / " + str.tostring(rep.nLosses) + "L)",
+         str.tostring(rep.n),
          num(rep.winRate * 100, "#.#") + "%",
-         signed(rep.expectancy, "#.###") + " R",
+         signed(rep.expectancy, "#.##") + " R",
          rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"),
          rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"),
-         num(rep.breakEvenWinRate * 100, "#.#") + "%" + (na(actualWr) ? "" : " (act " + num(actualWr * 100, "#.#") + "%)"),
-         signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R",
          num(rep.sqn, "#.##"),
          num(rep.maxDrawdownR, "#.#") + " R",
          num(rep.excursionRatio, "#.##"),
          num(rep.timeAsymmetry, "#.##"),
-         na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%")
+         na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%",
+         wonLostText(rep),
+         num(rep.breakEvenWinRate * 100, "#.#") + "%",
+         signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R")
     colors = array.from(st.valBg, st.valBg,
          flagColor("expectancy", rep.expectancy, false, st),
          flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st),
-         st.valBg,
-         flagColor("break_even", beMargin, false, st),
          st.valBg, st.valBg, st.valBg,
          flagColor("excursion_ratio", rep.excursionRatio, false, st),
          flagColor("time_asymmetry", rep.timeAsymmetry, false, st),
+         st.valBg, st.valBg,
+         flagColor("break_even", beMargin, false, st),
          st.valBg)
-    for i = 0 to 11
-        gridCell(t, i % c, row + math.floor(i / c), array.get(keys, i), array.get(labels, i), array.get(values, i), array.get(colors, i), st)
-    next = row + math.ceil(12.0 / c)
+    for i = 0 to 12
+        gridCell(t, i % GRID_COLS, row + math.floor(i / GRID_COLS), array.get(keys, i), array.get(labels, i), array.get(values, i), array.get(colors, i), st)
+    k = 0
     if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
-        k = math.min(maxReasons, array.size(rep.reasonLabels))
+        k := math.min(maxReasons, array.size(rep.reasonLabels))
         for i = 0 to k - 1
             cnt = array.get(rep.reasonCounts, i)
             share = rep.n > 0 ? cnt * 100.0 / rep.n : na
             val = str.tostring(cnt) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
-            gridCell(t, i % c, next + math.floor(i / c), "exit_reason", "Exit: " + array.get(rep.reasonLabels, i), val, st.valBg, st)
-        next += math.ceil(k / float(c))
-    next
+            idx = 13 + i
+            gridCell(t, idx % GRID_COLS, row + math.floor(idx / GRID_COLS), "exit_reason", "Exit: " + array.get(rep.reasonLabels, i), val, st.valBg, st)
+    row + math.ceil((13 + k) / float(GRID_COLS))
 
 //@function edgeReportRows Rows drawEdgeReport writes, so the caller can size its table. `maxReasons` > 0 adds a header
 // row plus one row per exit reason (up to that many); size for the most reasons the strategy can produce.
@@ -571,27 +588,27 @@ export drawEdgeReport(table t, int col, int row, EdgeReport rep, ReportStyle st,
     actualWr = decisive > 0 ? rep.nWins / decisive : na
     beMargin = na(actualWr) or na(rep.breakEvenWinRate) ? na : actualWr - rep.breakEvenWinRate
     reportRow(t, col, r, "report", title, "R, gross", st.valBg, st)
-    reportRow(t, col, r + 1, "trades", "Trades", str.tostring(rep.n) + "  (" + str.tostring(rep.nWins) + " W / " + str.tostring(rep.nLosses) + " L)", st.valBg, st)
-    reportRow(t, col, r + 2, "win_rate", "Win rate", num(rep.winRate * 100, "#.#") + "%", st.valBg, st)
-    reportRow(t, col, r + 3, "expectancy", "Expectancy", signed(rep.expectancy, "#.###") + " R", flagColor("expectancy", rep.expectancy, false, st), st)
-    reportRow(t, col, r + 4, "profit_factor", "Profit factor", rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"), flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st), st)
-    reportRow(t, col, r + 5, "payoff_ratio", "Reward / risk (payoff)", rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"), st.valBg, st)
-    reportRow(t, col, r + 6, "break_even", "Break-even win rate", num(rep.breakEvenWinRate * 100, "#.#") + "%" + (na(actualWr) ? "" : "  (actual " + num(actualWr * 100, "#.#") + "%)"), flagColor("break_even", beMargin, false, st), st)
-    reportRow(t, col, r + 7, "avg_win_loss", "Avg win / avg loss", signed(rep.avgWinR, "#.##") + " R / " + signed(rep.avgLossR, "#.##") + " R", st.valBg, st)
+    reportRow(t, col, r + 1, "trades", "Trades", tradesText(rep), st.valBg, st)
+    reportRow(t, col, r + 2, "win_rate", "Win Rate", num(rep.winRate * 100, "#.#") + "%", st.valBg, st)
+    reportRow(t, col, r + 3, "expectancy", "Expectancy", signed(rep.expectancy, "#.##") + " R", flagColor("expectancy", rep.expectancy, false, st), st)
+    reportRow(t, col, r + 4, "profit_factor", "PF (R)", rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"), flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st), st)
+    reportRow(t, col, r + 5, "payoff_ratio", "Payoff (RR)", rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"), st.valBg, st)
+    reportRow(t, col, r + 6, "break_even", "BE Win %", num(rep.breakEvenWinRate * 100, "#.#") + "%", flagColor("break_even", beMargin, false, st), st)
+    reportRow(t, col, r + 7, "avg_win_loss", "Avg W / L", signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R", st.valBg, st)
     reportRow(t, col, r + 8, "sqn", "SQN-100", num(rep.sqn, "#.##"), st.valBg, st)
-    reportRow(t, col, r + 9, "max_drawdown", "Max drawdown", num(rep.maxDrawdownR, "#.#") + " R", st.valBg, st)
-    reportRow(t, col, r + 10, "excursion_ratio", "Excursion ratio", num(rep.excursionRatio, "#.##"), flagColor("excursion_ratio", rep.excursionRatio, false, st), st)
-    reportRow(t, col, r + 11, "time_asymmetry", "Time asymmetry", num(rep.timeAsymmetry, "#.##"), flagColor("time_asymmetry", rep.timeAsymmetry, false, st), st)
-    reportRow(t, col, r + 12, "exit_efficiency", "Exit efficiency", na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%", st.valBg, st)
+    reportRow(t, col, r + 9, "max_drawdown", "Max DD", num(rep.maxDrawdownR, "#.#") + " R", st.valBg, st)
+    reportRow(t, col, r + 10, "excursion_ratio", "Excursion", num(rep.excursionRatio, "#.##"), flagColor("excursion_ratio", rep.excursionRatio, false, st), st)
+    reportRow(t, col, r + 11, "time_asymmetry", "Time Asym", num(rep.timeAsymmetry, "#.##"), flagColor("time_asymmetry", rep.timeAsymmetry, false, st), st)
+    reportRow(t, col, r + 12, "exit_efficiency", "Exit Eff", na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%", st.valBg, st)
     next = r + 13
     if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
-        reportRow(t, col, next, "exit_reasons", "Exit reasons", "count  (share)  mean R", st.valBg, st)
+        reportRow(t, col, next, "exit_reasons", "Exit reasons", "count (share) mean R", st.valBg, st)
         next += 1
         k = math.min(maxReasons, array.size(rep.reasonLabels))
         for i = 0 to k - 1
             c = array.get(rep.reasonCounts, i)
             share = rep.n > 0 ? c * 100.0 / rep.n : na
-            val = str.tostring(c) + "  (" + num(share, "#") + "%)  " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
+            val = str.tostring(c) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
             reportRow(t, col, next, "exit_reason", "  " + array.get(rep.reasonLabels, i), val, st.valBg, st)
             next += 1
     next
