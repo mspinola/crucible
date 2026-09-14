@@ -515,23 +515,51 @@ reportRow(table t, int col, int row, string key, string label, string value, col
     table.cell(t, col + 1, row, value, text_color = st.fg, bgcolor = valBg, text_size = txtSize(st.textSize), tooltip = tip, text_formatting = textFormat(st))
 
 // ── Grid layout (BackTestLib's summary table, cell for cell) ───────────────────────────
+// Five columns is the shape, but 13 metric cells plus one per exit reason in use is not
+// always a multiple of five: three reasons made 16 cells, three full rows and one orphan.
+// So the column count is chosen per report, 4 to 6, whichever leaves the fewest empty
+// cells (ties keep 5): 15 -> 5 x 3, 16 -> 4 x 4, 18 -> 6 x 3. Callers size the table with
+// edgeReportGridCols() columns; unused columns draw nothing.
 GRID_COLS = 5
+GRID_MIN_COLS = 4
+GRID_MAX_COLS = 6
+
+gridColsFor(int n) =>
+    best = GRID_COLS
+    bestEmpty = math.ceil(n / float(GRID_COLS)) * GRID_COLS - n
+    for c = GRID_MIN_COLS to GRID_MAX_COLS
+        empty = math.ceil(n / float(c)) * c - n
+        if empty < bestEmpty
+            bestEmpty := empty
+            best := c
+    best
 
 gridCell(table t, int col, int row, string key, string label, string value, color bg, ReportStyle st) =>
     table.cell(t, col, row, label + "\n" + value, text_color = st.fg, bgcolor = bg, text_size = txtSize(st.textSize), tooltip = metricTooltip(key), text_formatting = textFormat(st))
 
-//@function edgeReportGridRows Rows drawEdgeReportGrid writes: two metric rows, then Won / Lost, BE Win %, Avg W / L and
-// up to `maxReasons` exit-reason cells wrapping five to a row. The table needs 5 columns.
-export edgeReportGridRows(int maxReasons = 0) =>
-    math.ceil((13 + math.max(maxReasons, 0)) / float(GRID_COLS))
+//@function edgeReportGridCols Columns a table for drawEdgeReportGrid needs: the widest layout it may pick.
+export edgeReportGridCols() =>
+    GRID_MAX_COLS
 
-//@function drawEdgeReportGrid The report laid out as BackTestLib's summary grid: five cells per row, each "label / value"
-// with the definition as its tooltip and crucible's flags as its colour. Row 1: Trades, Win Rate, Expectancy, PF (R),
-// Payoff (RR). Row 2: SQN-100, Max DD, Excursion, Time Asym, Exit Eff. Row 3: Won / Lost, BE Win %, Avg W / L, then one
-// cell per exit reason (most frequent first, up to `maxReasons`), continuing onto further rows five at a time.
-// No title cell: the Trades cell carries the report tooltip. The table needs 5 columns and
-// edgeReportGridRows(maxReasons) rows from `row`. Returns the next free row.
+//@function edgeReportGridRows Rows drawEdgeReportGrid may write for up to `maxReasons` exit-reason cells: the most any
+// reason count from 0 to `maxReasons` needs under the per-report column choice. Size the table with this many rows
+// from `row` and edgeReportGridCols() columns.
+export edgeReportGridRows(int maxReasons = 0) =>
+    rows = 0
+    for k = 0 to math.max(maxReasons, 0)
+        n = 13 + k
+        rows := math.max(rows, math.ceil(n / float(gridColsFor(n))))
+    rows
+
+//@function drawEdgeReportGrid The report laid out as BackTestLib's summary grid, each cell "label / value" with the
+// definition as its tooltip and crucible's flags as its colour, in the order Trades, Win Rate, Expectancy, PF (R),
+// Payoff (RR), SQN-100, Max DD, Excursion, Time Asym, Exit Eff, Won / Lost, BE Win %, Avg W / L, then one cell per exit
+// reason (most frequent first, up to `maxReasons`). Cells wrap at the column count gridColsFor picks for this report,
+// so the last row is full or nearly so. No title cell: the Trades cell carries the report tooltip. The table needs
+// edgeReportGridCols() columns and edgeReportGridRows(maxReasons) rows from `row`. Returns the next free row.
 export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int maxReasons = 0) =>
+    k0 = maxReasons > 0 and not na(rep.reasonLabels) ? math.min(maxReasons, array.size(rep.reasonLabels)) : 0
+    cols = gridColsFor(13 + k0)
     decisive = rep.nWins + rep.nLosses
     actualWr = decisive > 0 ? rep.nWins / decisive : na
     beMargin = na(actualWr) or na(rep.breakEvenWinRate) ? na : actualWr - rep.breakEvenWinRate
@@ -540,17 +568,17 @@ export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int 
     values = array.from(
          str.tostring(rep.n),
          num(rep.winRate * 100, "#.#") + "%",
-         signed(rep.expectancy, "#.##") + " R",
-         rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"),
-         rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"),
-         num(rep.sqn, "#.##"),
+         signed(rep.expectancy, "#.#") + " R",
+         rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.#"),
+         rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.#"),
+         num(rep.sqn, "#.#"),
          num(rep.maxDrawdownR, "#.#") + " R",
-         num(rep.excursionRatio, "#.##"),
-         num(rep.timeAsymmetry, "#.##"),
+         num(rep.excursionRatio, "#.#"),
+         num(rep.timeAsymmetry, "#.#"),
          na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%",
          wonLostText(rep),
          num(rep.breakEvenWinRate * 100, "#.#") + "%",
-         signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R")
+         signed(rep.avgWinR, "#.#") + " / " + signed(rep.avgLossR, "#.#") + " R")
     colors = array.from(st.valBg, st.valBg,
          flagColor("expectancy", rep.expectancy, false, st),
          flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st),
@@ -561,17 +589,15 @@ export drawEdgeReportGrid(table t, int row, EdgeReport rep, ReportStyle st, int 
          flagColor("break_even", beMargin, false, st),
          st.valBg)
     for i = 0 to 12
-        gridCell(t, i % GRID_COLS, row + math.floor(i / GRID_COLS), array.get(keys, i), array.get(labels, i), array.get(values, i), array.get(colors, i), st)
-    k = 0
-    if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
-        k := math.min(maxReasons, array.size(rep.reasonLabels))
-        for i = 0 to k - 1
+        gridCell(t, i % cols, row + math.floor(i / cols), array.get(keys, i), array.get(labels, i), array.get(values, i), array.get(colors, i), st)
+    if k0 > 0
+        for i = 0 to k0 - 1
             cnt = array.get(rep.reasonCounts, i)
             share = rep.n > 0 ? cnt * 100.0 / rep.n : na
-            val = str.tostring(cnt) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
+            val = str.tostring(cnt) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.#") + " R"
             idx = 13 + i
-            gridCell(t, idx % GRID_COLS, row + math.floor(idx / GRID_COLS), "exit_reason", "Exit: " + array.get(rep.reasonLabels, i), val, st.valBg, st)
-    row + math.ceil((13 + k) / float(GRID_COLS))
+            gridCell(t, idx % cols, row + math.floor(idx / cols), "exit_reason", "Exit: " + array.get(rep.reasonLabels, i), val, st.valBg, st)
+    row + math.ceil((13 + k0) / float(cols))
 
 //@function edgeReportRows Rows drawEdgeReport writes, so the caller can size its table. `maxReasons` > 0 adds a header
 // row plus one row per exit reason (up to that many); size for the most reasons the strategy can produce.
@@ -590,15 +616,15 @@ export drawEdgeReport(table t, int col, int row, EdgeReport rep, ReportStyle st,
     reportRow(t, col, r, "report", title, "R, gross", st.valBg, st)
     reportRow(t, col, r + 1, "trades", "Trades", tradesText(rep), st.valBg, st)
     reportRow(t, col, r + 2, "win_rate", "Win Rate", num(rep.winRate * 100, "#.#") + "%", st.valBg, st)
-    reportRow(t, col, r + 3, "expectancy", "Expectancy", signed(rep.expectancy, "#.##") + " R", flagColor("expectancy", rep.expectancy, false, st), st)
-    reportRow(t, col, r + 4, "profit_factor", "PF (R)", rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.##"), flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st), st)
-    reportRow(t, col, r + 5, "payoff_ratio", "Payoff (RR)", rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.##"), st.valBg, st)
+    reportRow(t, col, r + 3, "expectancy", "Expectancy", signed(rep.expectancy, "#.#") + " R", flagColor("expectancy", rep.expectancy, false, st), st)
+    reportRow(t, col, r + 4, "profit_factor", "PF (R)", rep.profitFactorInf ? "inf" : num(rep.profitFactor, "#.#"), flagColor("profit_factor", rep.profitFactor, rep.profitFactorInf, st), st)
+    reportRow(t, col, r + 5, "payoff_ratio", "Payoff (RR)", rep.payoffRatioInf ? "inf" : num(rep.payoffRatio, "#.#"), st.valBg, st)
     reportRow(t, col, r + 6, "break_even", "BE Win %", num(rep.breakEvenWinRate * 100, "#.#") + "%", flagColor("break_even", beMargin, false, st), st)
-    reportRow(t, col, r + 7, "avg_win_loss", "Avg W / L", signed(rep.avgWinR, "#.##") + " / " + signed(rep.avgLossR, "#.##") + " R", st.valBg, st)
-    reportRow(t, col, r + 8, "sqn", "SQN-100", num(rep.sqn, "#.##"), st.valBg, st)
+    reportRow(t, col, r + 7, "avg_win_loss", "Avg W / L", signed(rep.avgWinR, "#.#") + " / " + signed(rep.avgLossR, "#.#") + " R", st.valBg, st)
+    reportRow(t, col, r + 8, "sqn", "SQN-100", num(rep.sqn, "#.#"), st.valBg, st)
     reportRow(t, col, r + 9, "max_drawdown", "Max DD", num(rep.maxDrawdownR, "#.#") + " R", st.valBg, st)
-    reportRow(t, col, r + 10, "excursion_ratio", "Excursion", num(rep.excursionRatio, "#.##"), flagColor("excursion_ratio", rep.excursionRatio, false, st), st)
-    reportRow(t, col, r + 11, "time_asymmetry", "Time Asym", num(rep.timeAsymmetry, "#.##"), flagColor("time_asymmetry", rep.timeAsymmetry, false, st), st)
+    reportRow(t, col, r + 10, "excursion_ratio", "Excursion", num(rep.excursionRatio, "#.#"), flagColor("excursion_ratio", rep.excursionRatio, false, st), st)
+    reportRow(t, col, r + 11, "time_asymmetry", "Time Asym", num(rep.timeAsymmetry, "#.#"), flagColor("time_asymmetry", rep.timeAsymmetry, false, st), st)
     reportRow(t, col, r + 12, "exit_efficiency", "Exit Eff", na(rep.exitEfficiency) ? "-" : str.tostring(rep.exitEfficiency * 100, "#") + "%", st.valBg, st)
     next = r + 13
     if maxReasons > 0 and not na(rep.reasonLabels) and array.size(rep.reasonLabels) > 0
@@ -608,7 +634,7 @@ export drawEdgeReport(table t, int col, int row, EdgeReport rep, ReportStyle st,
         for i = 0 to k - 1
             c = array.get(rep.reasonCounts, i)
             share = rep.n > 0 ? c * 100.0 / rep.n : na
-            val = str.tostring(c) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.##") + " R"
+            val = str.tostring(c) + " (" + num(share, "#") + "%) " + signed(array.get(rep.reasonMeanR, i), "#.#") + " R"
             reportRow(t, col, next, "exit_reason", "  " + array.get(rep.reasonLabels, i), val, st.valBg, st)
             next += 1
     next
