@@ -6,6 +6,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **`pine/CrucibleEdge.pine`: the grid report sizes its own columns, and R values print to one
+  decimal.** `drawEdgeReportGrid` wrapped at a fixed five columns, so 13 metric cells plus
+  three exit reasons made three full rows and an orphan; it now picks 4 to 6 columns per
+  report, whichever leaves the fewest empty cells (ties keep 5), and the new
+  `edgeReportGridCols()` says how many columns to give the table. `edgeReportGridRows` sizes
+  for the widest case. Every `#.##` display format is `#.#`; `csvLine` is untouched, so the
+  Python gate reads the same numbers. Publishes as CrucibleEdge/13; BackTestLib and the NPF
+  strategy import lines move with it.
+
 ### Added
 - **`examples/README.md`, an index of the examples.** One row per file: what it shows,
   which extra it needs (core, `[report]`, `[examples]` + network), and whether CI runs it.
