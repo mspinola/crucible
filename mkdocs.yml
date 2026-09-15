@@ -42,6 +42,7 @@ nav:
   - Architecture: architecture.md
   - Python support: python_support.md
   - The Pine port: pine.md
+  - "Compared: Edge Stats": compared_edge_stats.md
 
 markdown_extensions:
   - admonition
