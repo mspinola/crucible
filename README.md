@@ -274,6 +274,7 @@ from crucible.ml import (
     quantile_decay, decay_tearsheet,       # does a higher score mean a better outcome?
     fold_ic, redundancy_droplist,          # out-of-fold IC; which features overlap
     asof_window,                           # a point-in-time slice that can't peek ahead
+    rank_band_decay, random_selection_null,  # is a cross-sectional ranking real?
 )
 
 # `preds`: a frame with a continuous `score` and the realized `label` (+1 win / -1 or 0 loss)
@@ -285,6 +286,10 @@ print(decay.monotonic, decay.spread)       # a real edge climbs Q1 -> Q5
 
 rep = redundancy_droplist(panel, features, target="fwd")
 print(rep.kept, rep.dropped)               # keep the highest-|IC| of each redundant cluster
+
+# `ranks`: one row per (date, name) with the `score` known then and the forward return as `label`
+print(rank_band_decay(ranks, band_size=5).table)          # return / t / win rate / payoff per band
+print(random_selection_null(ranks, top_n=5, seed=0))      # top-5 vs the same rule on permuted scores
 ```
 
 - **`information_coefficient` / `alpha_gate`**: Spearman rank IC of a score against
@@ -295,6 +300,12 @@ print(rep.kept, rep.dropped)               # keep the highest-|IC| of each redun
   keep-highest-|IC| drop-list that groups features by |Spearman| / Cramér's V.
 - **`asof_window` / `window_before`**: leakage-safe point-in-time slices, so a live
   feature is built identically to its training twin.
+- **`rank_band_decay` / `random_selection_null`**: for a ranking with no entry event or
+  stop (relative momentum, factor rotation). Per-band return, t-stat, win rate and payoff,
+  every band on the same dates, with `cliff_share` telling a slope from a cliff; and the
+  top-N against the same rule when each name is handed another name's score path, so a
+  sticky score, overlapping holding periods and names that simply drifted up cannot pass
+  for skill. A scored name with no forward return (a delisting) is refused, not dropped.
 
 Still capital-free: it judges *signals and features*, never an equity curve.
 

@@ -72,7 +72,7 @@ flowchart TD
 | **`edge`** | `edge/` (trade_log, simulator, metrics, stats) | Produce and describe the `TradeLog`; the honesty layer (CI + p-value). | `TradeLog`, `barrier_trades`, `edge_report`, `reality_check`, `bootstrap_ci`, `block_bootstrap_pvalue`, `random_entry_null` |
 | **`validation`** | `validation/` (holdout, walk_forward, permutation, pbo, search_space, gate, gauntlet, thresholds, diagnostics, monitor) | Out-of-sample survival, data-mining corrections, the audited gauntlet, and the post-promotion decay monitor. | `holdout`, `walk_forward`, `sign_permutation_pvalue`, `sidak_correction`, `spa_test`, `pbo_cscv`, `deflated_sharpe`, `deflated_expectancy`, `SearchSpaceLog`, `run_gauntlet`, `Thresholds`, `edge_monitor`, `EdgeBaseline` |
 | **`breadth`** | `breadth.py` (single file) | How many *independent* bets a correlated set of return streams holds. | `effective_n`, `participation_ratio`, `Breadth` |
-| **`ml`** | `ml/` (ic, decay, redundancy, pit) | The same honesty aimed at a model's scores — a predictions frame, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window` |
+| **`ml`** | `ml/` (ic, decay, redundancy, pit, cross_section) | The same honesty aimed at a model's scores — a predictions frame, or a `(date, name)` panel for a cross-sectional ranking, not a `TradeLog`. | `information_coefficient`, `alpha_gate`, `quantile_decay`, `fold_ic`, `redundancy_droplist`, `asof_window`, `rank_band_decay`, `random_selection_null` |
 | **`report`** | `report/` (tearsheet, scorecards) | Self-contained HTML tearsheets. Plotly, behind the `[report]` extra; **not** re-exported at top level. | `tearsheet`, `gauntlet_report`, `fullrange_scorecard`, `monitor_panel` |
 | **`strategies`** | `strategies/` (ma_cross, macd_cross) | Demo signals for examples and tests. *Not endorsed edges.* | `ma_cross`, `macd_cross` |
 | **`pine`** | `pine/` at the repo root, not a Python package | The TradingView port of `edge` (Pine v6), its on-chart conformance check, and the vectors crucible generates for it. Scorecard only; nothing from the gauntlet. See [The Pine port](pine.md). | `CrucibleEdge.pine`, `CrucibleEdgeConformance.pine`, `gen_vectors.py` |
@@ -150,6 +150,7 @@ simulator), this is the output you must return.
 | `Fold` / `WalkForwardResult` | `validation/walk_forward.py:62,75` | dataclass | fold detail; `folds, stitched, param_grid` |
 | `HoldoutResult` | `validation/holdout.py:51` | dataclass | early/late `Verdict`s |
 | `DecayTable` / `RedundancyReport` | `ml/decay.py:16`, `ml/redundancy.py:28` | frozen | ML score-quality results |
+| `BandDecay` / `SelectionNull` | `ml/cross_section.py` | frozen | cross-sectional ranking results: per-band table best-first with `.spread` / `.cliff_share`; top-N against a name-permuted null (`p_value`, per-date `excess`). Descriptive, never a gate |
 | `EdgeBaseline` | `validation/monitor.py:72` | frozen | what the edge promised, frozen at promotion: `expectancy`, `sigma`, `n_trades`, `trades_per_year`, `n_variants`, `deflated` |
 | `CusumDesign` / `MonitorVerdict` | `validation/monitor.py:141`, `:359` | frozen | the derived detector (`k_r`, `h_std`, `arl0`, `arl1`) and its verdict (`.label` HOLDING/SLIPPING/DEGRADED) |
 
@@ -198,6 +199,7 @@ variants you discarded. This records them.
 | Add a demo signal | `strategies/` | Demos only — not endorsed edges. |
 | Add a tearsheet panel | `report/tearsheet.py` | Behind the `[report]` extra; never import plotly from the core. |
 | Validate a model's scores | `ml/` | Works on a predictions frame (`score`, `label`), not a `TradeLog`. |
+| Validate a cross-sectional ranking | `ml/cross_section.py` | A `(date, name, score, label)` panel. Any null must keep score persistence and per-name drift (permute names, not per-date draws); compare bands on common dates; never drop a scored row with no label silently. |
 
 ## Running the tests, building the docs, releasing
 
