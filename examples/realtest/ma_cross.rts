@@ -1,0 +1,69 @@
+/* ===========================================================================
+   ma_cross.rts  —  a 20/50 SMA crossover, long only, for the crucible round trip
+   ===========================================================================
+
+   This is a STARTING TEMPLATE. RealTest (https://mhptrading.com/) is paid
+   software; this file was written from its documentation, not executed by the
+   crucible tooling. Comment syntax and section names follow the RealTest docs,
+   but confirm the order-price / stop keys against your version before trusting
+   the export.
+
+   The point of the pairing: run this in RealTest, then feed the exported trade
+   log to crucible with
+
+       python examples/realtest_ingest.py --csv ma_cross_trades.csv --r-pct 5
+
+   Two lines below are the whole contract with the crucible side:
+     * StopPct (the protective stop, in %) is what makes 1R well defined. Pass
+       the SAME number to the ingest script as --r-pct, so r = PctGain / StopPct.
+     * SaveTradesAs writes the per-trade CSV crucible reads. Without it there is
+       nothing to import.
+
+   A trend-following crossover has a low win rate and a few big winners, so at a
+   hundred trades the edge is easy to *see* (a rising curve) and hard to *prove*.
+   That gap is exactly what crucible measures.
+   =========================================================================== */
+
+Import: {
+    // Point this at whatever price data you have. Norgate shown; a CSV folder
+    // (DataSource: CSV / DataFolder: ...) works too. One liquid symbol is enough.
+    DataSource:  Norgate
+    IncludeList: SPY
+}
+
+Settings: {
+    StartDate:    1993-01-29        // SPY's inception era; use your data's range
+    EndDate:      Latest
+    BarSize:      Daily
+    AccountSize:  100000
+    // The export crucible reads. Percent P&L (PctGain) and MFE/MAE come with it.
+    SaveTradesAs: ma_cross_trades.csv
+}
+
+Parameters: {
+    Fast:    20
+    Slow:    50
+    StopPct: 5                      // protective stop, in %. THIS IS 1R.
+}
+
+Data: {
+    FastMA: MA(C, Fast)
+    SlowMA: MA(C, Slow)
+}
+
+// --- the strategy ----------------------------------------------------------
+MACrossLong: {
+    Side:       Long
+    // ~fixed-fractional sizing; the % stop below, not this line, defines 1R.
+    Quantity:   S.Equity * 0.10 / C
+
+    // enter the bar after the fast SMA closes above the slow SMA (golden cross)
+    EntrySetup: FastMA > SlowMA and FastMA[1] <= SlowMA[1]
+    EntryPrice: Open
+
+    // exit the bar after it closes back below (death cross)...
+    ExitRule:   FastMA < SlowMA and FastMA[1] >= SlowMA[1]
+    ExitPrice:  Open
+    // ...or intrabar if price falls StopPct below the entry. This stop == 1R.
+    ExitStop:   EntryPrice * (1 - StopPct / 100)
+}
