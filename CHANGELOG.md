@@ -17,6 +17,28 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   strategy import lines move with it.
 
 ### Added
+- **`crucible.ml.rank_band_decay` and `random_selection_null`: tests for a *ranking*, not a
+  signal.** Relative-momentum-style rotations have no entry event and no stop, so neither the
+  R-multiple trade log nor the random-entry null fits. Input is a long `(date, name, score,
+  label)` panel; point-in-time membership stays the caller's job. numpy/pandas only, and
+  descriptive: neither is wired into the gauntlet.
+  - `rank_band_decay` ranks names within each date, trades each band of `band_size` as its
+    own equal-weight portfolio, and reports mean return, t-stat, win rate and payoff per
+    band, plus `cliff_share` (how much of the top-to-bottom spread is lost in the first
+    step: slope vs cliff). Every band is measured on the same dates, the ones where all
+    bands are full (`dates_dropped` counts the rest): measuring each band on the dates it
+    happened to be full let a noise score in a growing universe show a 1.7% spread at t = 7.
+  - `random_selection_null` asks whether top-N beats the same rule when each name is handed
+    another name's whole score path (one permutation of names per simulation). That keeps
+    the market move, score persistence, overlapping holding periods and per-name drift in
+    the null. A draft that drew N names independently on each date rejected a worthless
+    sticky ranking 25% to 40% of the time at the 5% level, and a time-block bootstrap of
+    its per-date `excess` did not repair it; the name permutation measured 3.5% and 7% over
+    200 seeds. `p_value` is uncorrected: log each `top_n` tried in a `SearchSpaceLog`.
+  - A scored row with no label on an otherwise realized date (typically a delisting inside
+    the holding period) raises by default, since dropping it silently is survivorship bias;
+    `missing_label="drop"` drops it knowingly and reports the count. A date with no label
+    at all is an open holding period and is skipped.
 - **`examples/README.md`, an index of the examples.** One row per file: what it shows,
   which extra it needs (core, `[report]`, `[examples]` + network), and whether CI runs it.
   `tests/test_examples_readme.py` keeps the roster in sync both ways (every example is

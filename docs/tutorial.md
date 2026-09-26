@@ -390,6 +390,7 @@ real?"* actually gets answered.
 |---|---|---|---|
 | `sign_permutation_pvalue` (§5a) | each trade's magnitude | its **sign** | is there directional skill at all |
 | `random_entry_null` (§6) | the prices, the barriers, the trade count, the holding period | ***when* you entered** | timing skill, or just exposure |
+| `random_selection_null` (§7) | each date's eligible names, each name's return path, the score paths | **which name carries which score path** | ranking skill, or just the universe (for a ranking with no entry event) |
 | `detrended_timing_null` (§6) | your directions and holding periods | timing, on **drift-removed** returns | timing skill once the market's own drift is gone |
 | `block_bootstrap_pvalue` (§3) | the block structure | which blocks, **zero-centered to impose a no-edge null** | the same, for a serially dependent book |
 
@@ -694,7 +695,8 @@ backtester, the pipeline §13 runs end to end.*
 ### Is the ML score real? `crucible.ml`
 
 **Code:** [`ml/ic.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/ic.py), [`ml/decay.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/decay.py),
-[`ml/redundancy.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/redundancy.py), [`ml/pit.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/pit.py)
+[`ml/redundancy.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/redundancy.py), [`ml/pit.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/pit.py),
+[`ml/cross_section.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/cross_section.py)
 
 Once a model emits a **score**, the same honesty question §4 asks of a trade log applies to the
 score: does a higher score actually rank better outcomes, or is it noise, leakage, or a feature
@@ -730,6 +732,84 @@ predictions rather than an equity curve.
 > feature importance, judging features on unseen data: **AFML Ch. 8 "Feature Importance."** No-look-
 > ahead feature construction: **AFML Ch. 7 §7.4**, the purge/embargo principle applied to features.
 > Quantile-decay monotonicity is the standard factor-research check (the alphalens lineage).
+
+### Is a ranking real? `rank_band_decay` and `random_selection_null`
+
+**Code:** [`ml/cross_section.py`](https://github.com/mspinola/crucible/blob/main/src/crucible/ml/cross_section.py)
+
+A ranking strategy (relative momentum, a factor rotation, "hold the top five by score") has no
+entry event and no stop. There is no natural R-multiple, and there is no entry timing to
+randomize, so neither the trade log of §2 nor the random-entry null of §6 fits. The honest
+questions are cross-sectional: does return fall as you go down the ranking, and does the top of
+the ranking beat what the same rule would pick if the scores meant nothing?
+
+Both functions take a long **panel**, one row per `(date, name)`: the `score` known at the date
+and the `label`, the forward return realized over the holding period that follows.
+Point-in-time membership is your job, since crucible cannot see a name the panel omits. A name
+that *is* in the panel with a score but no label (typically a delisting inside the holding
+period) is refused rather than silently dropped, because dropping it is exactly how survivorship
+bias gets in. Fill in its delisting return, or pass `missing_label="drop"` to drop it knowingly
+(the count is reported). A date with no label at all is a holding period still open, and is
+skipped.
+
+```python
+import numpy as np, pandas as pd
+from crucible.ml import rank_band_decay, random_selection_null
+
+# 10 years of month-ends, 40 names: a shared market move, noise, and a weak real slope
+rng = np.random.default_rng(0)
+dates, names = pd.date_range("2015-01-31", periods=120, freq="ME"), 40
+score = rng.normal(size=(120, names))
+label = rng.normal(0.008, 0.04, (120, 1)) + 0.01 * score + rng.normal(0, 0.08, (120, names))
+panel = pd.DataFrame({"date": np.repeat(dates, names), "name": np.tile(np.arange(names), 120),
+                      "score": score.ravel(), "label": label.ravel()})
+
+bands = rank_band_decay(panel, band_size=5, n_bands=6)
+print(bands.table[["ranks", "mean_return", "t_stat", "win_rate", "payoff"]]
+      .round(3).to_string(index=False))
+print(f"spread {bands.spread:+.4f}  cliff_share {bands.cliff_share:.2f}  monotonic {bands.monotonic}")
+print(random_selection_null(panel, top_n=5, n_sims=2000, seed=0))
+```
+
+```text
+ranks  mean_return  t_stat  win_rate  payoff
+  1-5        0.022   5.030     0.617   1.191
+ 6-10        0.017   3.812     0.595   1.114
+11-15        0.013   2.792     0.558   1.124
+16-20        0.009   1.736     0.553   1.027
+21-25        0.008   1.826     0.520   1.169
+26-30        0.001   0.210     0.495   1.050
+spread +0.0209  cliff_share 0.23  monotonic True
+top-5 vs name-permuted top-5 over 120 periods: observed +0.0220, null +0.0065, p = 0.0005 (100.0th pct, 2000 sims)
+```
+
+- **Rank-band decay** ranks names within each date, cuts the ranking into bands of `band_size`,
+  and trades each band as its own equal-weight portfolio. A real factor decays down the
+  ranking, and *how* it decays is a finding of its own: `cliff_share` is the share of the
+  top-to-bottom spread lost in the first step. About `1/(bands-1)` (0.2 here) is an even slope.
+  Near 1 means the whole edge sits in the top band and the rest of the ranking is noise. Every
+  band is measured on the **same dates**, the ones where all bands are full. Without that, a
+  universe that grows over time averages band 1 over every year and band 6 over only the late
+  ones, and whatever the market did early turns into a spread between them. In the test suite a
+  meaningless score in a growing universe with an early rally showed a 1.7% spread at t = 7
+  that way.
+- **Read the t-stats with care.** They treat each date as an independent draw and include the
+  market move: every band above is "significant" partly because the whole universe drifted up.
+  The spread down the table is the evidence, not any single band's t-stat.
+- **Random-selection null** asks whether the top-N beats the same rule run on scores that carry
+  no information about their names. Each simulation hands every name another name's *whole
+  score path* and picks the top-N on every date as before. The permutation keeps everything
+  the real selection has except the link between score and name: the market move, a
+  persistent score picking the same names month after month, overlapping holding periods, and
+  names that simply drifted up. Redrawing N names independently on each date instead keeps
+  none of the last three. On a sticky score that null passed a worthless ranking about 30% to
+  40% of the time at the 5% level. The name permutation holds near 5% (both measured in
+  `tests/test_ml_cross_section.py`).
+
+Both report **raw, uncorrected** statistics. Every `top_n` and `band_size` you try is a variant:
+log each one in a `SearchSpaceLog` (§5b) and read the p-value against that count. Neither
+function is a gate. They describe a ranking, and a ranking that survives them still has to
+become a book and pass through the gauntlet.
 
 ---
 
@@ -1456,7 +1536,7 @@ Information Coefficient (§7).
 | Random-entry null + detrended timing null | `crucible/src/crucible/edge/stats.py` |
 | Sign-permutation, Šidák, White's Reality Check + Hansen's SPA | `crucible/src/crucible/validation/permutation.py` |
 | PBO (CSCV) + deflated Sharpe | `crucible/src/crucible/validation/pbo.py` |
-| ML signal quality: IC, decay, redundancy, PIT | `crucible/src/crucible/ml/` |
+| ML signal quality: IC, decay, redundancy, PIT; cross-sectional rankings | `crucible/src/crucible/ml/` |
 | Purged/embargoed holdout | `crucible/src/crucible/validation/holdout.py` |
 | Walk-forward + WFE | `crucible/src/crucible/validation/walk_forward.py` |
 | Fold dispersion / WFE diagnostics | `crucible/src/crucible/validation/diagnostics.py` |
