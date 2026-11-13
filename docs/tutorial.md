@@ -325,6 +325,21 @@ The report draws this comparison directly: pass a period series to the tearsheet
 correlation-preserving CI against the optimistic i.i.d. one on the period-mean axis, the
 picture of "the i.i.d. band is too tight" rather than just the assertion.
 
+**On a trade log, without building a period series.** `calendar_block_metric_cis(trades,
+block_months=6)` is the trade-level version. It groups trades by the calendar block their
+`entry_date` falls in (half-years by default) and draws whole blocks with replacement. It
+returns expectancy, profit factor and win rate with the same point estimates as
+`bootstrap_metric_cis`, but with intervals that widen when trades in the same months share a
+shock. STRONG reports these block floors as **soft** checks beside its hard i.i.d. floors
+(`expectancy_block_ci_lower`, `profit_factor_block_ci_lower`, §11). A pass that warns there
+holds only because the i.i.d. bootstrap treated overlapping trades as independent.
+
+```python
+from crucible.edge import calendar_block_metric_cis
+cis = calendar_block_metric_cis(trades, block_months=6)   # needs entry_date on the log
+cis["profit_factor"].low                                  # the floor STRONG reads, block version
+```
+
 > **Source.** Politis & Romano (1994), "The Stationary Bootstrap," *JASA* 89(428): 1303–1313,
 > the block/stationary bootstrap for dependent data ([Bootstrapping (statistics)](https://en.wikipedia.org/wiki/Bootstrapping_(statistics))).
 

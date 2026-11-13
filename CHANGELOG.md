@@ -17,6 +17,26 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   strategy import lines move with it.
 
 ### Added
+- **`calendar_block_metric_cis`: trade-level CIs that resample whole calendar blocks, and
+  STRONG reads its two floors off them as soft checks.**
+  - **The new functions.** `crucible.edge.calendar_block_metric_cis(trades, block_months=6)`
+    groups trades by the calendar block of their `entry_date` (anchored on the calendar:
+    half-years by default) and draws whole blocks with replacement. It returns expectancy,
+    profit factor and win rate, with the same point estimates as `bootstrap_metric_cis` and
+    wider intervals when trades in the same months share a shock. Seeded, exact for these
+    decomposable metrics, and vectorized over draws. `calendar_block_labels` exposes the
+    grouping.
+  - **What STRONG reports.** `gate_strong` now adds `expectancy_block_ci_lower` and
+    `profit_factor_block_ci_lower` as **soft** checks, at the same thresholds:
+    - skipped when the log has no `entry_date`;
+    - "not read" below `Thresholds.strong_block_min_blocks` (8) occupied blocks;
+    - block length set by `Thresholds.strong_block_months` (6).
+  - **No verdict changes.** The hard i.i.d. floors are unchanged. Promoting the block floors
+    to hard would be a threshold change, to make in the open (`docs/edge_gate.md`, Notes).
+  - **Motivation.** An i.i.d. trade bootstrap is too narrow on a pooled book whose trades
+    overlap in calendar time. A downstream study measured a half-year block interval 3.3x as
+    wide on a dense, long-hold design.
+
 - **`crucible.ml.rank_band_decay` and `random_selection_null`: tests for a *ranking*, not a
   signal.** Relative-momentum-style rotations have no entry event and no stop, so neither the
   R-multiple trade log nor the random-entry null fits. Input is a long `(date, name, score,

@@ -23,6 +23,11 @@ class Thresholds:
     min_excursion_ratio: float = 1.2
     min_time_asymmetry: float = 2.0
     min_exit_efficiency: float = 0.5
+    # calendar-block companion to the two hard CI-low checks: SOFT, informational. The
+    # same thresholds, read off a bootstrap that resamples whole calendar blocks of
+    # trades (by entry_date) instead of single trades. See docs/edge_gate.md.
+    strong_block_months: int = 6            # block length in calendar months
+    strong_block_min_blocks: int = 8        # fewer occupied blocks than this: too coarse to read
 
     # ── DURABLE — walk-forward robustness ───────────────────────────────────
     wfe_reject_low: float = 0.30            # WFE below this = fragile (reject)

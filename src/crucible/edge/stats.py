@@ -323,3 +323,104 @@ def block_bootstrap_ci(returns, *, block: int = 6, n_boot: int = 10_000,
     return CI(point=float(r.mean()),
               low=float(np.percentile(boot, alpha / 2 * 100)),
               high=float(np.percentile(boot, (1 - alpha / 2) * 100)), alpha=alpha)
+
+
+# ── calendar-block CIs on a trade log ────────────────────────────────────────
+# The i.i.d. bootstrap above treats every trade as independent. On a book pooled
+# across markets, trades open in the same months overlap in calendar time and share
+# the same shocks, so drawing them one at a time understates the noise. The
+# resampler below draws whole calendar blocks of trades instead: every trade whose
+# entry falls in a drawn block comes along together, so a shock common to that
+# block moves the whole draw. Metrics are read off per-block sums, which keeps it
+# exact for the decomposable metrics and vectorized over draws.
+
+_BLOCK_METRICS = ("expectancy", "profit_factor", "win_rate")
+
+
+def calendar_block_labels(entry_dates, block_months: int = 6) -> np.ndarray:
+    """Integer calendar-block label per trade, from its entry date.
+
+    Blocks are anchored on the calendar, not on the first trade: with
+    ``block_months=6`` every trade lands in its half-year (Jan-Jun, Jul-Dec), with
+    ``3`` in its quarter. Raises if a date is missing, since a trade that cannot be
+    placed in time cannot be resampled with its neighbors."""
+    import pandas as pd
+
+    block_months = int(block_months)
+    if block_months < 1:
+        raise ValueError(f"block_months must be >= 1, got {block_months}")
+    d = pd.to_datetime(pd.Series(entry_dates))
+    if d.isna().any():
+        raise ValueError(f"{int(d.isna().sum())} trade(s) have no entry_date; a calendar "
+                         "block bootstrap needs every trade placed in time")
+    months = d.dt.year.to_numpy() * 12 + (d.dt.month.to_numpy() - 1)
+    return months // block_months
+
+
+def calendar_block_metric_cis(trades: TradeLog, *, block_months: int = 6,
+                              n_boot: int = 10_000, alpha: float = 0.05,
+                              seed: int = 0) -> "dict[str, CI]":
+    """Bootstrap CIs for expectancy, profit factor and win rate that resample whole
+    CALENDAR BLOCKS of trades, the time-clustered companion to
+    :func:`bootstrap_metric_cis`.
+
+    Trades are grouped by the calendar block their ``entry_date`` falls in
+    (:func:`calendar_block_labels`), and each draw picks that many blocks with
+    replacement and pools their trades. Trades that overlap in calendar time and
+    share a shock (a pooled multi-market book is the usual case) therefore move
+    together, and the interval widens to match. When trades really are independent
+    across blocks the two bootstraps agree in expectation; when they are not, the
+    i.i.d. interval is the one that is too narrow.
+
+    Point estimates are identical to the i.i.d. ones (same metric, same trades).
+    Only blocks that contain a trade are drawn. With few blocks the percentile CI is
+    coarse, so read ``n_blocks`` (:func:`calendar_block_labels`) alongside it.
+    Requires an ``entry_date`` column; NaN returns are dropped with their dates."""
+    if not isinstance(trades, TradeLog):
+        raise TypeError("calendar_block_metric_cis needs a TradeLog with entry_date")
+    dates = trades.col("entry_date")
+    if dates is None:
+        raise ValueError("calendar_block_metric_cis needs an entry_date column")
+    r_all = trades.r
+    keep = ~np.isnan(r_all)
+    r = r_all[keep]
+    nan = float("nan")
+    if len(r) == 0:
+        return {name: CI(nan, nan, nan, alpha) for name in _BLOCK_METRICS}
+
+    labels = calendar_block_labels(np.asarray(dates)[keep], block_months)
+    _, block = np.unique(labels, return_inverse=True)
+    n_blocks = int(block.max()) + 1
+    s_sum = np.bincount(block, weights=r, minlength=n_blocks)
+    s_n = np.bincount(block, minlength=n_blocks).astype(float)
+    s_gain = np.bincount(block, weights=np.where(r > 0, r, 0.0), minlength=n_blocks)
+    s_loss = np.bincount(block, weights=np.where(r < 0, -r, 0.0), minlength=n_blocks)
+    s_win = np.bincount(block, weights=(r > 0).astype(float), minlength=n_blocks)
+
+    rng = np.random.default_rng(seed)
+    pick = rng.integers(0, n_blocks, size=(n_boot, n_blocks))
+    flat = (pick + n_blocks * np.arange(n_boot)[:, None]).ravel()
+    w = np.bincount(flat, minlength=n_boot * n_blocks).reshape(n_boot, n_blocks).astype(float)
+
+    n_draw = w @ s_n
+    gp, gl = w @ s_gain, w @ s_loss
+    with np.errstate(divide="ignore", invalid="ignore"):
+        draws = {
+            "expectancy": (w @ s_sum) / n_draw,
+            "profit_factor": np.where(gl > 0, gp / gl, np.where(gp > 0, np.inf, 0.0)),
+            "win_rate": (w @ s_win) / n_draw,
+        }
+    points = {"expectancy": expectancy(r), "profit_factor": profit_factor(r),
+              "win_rate": win_rate(r)}
+    out: "dict[str, CI]" = {}
+    for name in _BLOCK_METRICS:
+        vals = draws[name]
+        finite = vals[np.isfinite(vals)]
+        if len(finite) == 0:
+            lo = hi = float("inf")
+        else:
+            with np.errstate(invalid="ignore"):
+                lo = float(np.percentile(vals, alpha / 2 * 100))
+                hi = float(np.percentile(vals, (1 - alpha / 2) * 100))
+        out[name] = CI(point=float(points[name]), low=lo, high=hi, alpha=alpha)
+    return out

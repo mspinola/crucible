@@ -26,6 +26,8 @@ from crucible.edge.stats import (
     block_bootstrap_pvalue,
     bootstrap_ci,
     bootstrap_metric_cis,
+    calendar_block_labels,
+    calendar_block_metric_cis,
     detrended_timing_null,
     p_value_positive,
     random_entry_null,
@@ -41,5 +43,6 @@ __all__ = [
     "bootstrap_ci", "bootstrap_metric_cis", "p_value_positive", "reality_check",
     "random_entry_null", "detrended_timing_null",
     "block_bootstrap_pvalue", "block_bootstrap_ci", "CI", "Verdict",
+    "calendar_block_metric_cis", "calendar_block_labels",
     "barrier_trades", "random_entries",
 ]

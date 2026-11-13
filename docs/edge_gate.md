@@ -80,7 +80,7 @@ compute on a finished log:
 | Gate | Proves | Hard checks | Soft (informational) |
 |---|---|---|---|
 | **REAL** | not noise, corrected for the search | search-corrected significance (permutation + Šidák, or White's Reality Check). Beats the 95th-percentile random-entry null *when prices are given* | random-timing skipped when no prices |
-| **STRONG** | economically real at the pessimistic bound | expectancy CI-lower > 0. Profit-factor CI-lower > 1.25 | SQN CI-lower > 1.6. Excursion ratio / time asymmetry / exit efficiency |
+| **STRONG** | economically real at the pessimistic bound | expectancy CI-lower > 0. Profit-factor CI-lower > 1.25 | SQN CI-lower > 1.6. The same two floors on a calendar-block bootstrap (needs `entry_date`). Excursion ratio / time asymmetry / exit efficiency |
 | **DURABLE** | survives IS → OOS over time | aggregate WFE in [30%, 100%]. Majority of folds tradable with bounded dispersion | WFE in the 50–80% healthy band |
 | **GENERAL** | travels across markets | cross-market Reality Check across every market tested | none |
 
@@ -129,6 +129,26 @@ quantstats for an equity curve). crucible measures the edge. It does not size it
 
 ## Notes
 
+- **STRONG's calendar-block floors are soft, on purpose.** The two hard floors come from an
+  i.i.d. bootstrap that draws single trades. When trades overlap in calendar time and share
+  shocks (a pooled multi-market book), that interval is too narrow and the floor too
+  optimistic. So when the log carries `entry_date`, STRONG also reads both floors off
+  `calendar_block_metric_cis`, which draws whole calendar blocks of trades
+  (`Thresholds.strong_block_months`, default 6, anchored on half-years). It reports them as
+  soft checks, `expectancy_block_ci_lower` and `profit_factor_block_ci_lower`, beside the
+  hard ones.
+  - **What a warning means.** The pass holds only on the i.i.d. floor. Read it as a reason to
+    look harder, not as a verdict.
+  - **Too few blocks.** A book occupying fewer than `strong_block_min_blocks` (8) blocks has
+    too coarse an interval to read, and says so.
+  - **Why they are soft.** Making them hard would change verdicts behind a default. Promoting
+    them is a threshold change and should be made in the open with its rationale (AGENTS.md),
+    not slipped in with the measurement that motivated it.
+  - **What motivated them.** A downstream study measured a half-year block interval 3.3 times
+    as wide as the i.i.d. one on a dense, long-hold design (about 400 events a year, each held
+    56 bars). Sparse books, ten to thirty trades a year with holds of about two weeks, widen
+    far less. That is the case for reporting the block floor beside the i.i.d. one rather than
+    swapping one for the other.
 - **REAL's "beat random timing"** uses `random_entry_null`, random entries under the
   same barriers on the *same* prices, in R units consistent with the log. Pass the same
   `side`/`tp`/`sl` you generated the log with so the null is matched. (crucible does not
