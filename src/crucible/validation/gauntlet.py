@@ -28,6 +28,8 @@ import pandas as pd
 from crucible.edge import (
     TradeLog,
     bootstrap_metric_cis,
+    calendar_block_labels,
+    calendar_block_metric_cis,
     detrended_timing_null,
     edge_report,
     expectancy,
@@ -151,6 +153,54 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
     return g
 
 
+_BLOCK_CHECKS = (("expectancy_block_ci_lower", "expectancy", "min_expectancy_ci_low"),
+                 ("profit_factor_block_ci_lower", "profit_factor", "min_profit_factor_ci_low"))
+
+
+def _fmt_low(x: float) -> str:
+    return f"{x:+.3f}" if np.isfinite(x) else str(x)
+
+
+def _add_block_floors(g: Gate, trades: TradeLog, *, exp_iid_low: float, pf_iid_low: float,
+                      thr: Thresholds) -> None:
+    """The calendar-block companion to STRONG's two hard floors, added as SOFT checks.
+
+    Same thresholds, read off :func:`calendar_block_metric_cis`. Soft by design: a
+    hard check here would change verdicts behind a default, and crucible changes a
+    bar in the open (AGENTS.md). Promoting it is a maintainer decision, recorded in
+    docs/edge_gate.md."""
+    iid_low = {"expectancy": exp_iid_low, "profit_factor": pf_iid_low}
+    dates = trades.col("entry_date")
+    if dates is None or trades.n == 0:
+        for name, _, attr in _BLOCK_CHECKS:
+            g.add(name, False, hard=False, threshold=getattr(thr, attr),
+                  detail="skipped: the log carries no entry_date, so trades cannot be "
+                         "grouped into calendar blocks")
+        return
+    try:
+        labels = calendar_block_labels(dates[~np.isnan(trades.r)], thr.strong_block_months)
+    except ValueError as exc:
+        for name, _, attr in _BLOCK_CHECKS:
+            g.add(name, False, hard=False, threshold=getattr(thr, attr),
+                  detail=f"skipped: {exc}")
+        return
+    n_blocks = int(len(np.unique(labels)))
+    cis = calendar_block_metric_cis(trades, block_months=thr.strong_block_months,
+                                    n_boot=thr.n_boot, alpha=thr.alpha, seed=thr.seed)
+    coarse = n_blocks < thr.strong_block_min_blocks
+    for name, key, attr in _BLOCK_CHECKS:
+        bar, low = getattr(thr, attr), cis[key].low
+        note = (f"{thr.strong_block_months}-month calendar blocks, {n_blocks} occupied; "
+                f"iid floor {_fmt_low(iid_low[key])}")
+        if coarse:
+            g.add(name, False, hard=False, value=low, threshold=bar,
+                  detail=f"not read: {n_blocks} occupied blocks is fewer than "
+                         f"{thr.strong_block_min_blocks}, too coarse for a percentile CI; "
+                         + note)
+        else:
+            g.add(name, low > bar, hard=False, value=low, threshold=bar, detail=note)
+
+
 def gate_strong(trades: TradeLog, *, thr: Thresholds = Thresholds()) -> Gate:
     """STRONG — economically meaningful at the CI lower bound?
 
@@ -158,6 +208,14 @@ def gate_strong(trades: TradeLog, *, thr: Thresholds = Thresholds()) -> Gate:
     the point estimate — that's the fix for "PF 1.37 on 60 trades looked clean").
     SQN's lower bound is a soft/aspirational bar, and the structural excursion
     metrics (when the log carries mfe/mae/bars_held) are soft, informational.
+
+    When the log carries ``entry_date``, the same two floors are also read off a
+    bootstrap that resamples whole calendar blocks of trades
+    (``thr.strong_block_months``, default half-years) and reported as SOFT checks
+    ``expectancy_block_ci_lower`` / ``profit_factor_block_ci_lower``. The i.i.d. floor
+    is too narrow when trades overlap in calendar time and share shocks (a pooled
+    multi-market book), so a pass that holds only on the i.i.d. floor shows up as a
+    warning. The hard checks are unchanged.
     """
     g = Gate("STRONG")
     cis = bootstrap_metric_cis(trades, n_boot=thr.n_boot, alpha=thr.alpha, seed=thr.seed)
@@ -169,6 +227,8 @@ def gate_strong(trades: TradeLog, *, thr: Thresholds = Thresholds()) -> Gate:
           value=pf.low, threshold=thr.min_profit_factor_ci_low, detail=f"point={pf.point:.2f}")
     g.add("sqn_ci_lower", s.low > thr.min_sqn_ci_low, hard=False,
           value=s.low, threshold=thr.min_sqn_ci_low, detail=f"point={s.point:.2f}")
+
+    _add_block_floors(g, trades, exp_iid_low=exp.low, pf_iid_low=pf.low, thr=thr)
 
     er = edge_report(trades)
     if er.excursion_ratio is not None:
