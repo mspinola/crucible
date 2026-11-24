@@ -6,6 +6,30 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **A re-opened `SearchSpaceLog` no longer resolves to a search of 0.** `variant_count()`
+  reads a ledger's `session_n_variants` (the variants recorded in this process, so a re-run
+  does not compound its own penalty). A log written by one process and re-opened from
+  `path=` in another has a session count of 0 while its file holds the whole search, so
+  `run_gauntlet(..., n_variants=log)` resolved to 0 and reported the raw sign-permutation
+  p-value as `permutation_pvalue`, with no Šidák correction and no error.
+  - **Behaviour change.** `variant_count()` now raises `ValueError` when a ledger has
+    `session_n_variants == 0` and `n_variants > 0`, naming both counts. That reaches every
+    route that takes a ledger: `run_gauntlet` / `gate_real` (`n_variants=`),
+    `sidak_correction`, and `deflated_sharpe` / `deflated_expectancy` (`n_trials=`), which
+    now resolve through `variant_count()` instead of reading the attribute themselves.
+  - **What to pass.** `log.n_variants` when the on-disk history is the search being judged,
+    or an explicit int when it is not (a file holding repeated runs of one search
+    overstates it). It is an error and not a fallback to the on-disk count because the
+    ledger cannot tell those two cases apart.
+  - **Unchanged.** A log used in the process that recorded into it, a re-opened log that
+    then records this run's variants, an empty log (still 0), and a plain int. The meaning
+    of `n_variants` and `session_n_variants` on the log is untouched.
+  - **Who was affected.** Only the gauntlet's REAL gate was silent. `sidak_correction`
+    already raised on 0, and the two deflated functions already raised whenever the count
+    fell below the number of scored trials, so they failed loudly with a less useful
+    message.
+
 ### Changed
 - **`pine/CrucibleEdge.pine`: the grid report sizes its own columns, and R values print to one
   decimal.** `drawEdgeReportGrid` wrapped at a fixed five columns, so 13 metric cells plus

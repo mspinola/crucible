@@ -187,6 +187,17 @@ self-attestation, and the honest figure is the one you are least motivated to in
 it has to include the variants that errored or scored nothing, because those cost you a
 look at the data too. `SearchSpaceLog` counts them; memory does not.
 
+The log itself resolves to the variants recorded **in this process**
+(`session_n_variants`), so re-running a search does not compound its own penalty. If the
+search wrote the log to `path=` and a separate process judges it, the re-opened log has
+recorded nothing itself, and `run_gauntlet` raises rather than correct for a search of
+zero. Pass the on-disk count there:
+
+```python
+log = SearchSpaceLog(scope="ES:ma_cross_grid", path="logs/search.jsonl")   # re-opened
+gauntlet = run_gauntlet(trades, n_variants=log.n_variants)
+```
+
 The gates, **REAL** (not noise, corrected for the search) → **STRONG** (real at the
 CI lower bound) → **DURABLE** (holds out-of-sample) → **GENERAL** (travels across
 markets), with two bring-your-own preambles (**DECLARE**, **CLEAN**) and a deliberate

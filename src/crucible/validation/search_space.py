@@ -140,6 +140,11 @@ class SearchSpaceLog:
         default: session-scoping protects *re-runs of the same search*, not
         *genuine new exploration*. If each run tries something new, the honest
         number drifts toward `n_variants`.
+
+        Passing the log itself as `n_variants=` / `n_trials=` reads this count. In
+        a process that re-opened the log from `path=` and recorded nothing it is
+        0 while the file holds the search, and `variant_count` raises rather
+        than resolve to a search of 0. Pass `log.n_variants` there.
         """
         return len(self._session_entries)
 

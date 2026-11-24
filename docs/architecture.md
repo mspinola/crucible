@@ -166,6 +166,12 @@ variants you discarded. This records them.
   loaded from a prior run on disk) vs `session_n_variants` (this process only). The
   latter is the honest denominator for a single run's correction — re-running a search
   must not compound its own penalty.
+- Handing the log itself to a correction (`n_variants=log`, `n_trials=log`) reads
+  `session_n_variants` through `variant_count()`. A log **re-opened** from `path=` in a
+  process that recorded nothing (the judge running apart from the search) has a session
+  count of 0 while the file holds the search, so `variant_count()` raises `ValueError`
+  there instead of resolving to 0. Pass `log.n_variants` when the on-disk history is the
+  search being judged.
 - Optional JSONL persistence via `path=`; in-memory by default (core stays
   side-effect-free).
 

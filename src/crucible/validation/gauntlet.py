@@ -71,7 +71,9 @@ def gate_real(trades: TradeLog, *, prices: Optional[pd.DataFrame] = None,
     Significance is the hard check. If you pass `variant_returns` (every variant
     you searched, discards included), it uses White's Reality Check across them;
     else a sign-permutation p-value, Šidák-corrected when you declare
-    `n_variants`. When `prices` are given it also requires the expectancy to beat
+    `n_variants` (an int, or a `SearchSpaceLog` resolved by `variant_count`: a log
+    re-opened from disk in a process that recorded nothing raises `ValueError`
+    rather than count 0, so pass `log.n_variants` there). When `prices` are given it also requires the expectancy to beat
     the 95th percentile of a random-timing null on the *same* prices; without
     prices that check is a soft skip.
 

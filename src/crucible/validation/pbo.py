@@ -34,6 +34,8 @@ from typing import Callable, Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 
+from crucible.validation.permutation import variant_count
+
 # Metric contract is COLUMNAR for speed: map a (rows x N) block of period returns
 # to an N-vector of per-config scores, in one vectorized pass.
 ColMetric = Callable[[np.ndarray], np.ndarray]
@@ -274,7 +276,8 @@ def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns,
     too thin to score, and badly wrong when one search spans several sweeps — scanning
     45 markets and keeping the best is a search over 45 markets, not over the three
     configs of whichever one won. Pass the search's true size (an int, or a
-    `SearchSpaceLog`, whose `session_n_variants` is read) and the bar rises to match.
+    `SearchSpaceLog`, resolved by `variant_count`: its `session_n_variants`, and a
+    re-opened log raises rather than count 0) and the bar rises to match.
     Supplying the scored count when more were tried silently undercounts the search
     and flatters the winner — the exact failure the ledger exists to prevent."""
     sr_trials = np.asarray(trial_sharpes, dtype=float)
@@ -289,9 +292,8 @@ def deflated_sharpe(trial_sharpes: Returns, *, returns: Returns,
     if n < 2:
         raise ValueError(f"need >= 2 returns to compute the winning Sharpe, got {n}")
 
-    # a SearchSpaceLog is accepted directly; duck-typed to avoid coupling the modules
-    ledger_n = getattr(n_trials, "session_n_variants", None)
-    N = scored if n_trials is None else int(ledger_n if ledger_n is not None else n_trials)
+    # a SearchSpaceLog is accepted directly; variant_count raises on a re-opened one
+    N = scored if n_trials is None else variant_count(n_trials)
     if N < scored:
         raise ValueError(
             f"n_trials={N} is fewer than the {scored} trial Sharpes supplied; a search "
@@ -449,8 +451,7 @@ def deflated_expectancy(returns: Returns, trial_returns: Sequence[Returns], *,
             "of a single draw is not defined by this approximation."
         )
 
-    ledger_n = getattr(n_trials, "session_n_variants", None)
-    N = scored if n_trials is None else int(ledger_n if ledger_n is not None else n_trials)
+    N = scored if n_trials is None else variant_count(n_trials)
     if N < scored:
         raise ValueError(
             f"n_trials={N} is fewer than the {scored} trial logs supplied; a search "
