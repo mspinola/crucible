@@ -51,9 +51,32 @@ def variant_count(n_variants) -> int:
     ledger — the point is that a caller can hand over the ledger itself instead of
     self-reporting a number, which is the difference between a measurement and an
     attestation. See ADR-0002.
+
+    A ledger resolves to its `session_n_variants`: the variants recorded in this
+    process, so re-running one search does not compound its own penalty.
+
+    **A re-opened ledger raises.** A `SearchSpaceLog` constructed on an existing
+    `path=` in a process that recorded nothing (the judge running apart from the
+    search, say) has a session count of 0 while its file holds the whole search.
+    Resolving that to 0 would switch the correction off without a word, so it is a
+    `ValueError` naming both counts. Nothing here can tell whether the file holds
+    one search or several re-runs of it, so the caller says which: pass
+    `log.n_variants` when the on-disk history is the search being judged, or an
+    explicit int. A ledger that is empty everywhere still resolves to 0.
     """
     ledger_n = getattr(n_variants, "session_n_variants", None)
-    return int(n_variants if ledger_n is None else ledger_n)
+    if ledger_n is None:
+        return int(n_variants)
+    on_record = int(getattr(n_variants, "n_variants", ledger_n))
+    if ledger_n == 0 and on_record > 0:
+        raise ValueError(
+            f"this SearchSpaceLog was re-opened from disk: it holds {on_record} variant(s) "
+            "on record but none were recorded in this process (session_n_variants == 0), "
+            "so it would resolve to a search of 0 and no multiple-testing correction "
+            "would be applied. Pass log.n_variants if the on-disk history is the search "
+            "being judged, or an explicit int if it is not (for example when the file "
+            "holds repeated runs of the same search).")
+    return int(ledger_n)
 
 
 def sidak_correction(p_raw: float, n_variants) -> float:
